@@ -43,8 +43,13 @@ jobs:
         run: |
           umask 077
           mkdir -p /tmp/keys
-          echo "${{ secrets.TSX_APORTS_PRIVKEY }}" | base64 -d > /tmp/keys/tsx-mainline.rsa
-          openssl rsa -in /tmp/keys/tsx-mainline.rsa -pubout -out /tmp/keys/tsx-mainline.rsa.pub
+          # the key file must carry the committed public key's name
+          # (tsx-mainline-<id>.rsa): the index signature is named after it and
+          # panels look the key up in /etc/apk/keys by that name
+          KEYNAME=$(basename common/tsx-keys/*.rsa.pub .pub)
+          echo "${{ secrets.TSX_APORTS_PRIVKEY }}" | base64 -d > /tmp/keys/$KEYNAME
+          openssl rsa -in /tmp/keys/$KEYNAME -pubout -out /tmp/keys/$KEYNAME.pub
+          echo "TSX_APORTS_KEY=/tmp/keys/$KEYNAME" >> "$GITHUB_ENV"
 
       - name: Set up QEMU (armv7 emulation)
         uses: docker/setup-qemu-action@v3
@@ -53,11 +58,9 @@ jobs:
 
       - name: Build all packages
         if: github.event_name == 'push'
-        env:
-          TSX_APORTS_KEY: /tmp/keys/tsx-mainline.rsa
         run: scripts/build.sh --all
 
-      - name: Build all packages (PR: unsigned dry run, no publish)
+      - name: "Build all packages (PR: unsigned dry run, no publish)"
         if: github.event_name == 'pull_request'
         run: |
           # PRs don't get the private key; build with a throwaway one just
@@ -70,8 +73,6 @@ jobs:
 
       - name: Assemble published tree (prune to latest + 1 previous version)
         if: github.event_name == 'push'
-        env:
-          TSX_APORTS_KEY: /tmp/keys/tsx-mainline.rsa
         run: |
           scripts/index.sh --keep 2 --out repo
           echo "tsx-aports.unexceptional.net" > repo/CNAME
@@ -122,13 +123,16 @@ jobs:
         run: |
           umask 077
           mkdir -p /tmp/keys
-          echo "${{ secrets.TSX_APORTS_PRIVKEY }}" | base64 -d > /tmp/keys/tsx-mainline.rsa
-          openssl rsa -in /tmp/keys/tsx-mainline.rsa -pubout -out /tmp/keys/tsx-mainline.rsa.pub
+          # the key file must carry the committed public key's name
+          # (tsx-mainline-<id>.rsa): the index signature is named after it and
+          # panels look the key up in /etc/apk/keys by that name
+          KEYNAME=$(basename common/tsx-keys/*.rsa.pub .pub)
+          echo "${{ secrets.TSX_APORTS_PRIVKEY }}" | base64 -d > /tmp/keys/$KEYNAME
+          openssl rsa -in /tmp/keys/$KEYNAME -pubout -out /tmp/keys/$KEYNAME.pub
+          echo "TSX_APORTS_KEY=/tmp/keys/$KEYNAME" >> "$GITHUB_ENV"
 
       - name: Repack (fails loudly and stops here if the patch site moved)
         if: steps.check.outputs.new == 'true'
-        env:
-          TSX_APORTS_KEY: /tmp/keys/tsx-mainline.rsa
         run: scripts/build.sh xx60/tsx-xx60-chromium
 
       # On success: commit the bumped pkgver (patch-chromium.py verified the
