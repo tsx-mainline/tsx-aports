@@ -1,0 +1,41 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Third-party software (Sendspin/sendspin-cpp-cli); keeps its own upstream
+# license (see license= below), not GPL-2.0-or-later.
+#
+# Built the same way as the project's rootfs used to build it by hand
+# (rootfs/src/sendspin/build.sh in tsx-xx60-linux, same pinned tag, same
+# cmake flags): musl/armv7, statically linked FetchContent deps
+# (ArduinoJson, micro-flac, micro-opus, IXWebSocket) fetched by CMake at
+# configure time, so this build needs network -- options="net".
+pkgname=sendspin-cli
+pkgver=0.3.0
+pkgrel=0
+pkgdesc="Sendspin CLI client (C++)"
+url="https://github.com/Sendspin/sendspin-cpp-cli"
+arch="armv7"
+license="MIT"
+depends="alsa-lib avahi avahi-compat-libdns_sd dbus"
+makedepends="build-base cmake samurai git linux-headers alsa-lib-dev avahi-compat-libdns_sd avahi-dev"
+options="net !check"
+source="$pkgname-$pkgver.tar.gz::https://github.com/Sendspin/sendspin-cpp-cli/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/sendspin-cpp-cli-$pkgver"
+
+build() {
+	cmake -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_C_FLAGS="$CFLAGS -mcpu=cortex-a9 -mfpu=neon" \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS -mcpu=cortex-a9 -mfpu=neon" \
+		-DSENDSPIN_CLI_WITH_PORTAUDIO=OFF \
+		-DSENDSPIN_CLI_WITH_PULSE=OFF \
+		-DSENDSPIN_CLI_WITH_PIPEWIRE=OFF
+	cmake --build build
+}
+
+package() {
+	install -Dm755 build/sendspin-cli "$pkgdir"/usr/bin/sendspin-cli
+}
+
+sha512sums="
+d05582b720f59ea104a09c7cfe46140c46545c4634aacd8fef31a62813e8ea8f46f090707ab84e4b35a51e7eb804784243c3fa96a3c0416ad98d1e2100c08a13  sendspin-cli-0.3.0.tar.gz
+"
