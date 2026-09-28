@@ -1,0 +1,20 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+pkgname=tsx-keys
+pkgver=1
+pkgrel=0
+pkgdesc="tsx-mainline apk repository signing keys"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="noarch"
+license="GPL-2.0-or-later"
+options="!check"
+source="tsx-mainline-6ab9ca44.rsa.pub"
+
+package() {
+	install -Dm644 "$srcdir"/tsx-mainline-6ab9ca44.rsa.pub \
+		"$pkgdir"/etc/apk/keys/tsx-mainline-6ab9ca44.rsa.pub
+}
+
+sha512sums="
+bbd8e1769099f719f6e5706b08ec58db08e080b8ee5eea9a06fd70d47f42dfdec3a6b11e888812ac4dba424ae646efe1b9c9e47ffb6a77b4649bf85c74e4d6db  tsx-mainline-6ab9ca44.rsa.pub
+"

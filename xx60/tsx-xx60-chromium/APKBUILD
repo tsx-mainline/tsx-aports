@@ -1,0 +1,163 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Third-party software (Chromium); keeps its own upstream license (see
+# license= below), not GPL-2.0-or-later. Our own patch-chromium.py and
+# sigs.json in this directory are GPL-2.0-or-later (see ../../LICENSE).
+#
+# NOT a source build (a from-source Chromium build takes hours): this
+# repackages Alpine v3.24's own armv7 chromium .apk, byte-patches the
+# 2-byte ES3->ES2 EGL context fallback gate (see patch-chromium.py and
+# sigs.json -- carried over from tsx-xx60-linux rootfs/src/chromium-es2/,
+# same tool, same signature list) so Chromium's GPU process falls back to
+# GLES2 on the Mali-450 (lima, GLES2-only) instead of aborting GPU init, and
+# republishes the result signed with the project key. If the site is not
+# found (unknown sha256) or its bytes do not match the recorded instruction
+# pattern, the build FAILS LOUDLY and nothing is published -- see
+# ../../.github/workflows/build.yml's scheduled "chromium watch" job, and
+# rootfs/src/chromium-es2/README.md ("Re-deriving for a new Chromium
+# package") for what to do when Alpine ships a new Chromium build.
+#
+# provides=chromium=<same version> so `apk add chromium` resolves to this
+# package when this repo is listed (apk semantics: a real pkgname match and
+# a provides= virtual match of the same name+version are both eligible;
+# which one the solver actually picks depends on repository order -- see
+# README.md "Which chromium wins" for the order this repo's install
+# instructions use and how that was verified). replaces=chromium so
+# installing this over a machine that already has the real "chromium"
+# package cleanly takes over its files instead of a conflict.
+#
+# depends= is copied VERBATIM (plain deps and so: soname deps alike) from
+# the real chromium-152.0.7977.82-r0 package's own .PKGINFO: since we ship
+# the identical binaries (2 patched bytes aside), its dependency set is
+# exactly ours too, and copying it is more correct than re-deriving it --
+# abuild's automatic ELF/soname scan (options="tracedeps", the default)
+# would need every one of these so: libraries actually present in the build
+# container to resolve names to package versions, which our makedepends
+# doesn't otherwise pull in (e.g. nothing here needs libFLAC at build time).
+# !tracedeps turns that scan off; if you touch package() such that the
+# shipped binaries change, re-derive this list from the new .apk's .PKGINFO
+# (`tar -xzf chromium-*.apk .PKGINFO && cat .PKGINFO`) instead of hand-editing.
+pkgname=tsx-xx60-chromium
+pkgver=152.0.7977.82
+pkgrel=0
+pkgdesc="Chromium web browser, repackaged with the Mali-450 ES2 fallback patch"
+url="https://www.chromium.org/Home"
+arch="armv7"
+license="BSD-3-Clause"
+depends="
+	chromium-common=$pkgver-r$pkgrel
+	font-opensans
+	gtk+3.0
+	icu-data-full
+	mesa-dri-gallium
+	musl>=1.2.3_git20230322-r0
+	xdg-utils
+	so:libFLAC.so.12
+	so:libX11.so.6
+	so:libXcomposite.so.1
+	so:libXdamage.so.1
+	so:libXext.so.6
+	so:libXfixes.so.3
+	so:libXi.so.6
+	so:libXrandr.so.2
+	so:libXrender.so.1
+	so:libXtst.so.6
+	so:libasound.so.2
+	so:libatk-1.0.so.0
+	so:libatk-bridge-2.0.so.0
+	so:libatspi.so.0
+	so:libavcodec.so.62
+	so:libavformat.so.62
+	so:libavutil.so.60
+	so:libbrotlidec.so.1
+	so:libbrotlienc.so.1
+	so:libc.musl-armv7.so.1
+	so:libcairo.so.2
+	so:libcrc32c.so.1
+	so:libcups.so.2
+	so:libdav1d.so.7
+	so:libdbus-1.so.3
+	so:libdouble-conversion.so.3
+	so:libdrm.so.2
+	so:libexpat.so.1
+	so:libffi.so.8
+	so:libfontconfig.so.1
+	so:libfreetype.so.6
+	so:libgbm.so.1
+	so:libgcc_s.so.1
+	so:libgio-2.0.so.0
+	so:libglib-2.0.so.0
+	so:libgmodule-2.0.so.0
+	so:libgobject-2.0.so.0
+	so:libharfbuzz-subset.so.0
+	so:libharfbuzz.so.0
+	so:libintl.so.8
+	so:libjpeg.so.8
+	so:libminizip.so.1
+	so:libnspr4.so
+	so:libnss3.so
+	so:libnssutil3.so
+	so:libopenh264.so.8
+	so:libopus.so.0
+	so:libpango-1.0.so.0
+	so:libpipewire-0.3.so.0
+	so:libplc4.so
+	so:libplds4.so
+	so:libpulse.so.0
+	so:libsmime3.so
+	so:libstdc++.so.6
+	so:libudev.so.1
+	so:libwebp.so.7
+	so:libwebpdemux.so.2
+	so:libwebpmux.so.3
+	so:libxcb.so.1
+	so:libxkbcommon.so.0
+	so:libxml2.so.2
+	so:libxslt.so.1
+	so:libz.so.1
+	so:libzstd.so.1
+	"
+makedepends="python3"
+provides="chromium=$pkgver-r$pkgrel cmd:chromium=$pkgver-r$pkgrel cmd:chromium-browser=$pkgver-r$pkgrel"
+replaces="chromium"
+# suid: usr/lib/chromium/chrome-sandbox is intentionally setuid root (the
+# same as Alpine's own chromium package) -- it drops privileges again once
+# the sandbox is set up; without this option abuild's postcheck refuses to
+# package a setuid binary at all. !tracedeps: see the depends= comment above.
+options="net suid !tracedeps"
+source="chromium-$pkgver-r$pkgrel.apk::https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/chromium-$pkgver-r$pkgrel.apk
+	patch-chromium.py
+	sigs.json"
+
+build() {
+	rm -rf extract
+	mkdir -p extract
+	# .apk = concatenated gzip members (signature/control/data); plain tar -xzf
+	# reads all of them. Drop the control-tar metadata files it also drops in.
+	tar -xzf "$srcdir"/chromium-$pkgver-r$pkgrel.apk -C extract
+	rm -f extract/.PKGINFO extract/.SIGN.RSA.*
+
+	BIN=extract/usr/lib/chromium/chromium
+	[ -f "$BIN" ] || { echo "tsx-xx60-chromium: $BIN not found; Alpine's chromium package layout changed" >&2; exit 1; }
+
+	rc=0; python3 "$srcdir"/patch-chromium.py --check "$BIN" || rc=$?
+	[ "$rc" = 1 ] || { echo "tsx-xx60-chromium: $BIN is not a fresh, known, unpatched build (--check exit $rc); refusing to publish" >&2; exit 1; }
+
+	mkdir -p extract/etc/tsx
+	python3 "$srcdir"/patch-chromium.py --sidecar extract/etc/tsx/chromium-es2-patched \
+		--target-path /usr/lib/chromium/chromium "$BIN"
+
+	python3 "$srcdir"/patch-chromium.py --check "$BIN" || {
+		echo "tsx-xx60-chromium: patch verification failed after patching; refusing to publish" >&2; exit 1; }
+}
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a extract/. "$pkgdir"/
+}
+
+sha512sums="
+6173544374e822c7d25b581d63f6bdb548083e69e9caeb44924a0a4e0508b6d56b155fb5732b6aa573ea45b64c94223a0664e1ad0f5378325aa2b944e3a31adc  chromium-152.0.7977.82-r0.apk
+aa0dfa58e337d7e128a9d25c7becb49296deaa82e6b401b1f506237ff6e37f317616bf436c3ca3c24763b2dfd6ae502f571d61ed8d87ddf1f5f1701a1444adad  patch-chromium.py
+f883cc9603162f5b5d89e2c19c4999b859be92aaeaafa874e93d37088aa3c09da8a734fb7e36249690b6837374dd669a7b107140fb895bc640592118ab423525  sigs.json
+"

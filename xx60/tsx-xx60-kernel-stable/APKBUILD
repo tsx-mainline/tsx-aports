@@ -1,0 +1,50 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+#
+# BINARY packaging of an already-built kernel: no compiler runs in this
+# APKBUILD. The inputs (zImage, the board DTB, the modules tree and the
+# packed eMMC boot image) come from the build host and are staged into
+# dist/ by ../../scripts/stage-kernel.sh, which also fills in pkgver and
+# sha512sums below -- do not hand-edit either.
+#
+# pkgver scheme: <upstream kernel version>_git<YYYYMMDD>, e.g. 7.2.8_git20260927.
+# apk pkgver cannot contain '-', so the git-describe suffix
+# ("-NNNNN-gHASH") that `make kernelrelease` produces is replaced by the
+# staging date; the exact commit for a given pkgver is recorded in
+# _kernelrelease below (build provenance only -- nothing on the panel reads
+# it).
+#
+# "stable" here is Alpine's sense (linux-lts / linux-stable): this is the
+# latest upstream stable series (currently 7.2.x), re-based to each new
+# release since a stable series goes EOL soon after the next one ships. The
+# LTS flavor (tsx-xx60-kernel-lts) is the default, longer-lived kernel; this
+# one is for anyone who wants the newest driver fixes sooner. Only one of
+# the two is installed at a time (provides=tsx-xx60-kernel, mutually
+# conflicting).
+pkgname=tsx-xx60-kernel-stable
+pkgver=7.2.8_git20260927
+pkgrel=0
+_kernelrelease=7.2.8-00110-gdb78cb01d891
+pkgdesc="xx60 mainline kernel, latest stable line"
+url="https://github.com/tsx-mainline/tsx-xx60-linux"
+arch="armv7"
+license="GPL-2.0-only"
+depends="tsx-xx60-boot-tools !tsx-xx60-kernel-lts"
+provides="tsx-xx60-kernel=$pkgver-r$pkgrel"
+replaces="tsx-xx60-kernel-lts"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+source="dist/zImage dist/meson8m2-crestron-tsw1060.dtb dist/modules-$_kernelrelease.tar.gz dist/tsxboot-emmc.img"
+
+package() {
+	install -Dm644 "$srcdir"/tsxboot-emmc.img "$pkgdir"/boot/tsxboot-emmc.img
+	mkdir -p "$pkgdir"/lib/modules
+	tar -xzf "$srcdir"/modules-$_kernelrelease.tar.gz -C "$pkgdir"
+}
+
+sha512sums="
+6f0d834545093afc4b2579e0daa36a4c85a5048d0b630e456e2c5fde9fb70afa6ae669382c1fdfef6500236ab2e152c6ebab088fdb25b4d0faf5700f92e2ad19  zImage
+dc7610e97bb21549cdaedb180fa59538363ea9085b8f89c1eaaad03a0b1a4ad8317ec40751443ab62ad9b6b7c62ffc3f50204abbe8163199d3635481c6fc4eec  meson8m2-crestron-tsw1060.dtb
+10f6b18221fce2d2ea242d806f1db30b7d322b268c328ceac4aa1aa3397ec80a4eb43cb21dddb8b3c3c218085318c7fa5c588e376e6221bc7b14292c5d3897d1  modules-7.2.8-00110-gdb78cb01d891.tar.gz
+aeaf6e9b7e546c3fe638b39d3db5411a6ae4a8b73894e77ec22723a2780d4c3790144dde18b8e282c11dc00c2a0c6c3b7a889d4d8ec0aa3cc0f9e01620c7ed95  tsxboot-emmc.img
+"
