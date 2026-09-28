@@ -2,10 +2,23 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 #
 # BINARY packaging of an already-built kernel: no compiler runs in this
-# APKBUILD. The inputs (zImage, the board DTB, the modules tree and the
-# packed eMMC boot image) come from the build host and are staged into
-# dist/ by ../../scripts/stage-kernel.sh, which also fills in pkgver and
-# sha512sums below -- do not hand-edit either.
+# APKBUILD. source= fetches ONE release asset -- tsx-xx60-linux's
+# tsx-xx60-kernel-stable-bundle.tar.zst for the tagged release
+# _kbundle_tag, built by that repo's .github/workflows/release.yml (job
+# "kbundle") -- and abuild auto-extracts it (a plain .tar.zst) into a
+# zImage, the board DTB, the modules tree tarball, the packed eMMC boot
+# image, kernel.release and kernel.commit (the last two: provenance only,
+# nothing here reads them). This is how CI (which has no build host to
+# stage from) builds this package. For a LOCAL build of a kernel that has
+# not been tagged/released yet, ../../scripts/stage-kernel.sh still builds
+# the exact same bundle format from a build host and drops it in dist/
+# under the URL's own basename; SRCDEST below then makes abuild use that
+# local file (verified by sha512sum, never re-fetched) instead of hitting
+# the network. Either way, stage-kernel.sh fills in
+# pkgver/pkgrel/_kernelrelease/sha512sums below -- do not hand-edit them.
+# _kbundle_tag is CI-only and is not touched by stage-kernel.sh; bump it
+# by hand once a matching tsx-xx60-linux release exists (see ../../README.md).
+SRCDEST="$startdir/dist"
 #
 # pkgver scheme: <upstream kernel version>_git<YYYYMMDD>, e.g. 7.2.8_git20260927.
 # apk pkgver cannot contain '-', so the git-describe suffix
@@ -26,6 +39,10 @@ pkgname=tsx-xx60-kernel-stable
 pkgver=7.2.8_git20260928
 pkgrel=1
 _kernelrelease=7.2.8-00111-gb6f412fc08a1
+# tsx-xx60-linux release tag whose "kbundle" CI asset this pins. UNRELEASED
+# until that repo has cut a real tag with this job in it; until then this
+# package builds only from a local dist/ stage (see the header comment).
+_kbundle_tag=UNRELEASED
 pkgdesc="xx60 mainline kernel, latest stable line"
 url="https://github.com/tsx-mainline/tsx-xx60-linux"
 arch="armv7"
@@ -33,7 +50,7 @@ license="GPL-2.0-only"
 depends="tsx-xx60-boot-tools>=1-r1"
 options="!check"
 install="$pkgname.post-install $pkgname.post-upgrade"
-source="dist/zImage dist/meson8m2-crestron-tsw1060.dtb dist/modules-$_kernelrelease.tar.gz dist/tsxboot-emmc.img"
+source="https://github.com/tsx-mainline/tsx-xx60-linux/releases/download/$_kbundle_tag/tsx-xx60-kernel-stable-bundle.tar.zst"
 
 package() {
 	install -Dm644 "$srcdir"/tsxboot-emmc.img "$pkgdir"/boot/tsxboot-emmc-stable.img
@@ -47,8 +64,5 @@ package() {
 }
 
 sha512sums="
-bdc492bd2df196c25fb6663524f1c2e0349fe3253600e518c9a9f28498b6bb8e6e3f7bcf146c9f60818140a3c6f2377659aa5ffea88d4b7295397983910493b7  zImage
-1c7d5555b3c1ee0c8a81964dfdf049e28521d95fa015135461b4c0cb6010b3e14eb597427258742c907ea81b32a62b9e37ee313a4703179942f3ee29b1583f62  meson8m2-crestron-tsw1060.dtb
-57a2e51d3702edb565ad2dd16136f1c8965313802c6462115bebd93cc3e85c149d3cca1fc8ded07ab143c4f9614187a868cae13e49a37f1984f7897a55bf2043  modules-7.2.8-00111-gb6f412fc08a1.tar.gz
-2c29afd95e72c75e5ed6cfa1c9c35e09d8cee8f7b5bc7ad7a6ae1ef4bfc3a4782689aff2b635f6b3f8c9a44208a338e0e9d2f13ada6ef49b1a4195d765c681cf  tsxboot-emmc.img
+a0044a84692e7521d0467909c395af5bd8d28eba1745a757de68728beecebe194491eb5aa636fb98337a8a0938890a31f718e6586ae4b837725ae141e7918ccf  tsx-xx60-kernel-stable-bundle.tar.zst
 "

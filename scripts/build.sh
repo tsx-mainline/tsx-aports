@@ -91,7 +91,10 @@ for PKGDIR in $PKGDIRS; do
 		-v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
 		alpine:3.24 sh -euc "
 			apk update >/dev/null
-			apk add --no-cache alpine-sdk >/dev/null
+			# zstd: alpine-sdk's abuild does not pull it in, but its
+			# unpack step needs the zstd binary for any .tar.zst
+			# source (e.g. the xx60/tsx-xx60-kernel-FLAVOR bundles).
+			apk add --no-cache alpine-sdk zstd >/dev/null
 			cp /keys/$KEYNAME.pub /etc/apk/keys/
 			mkdir -p /root/.abuild
 			echo 'PACKAGER_PRIVKEY=/keys/$KEYNAME' > /root/.abuild/abuild.conf
