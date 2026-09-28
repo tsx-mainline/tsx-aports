@@ -1,0 +1,69 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Third-party software (TensorFlow Lite); keeps its own upstream license
+# (Apache-2.0), not GPL-2.0-or-later.
+#
+# Built the same way tsx-xx60-linux used to build it by hand
+# (rootfs/voice/build-tflite.sh): PyPI's pymicro-wakeword/pyopen-wakeword
+# wheels bundle an x86-64 glibc libtensorflowlite_c.so, which does not load
+# on an Alpine (musl) armv7 panel. This packages the same cmake route --
+# tensorflow/lite/c's own CMakeLists, XNNPACK/GPU/NNAPI off, no NEON assumed
+# (Cortex-A9 has none) -- as a normal apk instead of a rootfs-build-time
+# hand roll. Not arch-restricted for any technical reason beyond "only
+# tested on armv7" (the only hardware this project ships for); TFLite's
+# CMake build itself is not architecture-specific.
+#
+# musl has no strtoll_l: flatbuffers is built with
+# FLATBUFFERS_LOCALE_INDEPENDENT=0 (see build-tflite.sh).
+#
+# TFLite's CMake build fetches several third-party deps itself (abseil,
+# flatbuffers, farmhash, fft2d, gemmlowp, ruy, cpuinfo, ...) via CMake
+# FetchContent/ExternalProject at configure time -- hence options="net",
+# same reason sendspin-cli needs it for its own FetchContent deps.
+pkgname=tensorflow-lite-c
+pkgver=2.17.1
+pkgrel=0
+pkgdesc="TensorFlow Lite C API shared library and headers"
+url="https://www.tensorflow.org/lite"
+arch="armv7"
+license="Apache-2.0"
+makedepends="build-base cmake samurai git curl python3 linux-headers patch"
+options="net !check"
+source="tensorflow-$pkgver.tar.gz::https://github.com/tensorflow/tensorflow/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/tensorflow-$pkgver"
+
+build() {
+	cmake -S "$builddir/tensorflow/lite/c" -B build -G Ninja \
+		-DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+		-DTFLITE_ENABLE_XNNPACK=OFF -DTFLITE_ENABLE_GPU=OFF \
+		-DTFLITE_ENABLE_NNAPI=OFF -DTFLITE_ENABLE_MMAP=ON \
+		-DCMAKE_C_FLAGS="$CFLAGS -fPIC" \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS -fPIC -Wno-error -DFLATBUFFERS_LOCALE_INDEPENDENT=0"
+	cmake --build build --target tensorflowlite_c
+}
+
+package() {
+	cd "$builddir"
+	install -Dm755 build/libtensorflowlite_c.so "$pkgdir"/usr/lib/libtensorflowlite_c.so
+	# soname symlink, only if upstream's build actually set one (it may not:
+	# tensorflow/lite/c's CMakeLists does not always set VERSION/SOVERSION)
+	soname=$(readelf -d build/libtensorflowlite_c.so 2>/dev/null | \
+		sed -n 's/.*(SONAME).*\[\(.*\)\].*/\1/p')
+	if [ -n "$soname" ] && [ "$soname" != "libtensorflowlite_c.so" ]; then
+		ln -s libtensorflowlite_c.so "$pkgdir/usr/lib/$soname"
+	fi
+	# C API headers. Recent TFLite splits the public C API headers between
+	# tensorflow/lite/c/ and tensorflow/lite/core/(async/)c/ (the former
+	# #includes the latter) -- install whichever of these dirs exist here,
+	# preserving the real tree, so both `#include <tensorflow/lite/c/*.h>`
+	# and its own internal includes resolve for other consumers.
+	for d in tensorflow/lite/c tensorflow/lite/core/c tensorflow/lite/core/async/c; do
+		[ -d "$d" ] || continue
+		install -d "$pkgdir/usr/include/$d"
+		install -m644 "$d"/*.h "$pkgdir/usr/include/$d/"
+	done
+}
+
+sha512sums="
+de7e536e9b51e1fbf24b9dbe851026c4be4b6cf9f64069a8ed48feac47564db54b6d4c88022eabfb4dbbc72d9842b8f2d82400ad1bc81487b018fbdde70e4ef2  tensorflow-2.17.1.tar.gz
+"
