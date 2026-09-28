@@ -1,13 +1,24 @@
 #!/bin/bash
 # Stage the binary inputs for xx60/tsx-xx60-kernel-<flavor> from an already
-# built kernel on a build host, and update that package's APKBUILD
-# (pkgver + sha512sums) to match. This does NOT compile anything: the
-# kernel and its modules must already be built (zImage, the board DTB and
-# the .ko files all present in BUILD_HOST_KDIR); this script only runs
-# `make modules_install` (installs already-built .ko's into a tree + depmod,
-# no compiler invoked unless something is actually stale) and, with
-# --pack-boot, kernel/mkimage.sh (packs an Android boot image from the
-# zImage + DTB + an initramfs -- again no compilation).
+# built kernel on a build host, pack them into the same
+# tsx-xx60-kernel-<flavor>-bundle.tar.zst format tsx-xx60-linux's
+# .github/workflows/release.yml (job "kbundle") publishes as a release
+# asset, and update that package's APKBUILD (pkgver + sha512sums) to match.
+# This does NOT compile anything: the kernel and its modules must already
+# be built (zImage, the board DTB and the .ko files all present in
+# BUILD_HOST_KDIR); this script only runs `make modules_install`
+# (installs already-built .ko's into a tree + depmod, no compiler invoked
+# unless something is actually stale) and, with --pack-boot, kernel/mkimage.sh
+# (packs an Android boot image from the zImage + DTB + an initramfs --
+# again no compilation).
+#
+# The APKBUILD's source= is a URL (a tagged tsx-xx60-linux release); this
+# script does not touch that URL or its _kbundle_tag, only the local
+# dist/<bundle>.tar.zst (named to match the URL's basename) and
+# sha512sums= (a single line, for that one file). The APKBUILD sets
+# SRCDEST=dist, so `abuild checksum`/`scripts/build.sh` finds this local
+# file and verifies it instead of fetching the (possibly not-yet-tagged)
+# release -- that is what "local build of an unreleased kernel" means here.
 #
 #   scripts/stage-kernel.sh stable|lts [--pack-boot]
 #
@@ -64,6 +75,11 @@ KREL=$(ssh_do "cat '$BUILD_HOST_KDIR/include/config/kernel.release'")
 say "kernel.release = $KREL"
 echo "$KREL" > "$DIST/kernel.release"
 
+KCOMMIT=$(ssh_do "git -C '$BUILD_HOST_LINUX_DIR' rev-parse HEAD")
+[ -n "$KCOMMIT" ] || { echo "could not read HEAD commit from $BUILD_HOST_LINUX_DIR" >&2; exit 1; }
+say "kernel.commit = $KCOMMIT"
+echo "$KCOMMIT" > "$DIST/kernel.commit"
+
 say "fetching zImage + $DTB_NAME"
 rsync -a "$BUILD_HOST:$BUILD_HOST_KDIR/arch/arm/boot/zImage" "$DIST/zImage"
 rsync -a "$BUILD_HOST:$BUILD_HOST_KDIR/arch/arm/boot/dts/amlogic/$DTB_NAME" "$DIST/$DTB_NAME"
@@ -99,40 +115,59 @@ say "checksums"
 (cd "$DIST" && sha256sum zImage "$DTB_NAME" "modules-$KREL.tar.gz" tsxboot-emmc.img > CHECKSUMS.sha256)
 cat "$DIST/CHECKSUMS.sha256"
 
+# --- pack the bundle (same layout+name the "kbundle" CI job publishes) ---
+BUNDLE="tsx-xx60-kernel-$FLAVOR-bundle.tar.zst"
+say "packing $BUNDLE"
+tar --zstd -cf "$DIST/$BUNDLE" -C "$DIST" \
+	zImage "$DTB_NAME" "modules-$KREL.tar.gz" tsxboot-emmc.img \
+	kernel.release kernel.commit CHECKSUMS.sha256
+ls -l "$DIST/$BUNDLE"
+
 # --- derive pkgver from the kernelrelease and rewrite the APKBUILD --------
 # Scheme: pkgver = <upstream version>_git<YYYYMMDD>, where <upstream version>
 # is the dotted release (e.g. 7.2.8, 6.18.54) taken from kernel.release up to
 # the first '-', and the date is today (the day this was staged, i.e. the day
 # of the commit count + hash that kernel.release also carries -- see
-# dist/kernel.release and dist/CHECKSUMS.sha256 for the exact commit).
+# dist/kernel.release and dist/kernel.commit for the exact commit).
 # apk pkgver may not contain '-', hence the switch to a date suffix instead
 # of the "-NNNNN-gHASH" git-describe suffix; the exact commit is recorded in
-# dist/kernel.release (shipped nowhere on the panel -- it is build provenance,
-# not runtime state) for anyone who needs to reproduce this exact package.
+# dist/kernel.release / dist/kernel.commit (shipped nowhere on the panel --
+# it is build provenance, not runtime state) for anyone who needs to
+# reproduce this exact package.
 BASEVER=${KREL%%-*}
 PKGVER="${BASEVER}_git$(date +%Y%m%d)"
 say "derived pkgver=$PKGVER (from kernel.release $KREL)"
 
 APKBUILD="$PKGDIR/APKBUILD"
-MODSSUM=$(sha512sum "$DIST/modules-$KREL.tar.gz" | cut -d' ' -f1)
-ZSUM=$(sha512sum "$DIST/zImage" | cut -d' ' -f1)
-DSUM=$(sha512sum "$DIST/$DTB_NAME" | cut -d' ' -f1)
-BSUM=$(sha512sum "$DIST/tsxboot-emmc.img" | cut -d' ' -f1)
+# pkgrel: a new kernel release staged on the same day keeps the same pkgver,
+# and apk only upgrades to a higher version -- bump pkgrel then. A new
+# pkgver starts again at pkgrel 0. Re-staging the same release keeps both.
+OLDVER=$(sed -n 's/^pkgver=//p' "$APKBUILD")
+OLDREL=$(sed -n 's/^pkgrel=//p' "$APKBUILD")
+OLDKREL=$(sed -n 's/^_kernelrelease=//p' "$APKBUILD")
+if [ "$OLDVER" != "$PKGVER" ]; then
+	PKGREL=0
+elif [ "$OLDKREL" != "$KREL" ]; then
+	PKGREL=$((OLDREL + 1))
+else
+	PKGREL=$OLDREL
+fi
+say "pkgrel=$PKGREL (was $OLDVER-r$OLDREL, $OLDKREL)"
+BUNDLESUM=$(sha512sum "$DIST/$BUNDLE" | cut -d' ' -f1)
 sed -i \
 	-e "s/^pkgver=.*/pkgver=$PKGVER/" \
+	-e "s/^pkgrel=.*/pkgrel=$PKGREL/" \
 	-e "s/^_kernelrelease=.*/_kernelrelease=$KREL/" \
 	"$APKBUILD"
-python3 - "$APKBUILD" "$ZSUM" "$DSUM" "$MODSSUM" "$BSUM" "$DTB_NAME" "$KREL" <<'PY'
+python3 - "$APKBUILD" "$BUNDLESUM" "$BUNDLE" <<'PY'
 import re, sys
-path, zsum, dsum, msum, bsum, dtb, krel = sys.argv[1:8]
+path, bsum, bundle = sys.argv[1:4]
 text = open(path).read()
-block = (f"sha512sums=\"\n"
-         f"{zsum}  zImage\n"
-         f"{dsum}  {dtb}\n"
-         f"{msum}  modules-{krel}.tar.gz\n"
-         f"{bsum}  tsxboot-emmc.img\n\"\n")
+block = f'sha512sums="\n{bsum}  {bundle}\n"\n'
 text = re.sub(r'sha512sums="[^"]*"\n', block, text, flags=re.S)
 open(path, "w").write(text)
 PY
-say "updated $APKBUILD (pkgver=$PKGVER, sha512sums refreshed)"
+say "updated $APKBUILD (pkgver=$PKGVER, pkgrel=$PKGREL, sha512sums refreshed for $BUNDLE)"
+say "_kbundle_tag is NOT touched -- it only matters for a networked (CI) build;"
+say "this staged dist/$BUNDLE satisfies a local build via SRCDEST regardless of its value"
 say "done. Build with: scripts/build.sh xx60/tsx-xx60-kernel-$FLAVOR"
