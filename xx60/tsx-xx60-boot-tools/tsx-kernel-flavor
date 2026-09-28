@@ -1,0 +1,111 @@
+#!/bin/sh
+# tsx-kernel-flavor: show or switch the kernel flavor an installed xx60 panel
+# boots (tsx-xx60-kernel-lts / tsx-xx60-kernel-stable).
+#
+#   tsx-kernel-flavor                 show the selected flavor, the running
+#                                     kernel and the packaged boot images
+#   tsx-kernel-flavor lts|stable      select FLAVOR (panel.conf KERNEL_FLAVOR)
+#                                     and write /boot/tsxboot-emmc-FLAVOR.img
+#                                     into the eMMC boot partition (mmcblk1p7,
+#                                     via tsx-update-boot: backup + readback
+#                                     verify). Reboot to use it.
+#   tsx-kernel-flavor --hook FLAVOR   package install/upgrade scripts: write
+#                                     FLAVOR's image only when FLAVOR is the
+#                                     selected one and the image differs from
+#                                     what the boot partition already holds.
+#
+# Both kernel packages can be installed at the same time: each ships its own
+# /lib/modules/<release>/ tree and its own /boot/tsxboot-emmc-<flavor>.img, so
+# a switch only writes the boot image. The SELECTED flavor is, in order:
+# KERNEL_FLAVOR in the panel configuration (tsx-config), kernel_flavor= in
+# /etc/tsx/emmc-root.info (the installer's choice), the flavor whose release
+# series matches the running kernel.
+# Writes nothing anywhere but on an installed xx60 panel (tsx_is_installed_panel).
+set -u
+. /usr/lib/tsx/tsx-is-panel.sh
+
+BOOT=/dev/mmcblk1p7
+INFO=/etc/tsx/emmc-root.info
+say() { echo "tsx-kernel-flavor: $*"; }
+
+tsx_config() {
+	for c in /usr/local/sbin/tsx-config /usr/sbin/tsx-config; do
+		[ -x "$c" ] && { "$c" "$@"; return; }
+	done
+	return 127
+}
+
+release_of() { cat "/usr/share/tsx/kernel-$1.release" 2>/dev/null; }
+series() { echo "$1" | cut -d. -f1-2; }
+
+selected_flavor() {
+	f=$(tsx_config get KERNEL_FLAVOR 2>/dev/null) || f=
+	case $f in lts|stable) echo "$f"; return;; esac
+	f=$(sed -n 's/^kernel_flavor=//p' "$INFO" 2>/dev/null | head -1)
+	case $f in lts|stable) echo "$f"; return;; esac
+	run=$(uname -r)
+	for f in lts stable; do
+		r=$(release_of $f)
+		[ -n "$r" ] && [ "$(series "$r")" = "$(series "$run")" ] && { echo "$f"; return; }
+	done
+}
+
+# sha256 of the first LEN bytes of the boot partition
+part_sha() {
+	dd if=$BOOT bs=1M count=$(( ($1 + 1048575) / 1048576 )) 2>/dev/null | head -c "$1" | sha256sum | cut -d' ' -f1
+}
+
+write_image() {  # write_image FLAVOR
+	img=/boot/tsxboot-emmc-$1.img
+	[ -r "$img" ] || { say "no $img (is tsx-xx60-kernel-$1 installed?)"; return 1; }
+	sha=$(sha256sum < "$img" | cut -d' ' -f1)
+	if [ "$(part_sha "$(stat -c %s "$img")")" = "$sha" ]; then
+		say "$BOOT already holds the $1 image ($(release_of "$1")); nothing written"
+		return 0
+	fi
+	say "writing the $1 boot image ($(release_of "$1")) into $BOOT"
+	if /usr/sbin/tsx-update-boot --emmc "$img" "$sha"; then
+		[ -f "$INFO" ] && { grep -q '^kernel_flavor=' "$INFO" && sed -i "s/^kernel_flavor=.*/kernel_flavor=$1/" "$INFO" || echo "kernel_flavor=$1" >> "$INFO"; }
+		say "reboot to use the $1 kernel"
+		return 0
+	fi
+	say "tsx-update-boot failed; the panel still boots the previous kernel"
+	return 1
+}
+
+case "${1:-}" in
+-h|--help) sed -n '2,24p' "$0"; exit 0;;
+'')
+	printf '%-10s%s\n' selected: "$(selected_flavor)" running: "$(uname -r)"
+	for f in lts stable; do
+		if [ -r /boot/tsxboot-emmc-$f.img ]; then
+			printf '%-10s%s\n' "$f:" "$(release_of $f) (/boot/tsxboot-emmc-$f.img)"
+		else
+			printf '%-10s%s\n' "$f:" "not installed (apk add tsx-xx60-kernel-$f)"
+		fi
+	done
+	exit 0;;
+--hook)
+	f=${2:?--hook FLAVOR}
+	tsx_is_installed_panel || { say "not on an installed xx60 panel (or running in a chroot/container); nothing written"; exit 0; }
+	sel=$(selected_flavor)
+	if [ -z "$sel" ]; then
+		say "no selected kernel flavor (KERNEL_FLAVOR unset, running kernel matches no package); nothing written"
+	elif [ "$sel" != "$f" ]; then
+		say "tsx-xx60-kernel-$f updated; the panel boots $sel, so nothing written (switch: tsx-kernel-flavor $f)"
+	else
+		write_image "$f" || true
+	fi
+	exit 0;;
+lts|stable)
+	f=$1
+	[ "$(id -u)" = 0 ] || { say "must run as root"; exit 1; }
+	tsx_is_installed_panel || { say "not on an installed xx60 panel (eMMC layout); nothing written"; exit 1; }
+	[ -r /boot/tsxboot-emmc-$f.img ] || { say "tsx-xx60-kernel-$f is not installed (apk add tsx-xx60-kernel-$f)"; exit 1; }
+	old=$(tsx_config get KERNEL_FLAVOR 2>/dev/null) || old=
+	write_image "$f" || exit 1
+	if tsx_config set KERNEL_FLAVOR "$f" 2>/dev/null; then say "KERNEL_FLAVOR=$f (was ${old:-unset})"
+	else say "WARNING: could not record KERNEL_FLAVOR=$f (tsx-config missing?); kernel_flavor in $INFO is set"; fi
+	exit 0;;
+*) sed -n '2,24p' "$0" >&2; exit 2;;
+esac

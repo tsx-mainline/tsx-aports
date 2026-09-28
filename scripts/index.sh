@@ -1,11 +1,12 @@
 #!/bin/bash
 # Assemble the published tree from what scripts/build.sh left in packages/v3.24,
 # and (re)sign the APKINDEX for each <category>/<arch>. scripts/build.sh
-# already writes a signed index as part of `abuild -r`; this script exists
-# for the case that matters for publishing: pruning old package versions
+# already writes a signed index as part of `abuild -r`, but only over the
+# packages in that build's own packages/ dir; this script rebuilds the index
+# over everything that is published, after pruning old package versions
 # (GitHub Pages has no hard per-file limit but a ~1GB soft repo-size limit,
 # and tsx-xx60-chromium alone is well over 100MB per build -- see
-# README.md "Hosting and size") and re-signing the index after a prune, plus
+# README.md "Hosting and size"), plus
 # copying a stable, ready-to-serve tree to $OUT (default repo/).
 #
 #   scripts/index.sh [--keep N] [--out DIR]
@@ -16,8 +17,7 @@
 # --out DIR  where to place the published tree (default: repo/, gitignored;
 #            CI publishes this directly, see .github/workflows/build.yml)
 #
-# Env: TSX_APORTS_KEY (private key, for re-signing after a prune -- not
-# needed if nothing was pruned, since scripts/build.sh already signed).
+# Env: TSX_APORTS_KEY (private key; the index is always rebuilt and signed).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
@@ -60,22 +60,32 @@ for cat_dir in "$SRC"/*/; do
 	cat=$(basename "$cat_dir")
 	for arch_dir in "$cat_dir"*/; do
 		arch=$(basename "$arch_dir")
-		if prune_dir "$arch_dir"; then
-			: # nothing pruned, existing APKINDEX (from build.sh) still valid
-		else
-			echo "index.sh: re-signing $cat/$arch after pruning"
-			: "${TSX_APORTS_KEY:?pruning happened; set TSX_APORTS_KEY to re-sign}"
-			docker run --rm --platform linux/arm/v7 \
-				-v "$arch_dir:/repo" -v "$TSX_APORTS_KEY:/key.rsa:ro" \
-				alpine:3.24 sh -euc "
-					apk add --no-cache abuild >/dev/null
-					cd /repo
-					rm -f APKINDEX.tar.gz
-					apk index -o APKINDEX.unsigned.tar.gz *.apk
-					abuild-sign -k /key.rsa APKINDEX.unsigned.tar.gz
-					mv APKINDEX.unsigned.tar.gz APKINDEX.tar.gz
-				"
-		fi
+		prune_dir "$arch_dir" || true
+		# Always re-index and re-sign: the index scripts/build.sh leaves behind
+		# only lists what that build's own packages/ dir held (a fresh remote
+		# BUILD_DIR, or a package built after the last full index, would
+		# otherwise be missing from what panels see).
+		echo "index.sh: indexing + signing $cat/$arch"
+		: "${TSX_APORTS_KEY:?set TSX_APORTS_KEY to sign the index}"
+		# keep the key's real basename: abuild-sign names the signature
+		# entry after it (.SIGN.RSA.<basename>.pub) and panels look the key
+		# up in /etc/apk/keys by exactly that name. The public key is
+		# trusted inside the container so `apk index` verifies every
+		# package's own signature too. --rewrite-arch (what abuild -r does):
+		# a noarch package (tsx-keys) is published in the <arch> dir, and apk
+		# fetches from <repo>/<arch recorded in the index>/.
+		KEYNAME=$(basename "$TSX_APORTS_KEY")
+		docker run --rm --platform linux/arm/v7 \
+			-v "$arch_dir:/repo" -v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
+			-v "$TSX_APORTS_KEY.pub:/etc/apk/keys/$KEYNAME.pub:ro" \
+			alpine:3.24 sh -euc "
+				apk add --no-cache abuild >/dev/null
+				cd /repo
+				rm -f APKINDEX.tar.gz APKINDEX.unsigned.tar.gz
+				apk index --rewrite-arch $arch -d 'tsx-aports $cat' -o APKINDEX.unsigned.tar.gz *.apk
+				abuild-sign -k /keys/$KEYNAME APKINDEX.unsigned.tar.gz
+				mv APKINDEX.unsigned.tar.gz APKINDEX.tar.gz
+			"
 	done
 done
 
