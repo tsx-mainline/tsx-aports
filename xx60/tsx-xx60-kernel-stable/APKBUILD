@@ -18,33 +18,37 @@
 # latest upstream stable series (currently 7.2.x), re-based to each new
 # release since a stable series goes EOL soon after the next one ships. The
 # LTS flavor (tsx-xx60-kernel-lts) is the default, longer-lived kernel; this
-# one is for anyone who wants the newest driver fixes sooner. Only one of
-# the two is installed at a time (provides=tsx-xx60-kernel, mutually
-# conflicting).
+# one is for anyone who wants the newest driver fixes sooner. Both flavors
+# install side by side (own /lib/modules/<release>/, own
+# /boot/tsxboot-emmc-<flavor>.img); only the SELECTED flavor's image is
+# written into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-stable
-pkgver=7.2.8_git20260927
-pkgrel=0
-_kernelrelease=7.2.8-00110-gdb78cb01d891
+pkgver=7.2.8_git20260928
+pkgrel=1
+_kernelrelease=7.2.8-00111-gb6f412fc08a1
 pkgdesc="xx60 mainline kernel, latest stable line"
 url="https://github.com/tsx-mainline/tsx-xx60-linux"
 arch="armv7"
 license="GPL-2.0-only"
-depends="tsx-xx60-boot-tools !tsx-xx60-kernel-lts"
-provides="tsx-xx60-kernel=$pkgver-r$pkgrel"
-replaces="tsx-xx60-kernel-lts"
+depends="tsx-xx60-boot-tools>=1-r1"
 options="!check"
 install="$pkgname.post-install $pkgname.post-upgrade"
 source="dist/zImage dist/meson8m2-crestron-tsw1060.dtb dist/modules-$_kernelrelease.tar.gz dist/tsxboot-emmc.img"
 
 package() {
-	install -Dm644 "$srcdir"/tsxboot-emmc.img "$pkgdir"/boot/tsxboot-emmc.img
+	install -Dm644 "$srcdir"/tsxboot-emmc.img "$pkgdir"/boot/tsxboot-emmc-stable.img
+	mkdir -p "$pkgdir"/usr/share/tsx
+	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-stable.release
 	mkdir -p "$pkgdir"/lib/modules
 	tar -xzf "$srcdir"/modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# modules_install's build/source links point into the build machine's
+	# kernel build dir: meaningless on a panel, and they name that machine's paths
+	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
 }
 
 sha512sums="
-6f0d834545093afc4b2579e0daa36a4c85a5048d0b630e456e2c5fde9fb70afa6ae669382c1fdfef6500236ab2e152c6ebab088fdb25b4d0faf5700f92e2ad19  zImage
-dc7610e97bb21549cdaedb180fa59538363ea9085b8f89c1eaaad03a0b1a4ad8317ec40751443ab62ad9b6b7c62ffc3f50204abbe8163199d3635481c6fc4eec  meson8m2-crestron-tsw1060.dtb
-10f6b18221fce2d2ea242d806f1db30b7d322b268c328ceac4aa1aa3397ec80a4eb43cb21dddb8b3c3c218085318c7fa5c588e376e6221bc7b14292c5d3897d1  modules-7.2.8-00110-gdb78cb01d891.tar.gz
-aeaf6e9b7e546c3fe638b39d3db5411a6ae4a8b73894e77ec22723a2780d4c3790144dde18b8e282c11dc00c2a0c6c3b7a889d4d8ec0aa3cc0f9e01620c7ed95  tsxboot-emmc.img
+bdc492bd2df196c25fb6663524f1c2e0349fe3253600e518c9a9f28498b6bb8e6e3f7bcf146c9f60818140a3c6f2377659aa5ffea88d4b7295397983910493b7  zImage
+1c7d5555b3c1ee0c8a81964dfdf049e28521d95fa015135461b4c0cb6010b3e14eb597427258742c907ea81b32a62b9e37ee313a4703179942f3ee29b1583f62  meson8m2-crestron-tsw1060.dtb
+57a2e51d3702edb565ad2dd16136f1c8965313802c6462115bebd93cc3e85c149d3cca1fc8ded07ab143c4f9614187a868cae13e49a37f1984f7897a55bf2043  modules-7.2.8-00111-gb6f412fc08a1.tar.gz
+2c29afd95e72c75e5ed6cfa1c9c35e09d8cee8f7b5bc7ad7a6ae1ef4bfc3a4782689aff2b635f6b3f8c9a44208a338e0e9d2f13ada6ef49b1a4195d765c681cf  tsxboot-emmc.img
 "

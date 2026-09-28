@@ -56,12 +56,14 @@ project's repos first does not otherwise change what a plain `apk add
 - `common/sendspin-cli` -- built from source (same pinned tag, same cmake
   flags as the old `rootfs/src/sendspin/build.sh` in tsx-xx60-linux).
 - `xx60/tsx-xx60-boot-tools` -- `tsx-update-boot` (vendored from
-  `installer/emmc/tsx-update-boot`) and the `tsx_is_installed_panel()`
-  detection helper the kernel packages' hooks use.
+  `installer/emmc/tsx-update-boot`), `tsx-kernel-flavor` (show/switch the
+  booted flavor; also the kernel packages' install hook) and the
+  `tsx_is_installed_panel()` detection helper.
 - `xx60/tsx-xx60-kernel-stable` / `xx60/tsx-xx60-kernel-lts` -- BINARY
   packaging of an already-built kernel (see "Kernel packages" below).
-  `provides=tsx-xx60-kernel`, mutually conflicting; installing one removes
-  the other.
+  Installable side by side; a panel's rootfs carries both.
+- `common/tensorflow-lite-c` -- the TFLite C library for the voice
+  satellite's wakeword models.
 - `xx60/tsx-xx60-chromium` -- Alpine's own armv7 `chromium` .apk, repacked
   with the 2-byte ES3->ES2 EGL fallback patch applied at build time (see
   "Chromium" below). `provides=chromium=<same version>`.
@@ -128,24 +130,33 @@ it) -- if you need to reproduce an exact build, look there, not at the date.
 This means two different commits staged on the same day would collide on
 `pkgver`; bump `pkgrel` in that case (or stage again the next day).
 
-**Contents**: `/boot/tsxboot-emmc.img`, `/lib/modules/<kernelrelease>/`.
+**Contents**: `/boot/tsxboot-emmc-<flavor>.img`,
+`/lib/modules/<kernelrelease>/` (without modules_install's `build`/`source`
+links, which name the build machine's paths), and
+`/usr/share/tsx/kernel-<flavor>.release`. No file is shared between the two
+flavors, so both install side by side: a panel's rootfs carries both module
+trees (package-owned) and both boot images, and switching flavors writes
+only the boot partition (`tsx-kernel-flavor lts|stable`, no network).
 
-**Install hook** (`post-install`/`post-upgrade`, identical logic in both
-flavors): the package ONLY writes anything when
-`tsx_is_installed_panel()` (from `tsx-xx60-boot-tools`) says this is a real,
-installed xx60 panel -- `/etc/tsx/emmc-root.info` exists, `/dev/mmcblk1p7`
-exists, and we are not in a chroot or container (checked via the `/` vs.
-`/proc/1/root` inode comparison, `/.dockerenv`, and `/proc/1/cgroup`).
-Otherwise it prints "not on an installed xx60 panel (or running in a chroot
-or container); nothing written" and does nothing -- this is what lets `apk
-add` for CI/test purposes run safely in a plain container (see "Testing"
-below). On a real panel it calls `tsx-update-boot --emmc` (from
-`tsx-xx60-boot-tools`), which keeps the previous boot partition content at
-`/data/tsxboot-emmc.prev.img`, verifies the write by reading it back, and
-restores the previous image automatically on a mismatch -- then prints
-"reboot to use the new kernel". Rollback if the new kernel doesn't come up:
-U-Boot's own `boot_retry` falls back to the rescue system, independent of
-this hook.
+**Install hook** (`post-install`/`post-upgrade` = `tsx-kernel-flavor --hook
+<flavor>`): it writes ONLY when `tsx_is_installed_panel()` (from
+`tsx-xx60-boot-tools`) says this is a real, installed xx60 panel --
+`/etc/tsx/emmc-root.info` exists, `/dev/mmcblk1p7` and `/dev/mmcblk1p8`
+exist, no `/.dockerenv`, and `/` IS the eMMC root partition (the device
+number of `/` equals that of `/dev/mmcblk1p8`; apk-tools 3 runs package
+scripts in their own PID/mount namespace, so a `/proc/1/root` comparison
+cannot be used) -- AND this package's flavor is the selected one
+(`KERNEL_FLAVOR` from `tsx-config`, else `kernel_flavor=` in
+`emmc-root.info`, else the flavor matching the running kernel's series) --
+AND the boot partition does not already hold this image. Otherwise it only
+reports why nothing was written; this is what lets `apk add` in a plain
+container, or a rootfs build's `apk add --root`, run safely. The write goes
+through `tsx-update-boot --emmc`, which keeps the previous boot partition
+content at `/data/tsxboot-emmc.prev.img`, verifies the write by reading it
+back, and restores the previous image automatically on a mismatch -- then
+prints "reboot to use the new kernel". Rollback if the new kernel doesn't
+come up: U-Boot's own `boot_retry` falls back to the rescue system,
+independent of this hook.
 
 **Safety note (needs a decision)**: the eMMC write happens synchronously
 inside `apk add`'s install script, with no "are you sure" and no reboot
@@ -211,21 +222,35 @@ append this repo's `common` and `xx60` lines to `/etc/apk/repositories`,
 apk add tsx-keys sendspin-cli tsx-xx60-kernel-stable tsx-xx60-chromium
 ```
 
-Expect: `/usr/bin/sendspin-cli`, `/boot/tsxboot-emmc.img`, a populated
-`/lib/modules/<kver>/`, and a chromium binary that
+Expect: `/usr/bin/sendspin-cli`, `/boot/tsxboot-emmc-stable.img`, a
+populated `/lib/modules/<kver>/`, and a chromium binary that
 `patch-chromium.py --check` (or the panel's own
 `/usr/local/sbin/tsx-chromium-es2 check`) reports as `PATCHED`. The kernel
 package's install hook should print "not on an installed xx60 panel (or
-running in a chroot or container); nothing written" (a plain container is
-neither). To switch flavors: `apk del tsx-xx60-kernel-stable && apk add
-tsx-xx60-kernel-lts` (not a single `apk add tsx-xx60-kernel-lts` -- `apk add`
-only ADDS to `/etc/apk/world`, so if `tsx-xx60-kernel-stable` is already
-pinned there by name, adding the other flavor on top just gives apk two
-mutually-conflicting world entries and it refuses the transaction; deleting
-the old one first is the correct, tested way to switch). The mutual
-`!pkgname` entry (in `depends=`, not a bare `conflicts=` -- newer abuild
-rejects that field outright) is what makes `apk del old && apk add new`
-atomic-safe: apk will never let both be installed at once.
+running in a chroot/container); nothing written" (a plain container is
+neither).
+
+On a panel (tested on a TSW-1060 running the stable flavor, the published
+tree served over HTTP from a workstation): `apk add tsx-xx60-kernel-lts
+tsx-xx60-kernel-stable` takes over the rootfs's unowned module trees; the
+stable hook reports that the boot partition already holds its image, the
+LTS hook that the panel boots stable. `tsx-config set KERNEL_FLAVOR lts &&
+apk fix tsx-xx60-kernel-lts` writes the LTS image from inside apk's script
+namespace (backup + readback verify) and the panel boots 6.18;
+`tsx-kernel-flavor stable` switches back. `apk add tsx-xx60-chromium` on a
+panel with Alpine's `chromium` installed purges it and installs ours
+(`apk del chromium` then drops the `chromium=<ver>` world pin, which
+`tsx-xx60-chromium` satisfies until then); an existing, unowned
+`/etc/tsx/chromium-es2-patched` is kept and the package's copy lands as
+`.apk-new` -- move it over (tsx-autoupdate in tsx-xx60-linux does all
+three steps).
+
+apk-tools 3 (Alpine 3.24) refuses every upgrade while a listed repository
+is unavailable ("Not continuing due to stale/unavailable repositories");
+until this repository is actually published, a panel that lists it needs
+`--force-missing-repositories` (tsx-autoupdate adds it by itself and
+reports the repository as unreachable) or `APK_URL=off` in its panel
+configuration.
 
 ## Hosting and size
 

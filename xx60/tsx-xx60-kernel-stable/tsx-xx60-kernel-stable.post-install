@@ -1,21 +1,10 @@
 #!/bin/sh
-# ONLY writes anything on an installed xx60 panel (see tsx_is_installed_panel
-# in tsx-xx60-boot-tools): elsewhere (a plain `apk add` test in a chroot or
-# a docker --platform linux/arm/v7 container) this just reports that and exits.
-. /usr/lib/tsx/tsx-is-panel.sh 2>/dev/null || {
-	echo "tsx-xx60-kernel-stable: tsx-is-panel.sh helper missing (tsx-xx60-boot-tools not installed?); nothing written"
-	exit 0
-}
-if tsx_is_installed_panel; then
-	IMG=/boot/tsxboot-emmc.img
-	SHA=$(sha256sum < "$IMG" | cut -d' ' -f1)
-	echo "tsx-xx60-kernel-stable: writing the new boot image into the eMMC boot partition"
-	if /usr/sbin/tsx-update-boot --emmc "$IMG" "$SHA"; then
-		echo "tsx-xx60-kernel-stable: reboot to use the new kernel"
-	else
-		echo "tsx-xx60-kernel-stable: tsx-update-boot failed; the panel still boots the previous kernel"
-	fi
+# Writes the boot image only on an installed xx60 panel whose selected flavor
+# is stable (see tsx-kernel-flavor in tsx-xx60-boot-tools); anywhere else (a
+# chroot, a container, the other flavor selected) it only reports.
+if [ -x /usr/sbin/tsx-kernel-flavor ]; then
+	/usr/sbin/tsx-kernel-flavor --hook stable
 else
-	echo "tsx-xx60-kernel-stable: not on an installed xx60 panel (or running in a chroot/container); nothing written"
+	echo "tsx-xx60-kernel-stable: tsx-kernel-flavor missing (tsx-xx60-boot-tools too old?); nothing written"
 fi
 exit 0

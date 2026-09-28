@@ -2,27 +2,29 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 # Shared boot-image tooling for the xx60 platform: tsx-update-boot (vendored
 # from tsx-xx60-linux installer/emmc/tsx-update-boot, same script the
-# installer uses) and the tsx_is_installed_panel() detection helper used by
-# tsx-xx60-kernel-*'s post-install/post-upgrade hooks. A separate package so
-# both kernel flavors (which are mutually conflicting) can depend on the
-# same copy without duplicating it.
+# installer uses), tsx-kernel-flavor (show/switch the booted kernel flavor;
+# also the tsx-xx60-kernel-* install/upgrade hook) and the
+# tsx_is_installed_panel() detection helper. A separate package so both
+# kernel flavors (installable side by side) share one copy.
 pkgname=tsx-xx60-boot-tools
 pkgver=1
-pkgrel=0
+pkgrel=3
 pkgdesc="xx60 eMMC/card boot image update tools"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
 license="GPL-2.0-or-later"
 depends="busybox"
 options="!check"
-source="tsx-update-boot tsx-is-panel.sh"
+source="tsx-update-boot tsx-is-panel.sh tsx-kernel-flavor"
 
 package() {
 	install -Dm755 "$srcdir"/tsx-update-boot "$pkgdir"/usr/sbin/tsx-update-boot
 	install -Dm644 "$srcdir"/tsx-is-panel.sh "$pkgdir"/usr/lib/tsx/tsx-is-panel.sh
+	install -Dm755 "$srcdir"/tsx-kernel-flavor "$pkgdir"/usr/sbin/tsx-kernel-flavor
 }
 
 sha512sums="
 c0c1fc7b18b32761ec70b6da7343eb794fea4cbe346d861a7527102dd9610195979b4f03ffad78c38f6f4c1b399adc56f31a689eee789b614b8aacf1946c1d54  tsx-update-boot
-8e8244c3d3148e2375dc8ed7812fe8304ae465d880c47acd2ee1703d2439b8087aeddd97134652a1099555f5886adaa7ff28bd3cc5e3836db23b343f16c85508  tsx-is-panel.sh
+c472647877fce188bd294db05b9b202301c8d422aa3242fe8f1b63144a321a709c3d1371d241d3806dba8d401a9ba9013149d24c898373ea0b459e87c60b653c  tsx-is-panel.sh
+7981ff2dc5d8f4661c6bf86271a2ab91877945323d64f35c2a740df0d0286a8948d34eaf3004c90e58b8e63d0fe40411d25bbadffdcacaf9c79de605793db4ff  tsx-kernel-flavor
 "
