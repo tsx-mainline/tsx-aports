@@ -1,0 +1,25 @@
+# abuild work areas and build products (rebuilt by scripts/build.sh, never committed)
+packages/
+repo/
+src/
+pkg/
+extract/
+*.log
+
+# staged binary inputs for the kernel packages (scripts/stage-kernel.sh output;
+# large, and reproducible from the build host, so not committed)
+xx60/tsx-xx60-kernel-stable/dist/
+xx60/tsx-xx60-kernel-lts/dist/
+
+# signing keys: the PRIVATE key never lives inside this repo (it stays in
+# tsx-mainline/keys/, outside every repo, chmod 600, mounted read-only into
+# the build container). This entry guards against an accidental copy landing
+# here. The PUBLIC key is committed on purpose in common/tsx-keys/.
+*.rsa
+!*.rsa.pub
+
+# abuild / apk local state
+.abuild/
+abuild.conf
+APKBUILD.orig
+*~
