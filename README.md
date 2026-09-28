@@ -111,14 +111,33 @@ single offline signing key.
 ## Kernel packages
 
 `tsx-xx60-kernel-stable` and `tsx-xx60-kernel-lts` are **binary** packages:
-no kernel compile happens inside `abuild`. `scripts/stage-kernel.sh
-stable|lts` copies the already-built `zImage`, board DTB, and modules tree
-off the build host (running `make modules_install` there -- installing
-already-compiled `.ko` files and running `depmod`, not compiling anything)
-and either fetches an already-packed eMMC boot image or packs one with
-`kernel/mkimage.sh` (from tsx-xx60-linux) + the switchroot initramfs, again
-no compilation. It then updates that package's `pkgver` and `sha512sums` in
-place.
+no kernel compile happens inside `abuild`. Each one's `source=` fetches a
+single release asset from tsx-xx60-linux --
+`tsx-xx60-kernel-<flavor>-bundle.tar.zst` (zImage + board DTB + modules
+tree tarball + packed eMMC boot image + `kernel.release`/`kernel.commit`,
+built by that repo's `.github/workflows/release.yml`, job `kbundle`) -- and
+`abuild` auto-extracts it (a plain `.tar.zst`); `package()` then just
+installs those already-built pieces. Two ways to produce/consume that
+bundle:
+
+- **CI** (`build.yml`, no build host available there): plain `abuild`
+  fetches the pinned `_kbundle_tag` release's asset over the network and
+  verifies it against `sha512sums`. This is the only thing that made this
+  package buildable in CI at all.
+- **Local / `BUILD_HOST`** (a kernel not tagged/released yet):
+  `scripts/stage-kernel.sh stable|lts` copies the already-built `zImage`,
+  board DTB, and modules tree off the build host (running `make
+  modules_install` there -- installing already-compiled `.ko` files and
+  running `depmod`, not compiling anything), either fetches an
+  already-packed eMMC boot image or packs one with `kernel/mkimage.sh`
+  (from tsx-xx60-linux) + the switchroot initramfs (again no compilation),
+  and packs the exact same bundle format into `dist/`. Each package's
+  `SRCDEST="$startdir/dist"` line makes `abuild` use that local file
+  (verified by `sha512sums`, never re-fetched) instead of the network --
+  `_kbundle_tag` is irrelevant here. `stage-kernel.sh` updates `pkgver`,
+  `_kernelrelease` and `sha512sums` in place; it never touches
+  `_kbundle_tag` (CI-only, bump it by hand once a matching tsx-xx60-linux
+  release exists).
 
 **pkgver scheme**: `<upstream kernel version>_git<YYYYMMDD>`, e.g.
 `7.2.8_git20260927`. `make kernelrelease`'s own suffix
