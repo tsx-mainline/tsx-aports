@@ -31,15 +31,30 @@
 # BUILD_HOST) mounts TSX_APORTS_KEY read-only into the container as before
 # and signs there, same as ever. A BUILD_HOST build does NOT copy
 # TSX_APORTS_KEY to the host at all: the remote invocation (ON_HOST=1)
-# generates its OWN throwaway RSA keypair, signs with that, and deletes it
-# before returning; the throwaway-signed packages are pulled back and
-# re-signed HERE, locally, with the real key (scripts/resign.sh: split each
-# apk, discard the throwaway signature, abuild-sign control.tar.gz with
-# TSX_APORTS_KEY in a disposable container, then `apk verify` the result
-# against a trust store holding ONLY the project's public key). CI is
-# unaffected -- it never sets BUILD_HOST; its GitHub Actions secret
-# TSX_APORTS_PRIVKEY is restored straight into a local TSX_APORTS_KEY the
-# same as any other local build (.github/workflows/build.yml).
+# generates its OWN throwaway RSA keypair and signs with that; the
+# throwaway-signed packages are pulled back and re-signed HERE, locally,
+# with the real key (scripts/resign.sh: split each apk, discard the
+# throwaway signature, abuild-sign control.tar.gz with TSX_APORTS_KEY in a
+# disposable container, then `apk verify` the result against a trust store
+# holding ONLY the project's public key). CI is unaffected -- it never sets
+# BUILD_HOST; its GitHub Actions secret TSX_APORTS_PRIVKEY is restored
+# straight into a local TSX_APORTS_KEY the same as any other local build
+# (.github/workflows/build.yml).
+#
+# The throwaway keypair lives at BUILD_DIR/.throwaway-key/ on the build
+# host and is REUSED across separate scripts/build.sh invocations against
+# the same BUILD_DIR, instead of being generated fresh (and deleted) every
+# call: a kernel package's `depends="tsx-xx60-boot-tools>=1-r4"` is
+# resolved by abuild from packages/v3.24 (REPODEST), which -- like
+# .throwaway-key/ -- is excluded from the push below and so persists
+# remotely between calls; if each call minted its own throwaway key, a dep
+# built in an earlier call would sit in an index signed by a key the
+# current call's container never trusts ("UNTRUSTED signature"), forcing
+# every dependent package into one big session under one key by hand. The
+# docker build step below also trusts this repo's own committed public key
+# (common/tsx-keys/*.rsa.pub) so a dependency that happens to carry the
+# real project signature (e.g. packages/ staged in from a local build) is
+# trusted too -- still only ever a .pub, never the private key.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
@@ -90,12 +105,19 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	# src/ and pkg/ are abuild's own per-package work dirs (root-owned inside
 	# the container, since builds run with abuild -F); never delete or
 	# descend into them from here -- they are host-side build state, not
-	# part of the pushed source tree.
-	to_build_host --delete --exclude packages/ --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
+	# part of the pushed source tree. .throwaway-key/ is the persistent
+	# throwaway signing keypair below -- also host-side state, never
+	# pushed from or deleted by the local side.
+	to_build_host --delete --exclude packages/ --exclude '.throwaway-key/' --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
 		"$REPO/" "$BUILD_HOST:$BUILD_DIR/"
 
-	echo "[build.sh] building on $BUILD_HOST with a throwaway signing key (generated there, deleted right after -- the real key stays here)"
-	REMOTE_CMD="set -e; KD=\$(mktemp -d); openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh' '$TARGET'; rc=\$?; rm -rf \"\$KD\"; exit \$rc"
+	echo "[build.sh] building on $BUILD_HOST with a throwaway signing key (generated there and reused for this BUILD_DIR -- the real key stays here)"
+	# KD persists at BUILD_DIR/.throwaway-key so a package built by an
+	# earlier, separate scripts/build.sh call against this same BUILD_DIR
+	# (e.g. tsx-xx60-boot-tools) is still signed with a key THIS call's
+	# container trusts when it resolves that package as a build dep out of
+	# packages/v3.24 (REPODEST) -- see the file header comment.
+	REMOTE_CMD="set -e; KD='$BUILD_DIR/.throwaway-key'; mkdir -p \"\$KD\"; [ -f \"\$KD/throwaway.rsa\" ] || { openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; }; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh' '$TARGET'"
 	assert_remote_cmd_safe "$REMOTE_CMD"
 	ssh -o BatchMode=yes "$BUILD_HOST" "$REMOTE_CMD"
 
@@ -149,6 +171,13 @@ for PKGDIR in $PKGDIRS; do
 			# source (e.g. the xx60/tsx-xx60-kernel-FLAVOR bundles).
 			apk add --no-cache alpine-sdk zstd >/dev/null
 			cp /keys/$KEYNAME.pub /etc/apk/keys/
+			# also trust this repo's own committed public key(s)
+			# (common/tsx-keys/*.rsa.pub -- public, already part of the
+			# pushed tree): a build dep resolved out of packages/v3.24
+			# may carry the real project signature (e.g. a local build's
+			# output staged in ahead of time) rather than this
+			# container's own signing key, and should still verify.
+			for k in /repo/common/tsx-keys/*.rsa.pub; do [ -f \"\$k\" ] && cp \"\$k\" /etc/apk/keys/; done
 			mkdir -p /root/.abuild
 			echo 'PACKAGER_PRIVKEY=/keys/$KEYNAME' > /root/.abuild/abuild.conf
 			echo 'PACKAGER=\"unex <7575866+unex@users.noreply.github.com>\"' >> /root/.abuild/abuild.conf
