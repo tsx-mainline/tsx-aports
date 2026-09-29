@@ -13,8 +13,7 @@
 #   TSX_APORTS_KEY   path to the PRIVATE signing key (required), e.g.
 #                    tsx-mainline/keys/tsx-mainline-<id>.rsa (this repo's own
 #                    keys/ is gitignored and never holds it -- the key lives
-#                    outside every repo). Mounted read-only into the
-#                    container; never copied into it or into this repo.
+#                    outside every repo).
 #   BUILD_HOST       ssh destination to build on instead of here (opt-in).
 #   BUILD_DIR        remote path this repo is mirrored to (required with
 #                    BUILD_HOST).
@@ -22,41 +21,96 @@
 # What runs per package: `abuild checksum` (fills in real sha512sums for any
 # source= that came from a URL -- e.g. sendspin-cli's pinned tarball; a
 # no-op when all sources are already-checksummed local files) then
-# `abuild -r` (fetch missing build deps, build, package, sign with
-# TSX_APORTS_KEY, index). Output: packages/v3.24/<common|xx60>/armv7/*.apk
-# +APKINDEX.tar.gz, here or under BUILD_DIR on the host. If BUILD_HOST was
-# used, the (possibly checksum-updated) APKBUILD is synced back too, so the
-# real checksum is what ends up committed -- diff it before committing.
+# `abuild -r` (fetch missing build deps, build, package, sign, index).
+# Output: packages/v3.24/<common|xx60>/armv7/*.apk +APKINDEX.tar.gz. If
+# BUILD_HOST was used, the (possibly checksum-updated) APKBUILD is synced
+# back too, so the real checksum is what ends up committed -- diff it before
+# committing.
+#
+# THE PRIVATE KEY NEVER LEAVES THIS MACHINE (user rule). A local build (no
+# BUILD_HOST) mounts TSX_APORTS_KEY read-only into the container as before
+# and signs there, same as ever. A BUILD_HOST build does NOT copy
+# TSX_APORTS_KEY to the host at all: the remote invocation (ON_HOST=1)
+# generates its OWN throwaway RSA keypair, signs with that, and deletes it
+# before returning; the throwaway-signed packages are pulled back and
+# re-signed HERE, locally, with the real key (scripts/resign.sh: split each
+# apk, discard the throwaway signature, abuild-sign control.tar.gz with
+# TSX_APORTS_KEY in a disposable container, then `apk verify` the result
+# against a trust store holding ONLY the project's public key). CI is
+# unaffected -- it never sets BUILD_HOST; its GitHub Actions secret
+# TSX_APORTS_PRIVKEY is restored straight into a local TSX_APORTS_KEY the
+# same as any other local build (.github/workflows/build.yml).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
+
+# to_build_host ARGS...: `rsync -a ARGS...`, but refuses outright if any
+# argument names a private key -- $TSX_APORTS_KEY itself, or anything ending
+# in .rsa that is not its own .rsa.pub -- so this one function is the single
+# place standing between BUILD_HOST and the private key ever reaching it.
+# Every rsync in the BUILD_HOST branch below goes through it, even ones that
+# do not currently touch the key: a future edit adding one more rsync call
+# there is covered by construction, not by remembering to re-check it.
+# scripts/tests/test-resign.sh exercises this directly (no BUILD_HOST
+# needed: it sources this file with TSX_APORTS_BUILD_SH_SOURCE_ONLY=1).
+to_build_host() {
+	local a
+	for a in "$@"; do
+		case "$a" in
+		"$TSX_APORTS_KEY"|*.rsa) tbh_die_key "$a";;
+		esac
+	done
+	rsync -a "$@"
+}
+tbh_die_key() { echo "build.sh: BUG: refusing to copy a private key ($1) to BUILD_HOST" >&2; exit 1; }
+
+# assert_remote_cmd_safe CMD: a grep guard on the literal command string
+# this script is about to hand to `ssh "$BUILD_HOST"` -- refuses if it
+# embeds the local private key's own path (it must not: the remote build
+# never sees it, only a throwaway key it generates itself).
+assert_remote_cmd_safe() {
+	case "$1" in
+	*"$TSX_APORTS_KEY"*) echo "build.sh: BUG: the command about to run on BUILD_HOST embeds the local private key path -- refusing" >&2; exit 1;;
+	esac
+}
+
+# Let a test load the two functions above without running the rest of this
+# script (no PKGDIR required, no docker, no ssh, no real BUILD_HOST).
+if [ "${TSX_APORTS_BUILD_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
+
 TARGET=${1:?"usage: build.sh <PKGDIR>|--all"}
 
 if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	: "${BUILD_DIR:?BUILD_HOST needs BUILD_DIR (remote path this repo is mirrored to)}"
-	: "${TSX_APORTS_KEY:?set TSX_APORTS_KEY (local path to the private key)}"
-	KEYNAME=$(basename "$TSX_APORTS_KEY")
+	: "${TSX_APORTS_KEY:?set TSX_APORTS_KEY (local path to the private key -- it re-signs the build host output afterward; it is never copied there)}"
+	[ -f "$TSX_APORTS_KEY" ] && [ -f "$TSX_APORTS_KEY.pub" ] || { echo "build.sh: no such key: $TSX_APORTS_KEY(.pub)" >&2; exit 1; }
+
 	echo "[build.sh] pushing $REPO -> $BUILD_HOST:$BUILD_DIR"
 	ssh -o BatchMode=yes "$BUILD_HOST" "mkdir -p '$BUILD_DIR'"
 	# src/ and pkg/ are abuild's own per-package work dirs (root-owned inside
 	# the container, since builds run with abuild -F); never delete or
 	# descend into them from here -- they are host-side build state, not
 	# part of the pushed source tree.
-	rsync -a --delete --exclude packages/ --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
+	to_build_host --delete --exclude packages/ --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
 		"$REPO/" "$BUILD_HOST:$BUILD_DIR/"
-	# Keep the real basename across the push: abuild-sign embeds it in the
-	# index's signature entry (.SIGN.RSA.<basename>.pub), and every panel
-	# and container trusts the key under ITS real name -- renaming it in
-	# transit would sign the index with an identity nothing else knows.
-	ssh -o BatchMode=yes "$BUILD_HOST" "mkdir -p '$BUILD_DIR.keys'"
-	rsync -a "$TSX_APORTS_KEY" "$BUILD_HOST:$BUILD_DIR.keys/$KEYNAME"
-	rsync -a "$TSX_APORTS_KEY.pub" "$BUILD_HOST:$BUILD_DIR.keys/$KEYNAME.pub"
-	echo "[build.sh] building on $BUILD_HOST"
-	ssh -o BatchMode=yes "$BUILD_HOST" \
-		"ON_HOST=1 TSX_APORTS_KEY='$BUILD_DIR.keys/$KEYNAME' '$BUILD_DIR/scripts/build.sh' '$TARGET'"
-	echo "[build.sh] pulling packages/ back"
+
+	echo "[build.sh] building on $BUILD_HOST with a throwaway signing key (generated there, deleted right after -- the real key stays here)"
+	REMOTE_CMD="set -e; KD=\$(mktemp -d); openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh' '$TARGET'; rc=\$?; rm -rf \"\$KD\"; exit \$rc"
+	assert_remote_cmd_safe "$REMOTE_CMD"
+	ssh -o BatchMode=yes "$BUILD_HOST" "$REMOTE_CMD"
+
+	echo "[build.sh] pulling packages/ back (still signed with the build host's throwaway key)"
+	REMOTE_PKGS=$(mktemp -d)
+	rsync -a "$BUILD_HOST:$BUILD_DIR/packages/" "$REMOTE_PKGS/"
 	mkdir -p "$REPO/packages"
-	rsync -a "$BUILD_HOST:$BUILD_DIR/packages/" "$REPO/packages/"
+	echo "[build.sh] re-signing every package locally with the real key (it never left this machine)"
+	while IFS= read -r -d '' arch_dir; do
+		rel=${arch_dir#"$REMOTE_PKGS/"}
+		mkdir -p "$REPO/packages/$rel"
+		"$HERE/resign.sh" "$arch_dir" "$REPO/packages/$rel"
+	done < <(find "$REMOTE_PKGS" -mindepth 3 -maxdepth 3 -type d -print0)
+	rm -rf "$REMOTE_PKGS"
+
 	if [ "$TARGET" != --all ]; then
 		rsync -a "$BUILD_HOST:$BUILD_DIR/$TARGET/APKBUILD" "$REPO/$TARGET/APKBUILD"
 	else
@@ -67,7 +121,6 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 			done
 		done
 	fi
-	ssh -o BatchMode=yes "$BUILD_HOST" "rm -rf '$BUILD_DIR.keys'"
 	exit 0
 fi
 

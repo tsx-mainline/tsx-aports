@@ -16,6 +16,8 @@ Package names carry the platform for the same reason (`tsx-xx60-*`).
 common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 (xx60/TSW-1060) packages
 scripts/build.sh           build one package or all, in an armv7 container
+scripts/resign.sh          re-sign a BUILD_HOST build's output with the real key, locally
+scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
 scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage a prebuilt kernel's binaries for packaging
 .github/workflows/build.yml   CI sketch (build + publish, chromium watch)
@@ -58,7 +60,15 @@ project's repos first does not otherwise change what a plain `apk add
 - `xx60/tsx-xx60-boot-tools` -- `tsx-update-boot` (vendored from
   `installer/emmc/tsx-update-boot`), `tsx-kernel-flavor` (show/switch the
   booted flavor; also the kernel packages' install hook) and the
-  `tsx_is_installed_panel()` detection helper.
+  `tsx_is_installed_panel()` detection helper. Before it writes a boot image
+  `tsx-update-boot` checks that the image carries a DTB for this panel's
+  U-Boot `aml_dt` (TSW-760: `crestron,tsw760`, TSW-1060/TSS-10:
+  `crestron,tsw1060`) and writes nothing otherwise (`--check IMG` only
+  checks; `--any-board` skips it). The kernel packages' boot image carries
+  both board DTBs in the vendor multi-DTB container (`stage-kernel.sh`
+  packs it with `mkimage.sh --board-dtbs` and checks it with
+  `scripts/check-bootimg-dtbs.py`; host tests:
+  `scripts/tests/test-board-dtbs.sh`).
 - `xx60/tsx-xx60-kernel-stable` / `xx60/tsx-xx60-kernel-lts` -- BINARY
   packaging of an already-built kernel (see "Kernel packages" below).
   Installable side by side; a panel's rootfs carries both.
@@ -90,11 +100,50 @@ One RSA-4096 project key, generated once with `abuild-keygen -n -b 4096`
 (the same tool and defaults Alpine itself uses). Layout:
 
 - Private key: `tsx-mainline/keys/tsx-mainline-<id>.rsa`, **outside every
-  repo**, `chmod 600`, never committed, never printed. `scripts/build.sh`
-  mounts it read-only into the build container via `TSX_APORTS_KEY`.
+  repo**, `chmod 600`, never committed, never printed, and **never copied to
+  a remote host** -- not even `BUILD_HOST` (see "Building on a remote host"
+  below). `scripts/build.sh`'s local path mounts it read-only into the build
+  container via `TSX_APORTS_KEY`.
 - Public key: `tsx-mainline/keys/tsx-mainline-<id>.rsa.pub`, committed
   in `common/tsx-keys/` (that is the whole point of that package) and baked
   into a panel's rootfs at build time so a fresh install already trusts it.
+
+### Building on a remote host
+
+`BUILD_HOST` never receives the private key. `scripts/build.sh`'s BUILD_HOST
+path pushes the repo, then runs itself again over ssh with `ON_HOST=1` and a
+throwaway RSA keypair generated on the build host for that one run
+(`openssl genrsa`, in `mktemp -d`, deleted the moment the remote build
+finishes) -- so the packages that come back are signed with a key nobody
+else has ever seen or will see again, not the project key.
+
+Those throwaway-signed packages are then re-signed locally, with the real
+key, by `scripts/resign.sh` (used by `build.sh` itself, and callable by
+hand): it splits each `.apk` into its three members (`scripts/apk-split.py`
+-- an apk v2 package is just three concatenated gzip streams: signature,
+control, data), throws the old signature away, re-signs `control.tar.gz`
+with `TSX_APORTS_KEY` inside a disposable Alpine container, and verifies the
+result with `apk verify` against a trust store holding ONLY the project's
+public key -- so a package that still carried a foreign signature would
+fail right there instead of silently getting published. `scripts/index.sh`
+then rebuilds and signs the published index the same way it always has:
+locally, with `TSX_APORTS_KEY`.
+
+Two things enforce "never copied to a remote host" beyond just not writing
+the code that would do it: `to_build_host()` (the one function `build.sh`
+uses for every rsync in its BUILD_HOST path) refuses outright if any
+argument is the private key's own path or anything ending in `.rsa` that
+isn't its own `.rsa.pub`, and `assert_remote_cmd_safe()` refuses to hand
+`ssh "$BUILD_HOST"` any command string that embeds the private key's local
+path. `scripts/tests/test-resign.sh` exercises both guards directly (no
+`BUILD_HOST` needed) plus the split/re-sign/verify round trip against a
+tiny fixture package built with two throwaway keys (neither is the real
+project key).
+
+Local (no `BUILD_HOST`) builds are unchanged: `TSX_APORTS_KEY` signs
+directly in the local container, same as ever. CI is unaffected either --
+it never sets `BUILD_HOST`; its `TSX_APORTS_PRIVKEY` secret is restored
+straight into a local `TSX_APORTS_KEY` (`.github/workflows/build.yml`).
 
 Key rotation: generate a new keypair the same way, add a new
 `common/tsx-keys` version whose `package()` installs both the old and new

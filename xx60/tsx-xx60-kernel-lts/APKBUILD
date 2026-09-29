@@ -37,8 +37,8 @@ SRCDEST="$startdir/dist"
 # written into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-lts
 pkgver=6.18.54_git20260928
-pkgrel=5
-_kernelrelease=6.18.54-00118-ga4d7ab201bab
+pkgrel=8
+_kernelrelease=6.18.54-00121-gf521d0d9730e
 # tsx-xx60-linux release tag whose "kbundle" CI asset this pins. UNRELEASED
 # until that repo has cut a real tag with this job in it; until then this
 # package builds only from a local dist/ stage (see the header comment).
@@ -47,7 +47,7 @@ pkgdesc="xx60 mainline kernel, longterm (LTS) line"
 url="https://github.com/tsx-mainline/tsx-xx60-linux"
 arch="armv7"
 license="GPL-2.0-only"
-depends="tsx-xx60-boot-tools>=1-r1"
+depends="tsx-xx60-boot-tools>=1-r4"
 options="!check"
 install="$pkgname.post-install $pkgname.post-upgrade"
 source="https://github.com/tsx-mainline/tsx-xx60-linux/releases/download/$_kbundle_tag/tsx-xx60-kernel-lts-bundle.tar.zst"
@@ -64,5 +64,5 @@ package() {
 }
 
 sha512sums="
-a66522fc14d6dae09ac4e8c072ebfa9f62e9091ddea925acfcd835cf2f0350f086e84d83693c7d54458ad53ab6c57474d31f325d78cd38b69118ee1635595f6f  tsx-xx60-kernel-lts-bundle.tar.zst
+11b78fea0770710b6e8b7be0fe5387ed425474a42a37896202256748dc091ab3179e3a36298ca0fd72a454ca4161c910cdc19086a1583324e4cef2a31abe8dcc  tsx-xx60-kernel-lts-bundle.tar.zst
 "
