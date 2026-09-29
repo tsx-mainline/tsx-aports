@@ -8,7 +8,7 @@
 # kernel flavors (installable side by side) share one copy.
 pkgname=tsx-xx60-boot-tools
 pkgver=1
-pkgrel=3
+pkgrel=5
 pkgdesc="xx60 eMMC/card boot image update tools"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
@@ -24,7 +24,7 @@ package() {
 }
 
 sha512sums="
-c0c1fc7b18b32761ec70b6da7343eb794fea4cbe346d861a7527102dd9610195979b4f03ffad78c38f6f4c1b399adc56f31a689eee789b614b8aacf1946c1d54  tsx-update-boot
+4515b1ef8af4a84f8d140fa463e104df8b7d1e751a932f9c7b9d0d1e60a9c2036046960bcc05a0ad71192ebae43c209a7a0643b3d7778256e4545ec4c59e9438  tsx-update-boot
 c472647877fce188bd294db05b9b202301c8d422aa3242fe8f1b63144a321a709c3d1371d241d3806dba8d401a9ba9013149d24c898373ea0b459e87c60b653c  tsx-is-panel.sh
-7981ff2dc5d8f4661c6bf86271a2ab91877945323d64f35c2a740df0d0286a8948d34eaf3004c90e58b8e63d0fe40411d25bbadffdcacaf9c79de605793db4ff  tsx-kernel-flavor
+148ada804e47d4a11637dccb342cd314353e3a8a81e309d94a0fd3c67f4203a1967ea8ba9f21dfff29d2a70b6c9dc3d035301088081e5baf6fa47b4cfeb018d7  tsx-kernel-flavor
 "
