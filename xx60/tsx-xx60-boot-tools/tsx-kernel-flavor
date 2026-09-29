@@ -58,6 +58,13 @@ part_sha() {
 write_image() {  # write_image FLAVOR
 	img=/boot/tsxboot-emmc-$1.img
 	[ -r "$img" ] || { say "no $img (is tsx-xx60-kernel-$1 installed?)"; return 1; }
+	# the image must carry this panel's DTB (a TSW-760 needs the multi-DTB
+	# container); tsx-update-boot checks again before it writes
+	if chk=$(/usr/sbin/tsx-update-boot --check "$img" 2>&1); then say "$chk"; else
+		say "$chk"
+		say "the $1 image does not boot this panel; nothing written (tsx-xx60-kernel-$1 too old for this model?)"
+		return 1
+	fi
 	sha=$(sha256sum < "$img" | cut -d' ' -f1)
 	if [ "$(part_sha "$(stat -c %s "$img")")" = "$sha" ]; then
 		say "$BOOT already holds the $1 image ($(release_of "$1")); nothing written"
@@ -79,7 +86,8 @@ case "${1:-}" in
 	printf '%-10s%s\n' selected: "$(selected_flavor)" running: "$(uname -r)"
 	for f in lts stable; do
 		if [ -r /boot/tsxboot-emmc-$f.img ]; then
-			printf '%-10s%s\n' "$f:" "$(release_of $f) (/boot/tsxboot-emmc-$f.img)"
+			ok=$(/usr/sbin/tsx-update-boot --check /boot/tsxboot-emmc-$f.img >/dev/null 2>&1 && echo "boots this panel" || echo "NOT for this panel")
+			printf '%-10s%s\n' "$f:" "$(release_of $f) (/boot/tsxboot-emmc-$f.img, $ok)"
 		else
 			printf '%-10s%s\n' "$f:" "not installed (apk add tsx-xx60-kernel-$f)"
 		fi

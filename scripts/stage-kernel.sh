@@ -10,7 +10,13 @@
 # (installs already-built .ko's into a tree + depmod, no compiler invoked
 # unless something is actually stale) and, with --pack-boot, kernel/mkimage.sh
 # (packs an Android boot image from the zImage + DTB + an initramfs --
-# again no compilation).
+# again no compilation). With a TSW-760 DTB in the kernel build (kernels with
+# meson8m2-crestron-tsw760.dts), --pack-boot packs both board DTBs into the
+# vendor AML_ multi-DTB container (mkimage.sh --board-dtbs), so the one image
+# boots the TSW-1060 and the TSW-760; the bundle carries both DTBs. Every boot
+# image (packed or fetched) is checked with scripts/check-bootimg-dtbs.py
+# against the kernel's DTBs before anything is packed: a fetched image
+# without the container is refused when the kernel has the TSW-760 DTB.
 #
 # The APKBUILD's source= is a URL (a tagged tsx-xx60-linux release); this
 # script does not touch that URL or its _kbundle_tag, only the local
@@ -35,14 +41,19 @@
 #                         for this flavor (skips packing)
 #   --pack-boot with:
 #   BUILD_HOST_INITRAMFS  remote path to initramfs-switchroot.cpio.gz
-#   BUILD_HOST_MKIMAGE    remote path to kernel/mkimage.sh (tsx-xx60-linux)
+#   BUILD_HOST_MKIMAGE    remote path to kernel/mkimage.sh (tsx-xx60-linux; a
+#                         version with --board-dtbs when the kernel has the
+#                         TSW-760 DTB)
 #
 # Optional:
 #   BUILD_HOST_DOCKER_IMG cross-toolchain docker image on the host, used for
 #                         modules_install (needs the ARM strip) and mkimage.sh
 #                         (needs python3 + the DT/image tools) (default tsx-mainline)
-#   DTB_NAME              device tree blob file name (default
+#   DTB_NAME              TSW-1060 device tree blob file name (default
 #                         meson8m2-crestron-tsw1060.dtb)
+#   DTB760_NAME           TSW-760 device tree blob file name (default
+#                         meson8m2-crestron-tsw760.dtb); used when the kernel
+#                         build has it
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
@@ -54,6 +65,7 @@ case "$FLAVOR" in stable|lts) ;; *) echo "flavor must be 'stable' or 'lts'" >&2;
 : "${BUILD_HOST_KDIR:?set BUILD_HOST_KDIR (remote kbuild output dir for $FLAVOR)}"
 : "${BUILD_HOST_LINUX_DIR:?set BUILD_HOST_LINUX_DIR (remote kernel source checkout for $FLAVOR)}"
 DTB_NAME=${DTB_NAME:-meson8m2-crestron-tsw1060.dtb}
+DTB760_NAME=${DTB760_NAME:-meson8m2-crestron-tsw760.dtb}
 DOCKER_IMG=${BUILD_HOST_DOCKER_IMG:-tsx-mainline}
 if [ -z "${BUILD_HOST_BOOTIMG:-}" ] && [ "$PACK_BOOT" != 1 ]; then
 	echo "set BUILD_HOST_BOOTIMG (an already-packed image) or pass --pack-boot" >&2; exit 1
@@ -80,9 +92,13 @@ KCOMMIT=$(ssh_do "git -C '$BUILD_HOST_LINUX_DIR' rev-parse HEAD")
 say "kernel.commit = $KCOMMIT"
 echo "$KCOMMIT" > "$DIST/kernel.commit"
 
-say "fetching zImage + $DTB_NAME"
+RDTB=$BUILD_HOST_KDIR/arch/arm/boot/dts/amlogic
+DTBS="$DTB_NAME"
+ssh_do "test -f '$RDTB/$DTB760_NAME'" && DTBS="$DTBS $DTB760_NAME"
+say "fetching zImage + $DTBS"
 rsync -a "$BUILD_HOST:$BUILD_HOST_KDIR/arch/arm/boot/zImage" "$DIST/zImage"
-rsync -a "$BUILD_HOST:$BUILD_HOST_KDIR/arch/arm/boot/dts/amlogic/$DTB_NAME" "$DIST/$DTB_NAME"
+rm -f "$DIST/$DTB760_NAME"
+for d in $DTBS; do rsync -a "$BUILD_HOST:$RDTB/$d" "$DIST/$d"; done
 
 say "modules_install (already-built .ko's; no compile) into a remote scratch tree"
 RSTAGE="/tmp/tsx-aports-stage-$FLAVOR-mods.$$"
@@ -99,27 +115,42 @@ if [ -n "${BUILD_HOST_BOOTIMG:-}" ]; then
 	say "fetching already-packed boot image $BUILD_HOST_BOOTIMG"
 	rsync -a "$BUILD_HOST:$BUILD_HOST_BOOTIMG" "$DIST/tsxboot-emmc.img"
 else
-	say "packing a new boot image (mkimage.sh, no compile) from zImage + $DTB_NAME + the switchroot initramfs"
 	RBOOT="/tmp/tsx-aports-stage-$FLAVOR-boot.$$"
+	if [ "$DTBS" = "$DTB_NAME" ]; then
+		DTBARG="--dtb '$RDTB/$DTB_NAME'"
+	else
+		# mkimage.sh --board-dtbs wants the two DTBs under their build names in one dir
+		ssh_do "mkdir -p '$RBOOT/dtbs' && cp '$RDTB/$DTB_NAME' '$RBOOT/dtbs/meson8m2-crestron-tsw1060.dtb' && cp '$RDTB/$DTB760_NAME' '$RBOOT/dtbs/meson8m2-crestron-tsw760.dtb'"
+		DTBARG="--board-dtbs '$RBOOT/dtbs'"
+	fi
+	say "packing a new boot image (mkimage.sh, no compile) from zImage + $DTBS + the switchroot initramfs"
 	ssh_do "mkdir -p '$RBOOT' && docker run --rm -u \$(id -u):\$(id -g) \
 		-v '$BUILD_HOST_KDIR':'$BUILD_HOST_KDIR' -v '$(dirname "$BUILD_HOST_MKIMAGE")':'$(dirname "$BUILD_HOST_MKIMAGE")' \
 		-v '$(dirname "$BUILD_HOST_INITRAMFS")':'$(dirname "$BUILD_HOST_INITRAMFS")' -v '$RBOOT':'$RBOOT' \
 		$DOCKER_IMG '$BUILD_HOST_MKIMAGE' --kernel '$BUILD_HOST_KDIR/arch/arm/boot/zImage' \
-		--dtb '$BUILD_HOST_KDIR/arch/arm/boot/dts/amlogic/$DTB_NAME' \
+		$DTBARG \
 		--initrd '$BUILD_HOST_INITRAMFS' --out '$RBOOT/tsxboot-emmc.img'"
 	rsync -a "$BUILD_HOST:$RBOOT/tsxboot-emmc.img" "$DIST/tsxboot-emmc.img"
 	ssh_do "rm -rf '$RBOOT'"
 fi
 
+say "boot image DTBs"
+CHK=$(mktemp -d); trap 'rm -rf "$CHK"' EXIT
+for d in $DTBS; do cp "$DIST/$d" "$CHK/"; done
+[ "$DTB_NAME" = meson8m2-crestron-tsw1060.dtb ] || mv "$CHK/$DTB_NAME" "$CHK/meson8m2-crestron-tsw1060.dtb"
+[ "$DTB760_NAME" = meson8m2-crestron-tsw760.dtb ] || [ ! -f "$CHK/$DTB760_NAME" ] || mv "$CHK/$DTB760_NAME" "$CHK/meson8m2-crestron-tsw760.dtb"
+python3 "$HERE/check-bootimg-dtbs.py" "$DIST/tsxboot-emmc.img" "$CHK" || {
+	echo "the boot image does not carry this kernel's board DTBs (a TSW-760 needs mkimage.sh --board-dtbs): not staged" >&2; exit 1; }
+
 say "checksums"
-(cd "$DIST" && sha256sum zImage "$DTB_NAME" "modules-$KREL.tar.gz" tsxboot-emmc.img > CHECKSUMS.sha256)
+(cd "$DIST" && sha256sum zImage $DTBS "modules-$KREL.tar.gz" tsxboot-emmc.img > CHECKSUMS.sha256)
 cat "$DIST/CHECKSUMS.sha256"
 
 # --- pack the bundle (same layout+name the "kbundle" CI job publishes) ---
 BUNDLE="tsx-xx60-kernel-$FLAVOR-bundle.tar.zst"
 say "packing $BUNDLE"
 tar --zstd -cf "$DIST/$BUNDLE" -C "$DIST" \
-	zImage "$DTB_NAME" "modules-$KREL.tar.gz" tsxboot-emmc.img \
+	zImage $DTBS "modules-$KREL.tar.gz" tsxboot-emmc.img \
 	kernel.release kernel.commit CHECKSUMS.sha256
 ls -l "$DIST/$BUNDLE"
 
