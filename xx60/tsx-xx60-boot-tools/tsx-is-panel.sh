@@ -1,15 +1,16 @@
-# Shared by tsx-kernel-flavor (the tsx-xx60-kernel-* install/upgrade hook):
-# is this an installed xx60 panel with an eMMC boot partition, running from
-# its eMMC root -- and not a chroot or container (an abuild/apk test run,
-# e.g. under docker --platform linux/arm/v7, or a rootfs build's
-# `apk add --root`)? Source this file, then check the exit status of
-# tsx_is_installed_panel.
+# tsx-kernel-flavor (the install and upgrade hook of the tsx-xx60-kernel-*
+# packages) uses this file. It answers one question: is this an installed
+# xx60 panel with an eMMC boot partition that runs from its eMMC root? A
+# chroot or container is not such a panel. This includes an abuild or apk test
+# run (for example under docker --platform linux/arm/v7) and the
+# `apk add --root` of a rootfs build. Source this file, then check the exit
+# status of tsx_is_installed_panel.
 #
-# The test is "/ IS the eMMC root partition (mmcblk1p8)": the device number
-# of / must equal the one of /dev/mmcblk1p8. apk-tools 3 runs package scripts
-# in their own PID/mount namespace, so /proc/1 there is not the panel's init
-# and a "/ vs /proc/1/root" comparison cannot tell a chroot from the real
-# system; the device number needs no /proc at all.
+# The test is "/ IS the eMMC root partition (mmcblk1p8)". The device number of
+# / must equal the device number of /dev/mmcblk1p8. apk-tools 3 runs package
+# scripts in their own PID and mount namespace. There, /proc/1 is not the init
+# of the panel, so a comparison of "/" and "/proc/1/root" cannot tell a chroot
+# from the real system. The device number does not need /proc.
 tsx_is_installed_panel() {
 	[ -e /etc/tsx/emmc-root.info ] || return 1
 	[ -b /dev/mmcblk1p7 ] && [ -b /dev/mmcblk1p8 ] || return 1

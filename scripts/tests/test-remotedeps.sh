@@ -1,26 +1,25 @@
 #!/bin/bash
-# Host test for the "UNTRUSTED signature" bug: a BUILD_HOST kernel build in
-# a fresh BUILD_DIR failed because tsx-xx60-kernel-*'s
-# depends="tsx-xx60-boot-tools>=1-r4" is resolved by abuild from
-# packages/v3.24 (REPODEST, which persists between separate scripts/build.sh
-# calls against the same BUILD_DIR -- it's excluded from the push, like
-# .throwaway-key/), but each call used to mint and delete its OWN throwaway
-# signing key: a dep built by an earlier call sat in an index signed by a
-# key the current call's container never trusted. The fix (see scripts/
-# build.sh's file header) makes the throwaway keypair persist at
-# BUILD_DIR/.throwaway-key and reused across calls, and also trusts this
-# repo's own committed public key (common/tsx-keys/*.rsa.pub) in the build
-# container.
+# Host test for the "UNTRUSTED signature" bug. A BUILD_HOST kernel build in a
+# fresh BUILD_DIR failed. The depends="tsx-xx60-boot-tools>=1-r4" of
+# tsx-xx60-kernel-* is resolved by abuild from packages/v3.24 (REPODEST). This
+# directory stays between separate scripts/build.sh calls for the same
+# BUILD_DIR, because the push excludes it, like .throwaway-key/. But each call
+# made and deleted its OWN throwaway signing key. A dependency from an earlier
+# call was in an index signed by a key that the container of the current call
+# did not trust. The fix (see the file header of scripts/build.sh) keeps the
+# throwaway keypair at BUILD_DIR/.throwaway-key and reuses it across calls. It
+# also makes the build container trust the committed public key of this repo
+# (common/tsx-keys/*.rsa.pub).
 #
-# 1. Static checks on scripts/build.sh: the fix is actually in place (no
-#    BUILD_HOST/ssh/docker needed).
-# 2. A docker reproduction of the real mechanism -- two REAL abuild -r
-#    builds (packaging, not compiling, same as test-resign.sh's fixture),
-#    one package depending on the other via REPODEST, exactly like
-#    tsx-xx60-kernel-* depending on tsx-xx60-boot-tools -- showing a
-#    dependent build FAILS untrusted against a differently-keyed dep index
-#    (the bug, reproduced), and SUCCEEDS when the same key is reused
-#    across the two separate builds (the fix).
+# 1. Static checks on scripts/build.sh: the fix is in place (no
+#    BUILD_HOST, ssh, or docker needed).
+# 2. A docker reproduction of the real mechanism. Two REAL abuild -r builds
+#    (packaging, not compiling, as in the fixture of test-resign.sh). One
+#    package depends on the other through REPODEST, like tsx-xx60-kernel-*
+#    depends on tsx-xx60-boot-tools. The test shows that a dependent build
+#    FAILS as untrusted against a dependency index with a different key (the
+#    bug, reproduced). It SUCCEEDS when the two separate builds use the same
+#    key (the fix).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
@@ -62,9 +61,9 @@ echo "== 2. reproduce the mechanism with real abuild -r builds =="
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 mkdir -p "$W/xx60fixture" "$W/repoA"
 
-# Two throwaway keypairs (neither is the real project key): "A" stands in
-# for a BUILD_DIR's persisted key, "B" for a fresh, unrelated one -- what
-# the old per-call mktemp -d behavior produced.
+# Two throwaway keypairs (neither is the real project key). "A" stands for
+# the persisted key of a BUILD_DIR. "B" stands for a new, unrelated key, which
+# the old per-call mktemp -d produced.
 openssl genrsa -out "$W/keyA.rsa" 4096 >/dev/null 2>&1
 openssl rsa -in "$W/keyA.rsa" -pubout -out "$W/keyA.rsa.pub" >/dev/null 2>&1
 openssl genrsa -out "$W/keyB.rsa" 4096 >/dev/null 2>&1
@@ -101,8 +100,8 @@ package() {
 }
 APKBUILD
 
-# Step A: build the dep, signed+indexed with key A, into a REPODEST both
-# later builds share -- this is packages/v3.24 in the real repo.
+# Step A: build the dependency, signed and indexed with key A, into a REPODEST
+# that both later builds share. This is packages/v3.24 in the real repo.
 docker run --rm --platform linux/arm/v7 -v "$W:/w" alpine:3.24 sh -euc '
 	apk add --no-cache alpine-sdk >/dev/null
 	mkdir -p /root/.abuild
@@ -121,9 +120,10 @@ if ! find "$W/repoA" -name "tsx-fixture-dep-*.apk" | grep -q .; then
 fi
 ok "fixture dep built and indexed (REPODEST), signed with key A"
 
-# Step B (the BUG, reproduced): a separate build, its OWN key B, trusting
-# only B -- the old "mktemp -d ... rm -rf" per-call behavior. The dep in
-# REPODEST is signed with A, which this container never trusts.
+# Step B (the BUG, reproduced): a separate build with its OWN key B. It
+# trusts only B, like the old "mktemp -d ... rm -rf" per-call behavior. The
+# dependency in REPODEST has a signature from A, which this container never
+# trusts.
 docker run --rm --platform linux/arm/v7 -v "$W:/w" alpine:3.24 sh -euc '
 	apk add --no-cache alpine-sdk >/dev/null
 	mkdir -p /root/.abuild
@@ -143,8 +143,8 @@ else
 	fi
 fi
 
-# Step C (the FIX): a separate build reusing the SAME key A (what
-# BUILD_DIR/.throwaway-key persistence now guarantees across calls).
+# Step C (the FIX): a separate build that reuses the SAME key A. The
+# persistent BUILD_DIR/.throwaway-key now guarantees this across calls.
 docker run --rm --platform linux/arm/v7 -v "$W:/w" alpine:3.24 sh -euc '
 	apk add --no-cache alpine-sdk >/dev/null
 	mkdir -p /root/.abuild

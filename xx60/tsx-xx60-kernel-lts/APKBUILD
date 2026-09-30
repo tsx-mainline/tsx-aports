@@ -2,45 +2,46 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 #
 # BINARY packaging of an already-built kernel: no compiler runs in this
-# APKBUILD. source= fetches ONE release asset -- tsx-xx60-linux's
-# tsx-xx60-kernel-lts-bundle.tar.zst for the tagged release _kbundle_tag,
-# built by that repo's .github/workflows/release.yml (job "kbundle") -- and
-# abuild auto-extracts it (a plain .tar.zst) into a zImage, the board DTB,
-# the modules tree tarball, the packed eMMC boot image, kernel.release and
-# kernel.commit (the last two: provenance only, nothing here reads them).
-# This is how CI (which has no build host to stage from) builds this
-# package. For a LOCAL build of a kernel that has not been tagged/released
-# yet, ../../scripts/stage-kernel.sh still builds the exact same bundle
-# format from a build host and drops it in dist/ under the URL's own
-# basename; SRCDEST below then makes abuild use that local file (verified
-# by sha512sum, never re-fetched) instead of hitting the network. Either
-# way, stage-kernel.sh fills in pkgver/pkgrel/_kernelrelease/sha512sums below --
-# do not hand-edit them. _kbundle_tag is CI-only and is not touched by
-# stage-kernel.sh; bump it by hand once a matching tsx-xx60-linux release
-# exists (see ../../README.md).
+# APKBUILD. source= fetches ONE release asset: the file
+# tsx-xx60-kernel-lts-bundle.tar.zst of tsx-xx60-linux, for the
+# tagged release _kbundle_tag. The job "kbundle" in
+# .github/workflows/release.yml of that repo builds it. abuild extracts it
+# automatically (it is a plain .tar.zst). The bundle contains a zImage, the
+# board DTB, the modules tree tarball, the packed eMMC boot image,
+# kernel.release, and kernel.commit. The last two are provenance only, and
+# nothing here reads them.
+# CI has no build host to stage from, so this is how CI builds the package.
+# For a LOCAL build of a kernel that has no tag or release yet,
+# ../../scripts/stage-kernel.sh builds the same bundle format from a build
+# host. It puts the bundle in dist/ under the basename of the URL. SRCDEST
+# below then makes abuild use that local file. sha512sum verifies it, and
+# abuild does not fetch it again. In both cases, stage-kernel.sh writes
+# pkgver, pkgrel, _kernelrelease, and sha512sums below. Do not edit them by
+# hand. stage-kernel.sh does not change _kbundle_tag, and only CI uses it.
+# Change it by hand when a matching tsx-xx60-linux release exists (see
+# ../../README.md).
 SRCDEST="$startdir/dist"
 #
-# pkgver scheme: <upstream kernel version>_git<YYYYMMDD>, e.g. 7.2.8_git20260927.
-# apk pkgver cannot contain '-', so the git-describe suffix
-# ("-NNNNN-gHASH") that `make kernelrelease` produces is replaced by the
-# staging date; the exact commit for a given pkgver is recorded in
-# _kernelrelease below (build provenance only -- nothing on the panel reads
-# it).
+# pkgver scheme: <upstream kernel version>_git<YYYYMMDD>, for example
+# 7.2.8_git20260927. An apk pkgver cannot contain '-'. The staging date
+# replaces the git-describe suffix ("-NNNNN-gHASH") of `make kernelrelease`.
+# The variable _kernelrelease below records the exact commit for a pkgver.
+# This is build provenance only, and nothing on the panel reads it.
 #
-# "LTS" here is Alpine's sense (linux-lts vs. linux-stable): this is
-# upstream's longterm series (currently 6.18.y), carried forward with weekly
-# point-release merges. This is the DEFAULT flavor for a panel install --
-# longer-lived than tsx-xx60-kernel-stable (which tracks the newest upstream
-# stable series and gets re-ported each time that series goes EOL). Both
-# flavors install side by side (own /lib/modules/<release>/, own
-# /boot/tsxboot-emmc-<flavor>.img); only the SELECTED flavor's image is
-# written into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
+# "LTS" has the Alpine meaning (linux-lts and linux-stable). This is the
+# longterm series of upstream (now 6.18.y). We add the weekly point releases
+# by merge. It is the DEFAULT flavor of a panel install. It lives longer than
+# tsx-xx60-kernel-stable, which follows the newest upstream stable series. We
+# port that flavor again each time its series reaches EOL. Both flavors install
+# side by side, each with its own /lib/modules/<release>/ and its own
+# /boot/tsxboot-emmc-<flavor>.img. Only the image of the SELECTED flavor goes
+# into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-lts
 pkgver=6.18.54_git20260928
 pkgrel=11
 _kernelrelease=6.18.54-00121-gf521d0d9730e
-# tsx-xx60-linux release tag whose "kbundle" CI asset this pins. UNRELEASED
-# until that repo has cut a real tag with this job in it; until then this
+# The tsx-xx60-linux release tag whose "kbundle" CI asset this package pins.
+# UNRELEASED until that repo has a real tag with this job. Until then, the
 # package builds only from a local dist/ stage (see the header comment).
 _kbundle_tag=UNRELEASED
 pkgdesc="xx60 mainline kernel, longterm (LTS) line"
@@ -58,8 +59,9 @@ package() {
 	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-lts.release
 	mkdir -p "$pkgdir"/lib/modules
 	tar -xzf "$srcdir"/modules-$_kernelrelease.tar.gz -C "$pkgdir"
-	# modules_install's build/source links point into the build machine's
-	# kernel build dir: meaningless on a panel, and they name that machine's paths
+	# The build/source links of modules_install point into the kernel build
+	# directory of the build machine. They have no meaning on a panel, and
+	# they name paths on that machine.
 	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
 }
 

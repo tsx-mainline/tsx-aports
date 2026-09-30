@@ -1,59 +1,63 @@
 #!/bin/bash
-# Stage the binary inputs for xx60/tsx-xx60-kernel-<flavor> from an already
-# built kernel on a build host, pack them into the same
-# tsx-xx60-kernel-<flavor>-bundle.tar.zst format tsx-xx60-linux's
-# .github/workflows/release.yml (job "kbundle") publishes as a release
-# asset, and update that package's APKBUILD (pkgver + sha512sums) to match.
-# This does NOT compile anything: the kernel and its modules must already
-# be built (zImage, the board DTB and the .ko files all present in
-# BUILD_HOST_KDIR); this script only runs `make modules_install`
-# (installs already-built .ko's into a tree + depmod, no compiler invoked
-# unless something is actually stale) and, with --pack-boot, kernel/mkimage.sh
-# (packs an Android boot image from the zImage + DTB + an initramfs --
-# again no compilation). With a TSW-760 DTB in the kernel build (kernels with
+# Stage the binary inputs for xx60/tsx-xx60-kernel-<flavor> from a kernel that
+# is already built on a build host. The script packs them into the bundle
+# tsx-xx60-kernel-<flavor>-bundle.tar.zst. This is the format that the job
+# "kbundle" in .github/workflows/release.yml of tsx-xx60-linux publishes as a
+# release asset. It then updates pkgver and sha512sums in the APKBUILD of the
+# package.
+# The script does NOT compile anything. The kernel and its modules must
+# already exist in BUILD_HOST_KDIR: zImage, the board DTB, and the .ko files.
+# The script runs `make modules_install`. This installs the built .ko files
+# into a tree and runs depmod. It starts the compiler only if a file is stale.
+# With --pack-boot, the script runs kernel/mkimage.sh. This packs an Android
+# boot image from the zImage, the DTB, and an initramfs, and does not compile.
+# If the kernel build has a TSW-760 DTB (kernels with
 # meson8m2-crestron-tsw760.dts), --pack-boot packs both board DTBs into the
-# vendor AML_ multi-DTB container (mkimage.sh --board-dtbs), so the one image
-# boots the TSW-1060 and the TSW-760; the bundle carries both DTBs. Every boot
-# image (packed or fetched) is checked with scripts/check-bootimg-dtbs.py
-# against the kernel's DTBs before anything is packed: a fetched image
-# without the container is refused when the kernel has the TSW-760 DTB.
+# vendor AML_ multi-DTB container (mkimage.sh --board-dtbs). The one image
+# then boots the TSW-1060 and the TSW-760, and the bundle has both DTBs.
+# Before it packs anything, the script checks each boot image (packed or
+# fetched) with scripts/check-bootimg-dtbs.py against the DTBs of the kernel.
+# It refuses a fetched image that has no container when the kernel has the
+# TSW-760 DTB.
 #
-# The APKBUILD's source= is a URL (a tagged tsx-xx60-linux release); this
-# script does not touch that URL or its _kbundle_tag, only the local
-# dist/<bundle>.tar.zst (named to match the URL's basename) and
-# sha512sums= (a single line, for that one file). The APKBUILD sets
-# SRCDEST=dist, so `abuild checksum`/`scripts/build.sh` finds this local
-# file and verifies it instead of fetching the (possibly not-yet-tagged)
-# release -- that is what "local build of an unreleased kernel" means here.
+# The source= of the APKBUILD is a URL (a tagged tsx-xx60-linux release). The
+# script does not change this URL or _kbundle_tag. It changes only the local
+# file dist/<bundle>.tar.zst (named like the basename of the URL) and
+# sha512sums= (one line, for that one file). The APKBUILD sets SRCDEST=dist.
+# So `abuild checksum` and scripts/build.sh find this local file and verify it.
+# They do not fetch the release, which can have no tag yet. This is what
+# "local build of an unreleased kernel" means here.
 #
 #   scripts/stage-kernel.sh stable|lts [--pack-boot]
 #
-# Required env (no defaults on purpose: this repo names no build host):
+# Required environment (no defaults, because this repo names no build host):
 #   BUILD_HOST            ssh destination of the build host
-#   BUILD_HOST_KDIR       remote kbuild output dir for this flavor
-#                         (has arch/arm/boot/zImage, arch/arm/boot/dts/amlogic/*.dtb,
+#   BUILD_HOST_KDIR       remote kbuild output directory for this flavor
+#                         (has arch/arm/boot/zImage,
+#                          arch/arm/boot/dts/amlogic/*.dtb,
 #                          include/config/kernel.release)
-#   BUILD_HOST_LINUX_DIR  remote kernel source checkout matching BUILD_HOST_KDIR
-#                         (the -o/O= source tree for modules_install)
+#   BUILD_HOST_LINUX_DIR  remote kernel source checkout that matches
+#                         BUILD_HOST_KDIR (the source tree for modules_install)
 #
-# One of, for the boot image:
+# For the boot image, set one of these:
 #   BUILD_HOST_BOOTIMG    remote path to an already-packed tsxboot-emmc.img
-#                         for this flavor (skips packing)
-#   --pack-boot with:
+#                         for this flavor (skips the packing)
+#   --pack-boot, with these variables:
 #   BUILD_HOST_INITRAMFS  remote path to initramfs-switchroot.cpio.gz
-#   BUILD_HOST_MKIMAGE    remote path to kernel/mkimage.sh (tsx-xx60-linux; a
-#                         version with --board-dtbs when the kernel has the
-#                         TSW-760 DTB)
+#   BUILD_HOST_MKIMAGE    remote path to kernel/mkimage.sh (tsx-xx60-linux).
+#                         Use a version with --board-dtbs when the kernel has
+#                         the TSW-760 DTB.
 #
 # Optional:
-#   BUILD_HOST_DOCKER_IMG cross-toolchain docker image on the host, used for
-#                         modules_install (needs the ARM strip) and mkimage.sh
-#                         (needs python3 + the DT/image tools) (default tsx-mainline)
-#   DTB_NAME              TSW-1060 device tree blob file name (default
+#   BUILD_HOST_DOCKER_IMG cross-toolchain docker image on the host. It is used
+#                         for modules_install (needs the ARM strip) and for
+#                         mkimage.sh (needs python3 and the DT/image tools).
+#                         The default is tsx-mainline.
+#   DTB_NAME              file name of the TSW-1060 device tree blob (default
 #                         meson8m2-crestron-tsw1060.dtb)
-#   DTB760_NAME           TSW-760 device tree blob file name (default
-#                         meson8m2-crestron-tsw760.dtb); used when the kernel
-#                         build has it
+#   DTB760_NAME           file name of the TSW-760 device tree blob (default
+#                         meson8m2-crestron-tsw760.dtb). The script uses it
+#                         when the kernel build has it.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
@@ -119,7 +123,7 @@ else
 	if [ "$DTBS" = "$DTB_NAME" ]; then
 		DTBARG="--dtb '$RDTB/$DTB_NAME'"
 	else
-		# mkimage.sh --board-dtbs wants the two DTBs under their build names in one dir
+		# mkimage.sh --board-dtbs needs the two DTBs in one directory, with their build names
 		ssh_do "mkdir -p '$RBOOT/dtbs' && cp '$RDTB/$DTB_NAME' '$RBOOT/dtbs/meson8m2-crestron-tsw1060.dtb' && cp '$RDTB/$DTB760_NAME' '$RBOOT/dtbs/meson8m2-crestron-tsw760.dtb'"
 		DTBARG="--board-dtbs '$RBOOT/dtbs'"
 	fi
@@ -146,7 +150,7 @@ say "checksums"
 (cd "$DIST" && sha256sum zImage $DTBS "modules-$KREL.tar.gz" tsxboot-emmc.img > CHECKSUMS.sha256)
 cat "$DIST/CHECKSUMS.sha256"
 
-# --- pack the bundle (same layout+name the "kbundle" CI job publishes) ---
+# --- pack the bundle (same layout and name as the "kbundle" CI job) ---
 BUNDLE="tsx-xx60-kernel-$FLAVOR-bundle.tar.zst"
 say "packing $BUNDLE"
 tar --zstd -cf "$DIST/$BUNDLE" -C "$DIST" \
@@ -154,25 +158,24 @@ tar --zstd -cf "$DIST/$BUNDLE" -C "$DIST" \
 	kernel.release kernel.commit CHECKSUMS.sha256
 ls -l "$DIST/$BUNDLE"
 
-# --- derive pkgver from the kernelrelease and rewrite the APKBUILD --------
-# Scheme: pkgver = <upstream version>_git<YYYYMMDD>, where <upstream version>
-# is the dotted release (e.g. 7.2.8, 6.18.54) taken from kernel.release up to
-# the first '-', and the date is today (the day this was staged, i.e. the day
-# of the commit count + hash that kernel.release also carries -- see
-# dist/kernel.release and dist/kernel.commit for the exact commit).
-# apk pkgver may not contain '-', hence the switch to a date suffix instead
-# of the "-NNNNN-gHASH" git-describe suffix; the exact commit is recorded in
-# dist/kernel.release / dist/kernel.commit (shipped nowhere on the panel --
-# it is build provenance, not runtime state) for anyone who needs to
-# reproduce this exact package.
+# --- derive pkgver from the kernelrelease and rewrite the APKBUILD ---
+# Scheme: pkgver = <upstream version>_git<YYYYMMDD>. <upstream version> is
+# the dotted release (for example 7.2.8 or 6.18.54). The script takes it from
+# kernel.release, up to the first '-'. The date is today, the day of staging.
+# The exact commit is in dist/kernel.release and dist/kernel.commit.
+# An apk pkgver cannot contain '-'. For this reason, a date suffix replaces
+# the "-NNNNN-gHASH" suffix of git describe. The two files record the exact
+# commit for anyone who must reproduce this package. This is build
+# provenance and not runtime state, so no file on the panel has it.
 BASEVER=${KREL%%-*}
 PKGVER="${BASEVER}_git$(date +%Y%m%d)"
 say "derived pkgver=$PKGVER (from kernel.release $KREL)"
 
 APKBUILD="$PKGDIR/APKBUILD"
-# pkgrel: a new kernel release staged on the same day keeps the same pkgver,
-# and apk only upgrades to a higher version -- bump pkgrel then. A new
-# pkgver starts again at pkgrel 0. Re-staging the same release keeps both.
+# pkgrel: a new kernel release that you stage on the same day has the same
+# pkgver, and apk upgrades only to a higher version. In that case, increase
+# pkgrel. A new pkgver starts again at pkgrel 0. If you stage the same
+# release again, pkgver and pkgrel stay the same.
 OLDVER=$(sed -n 's/^pkgver=//p' "$APKBUILD")
 OLDREL=$(sed -n 's/^pkgrel=//p' "$APKBUILD")
 OLDKREL=$(sed -n 's/^_kernelrelease=//p' "$APKBUILD")

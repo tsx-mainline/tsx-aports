@@ -1,29 +1,30 @@
 # Build the packages and publish the apk repository to GitHub Pages behind
 # tsx-aports.unexceptional.net.
 #
-#   build           push to main (only when packages, scripts or this file
-#                   change), manual runs, and pull requests. Restores the
-#                   currently published tree (scripts/carry-forward.py),
-#                   builds only what is new (scripts/build.sh
-#                   --skip-existing), re-indexes and signs it
-#                   (scripts/index.sh --keep 2). Pull requests build with a
-#                   throwaway key and publish nothing.
+#   build           runs on a push to main (only when packages, scripts or this
+#                   file change), on manual runs, and on pull requests.
+#                   It restores the published tree (scripts/carry-forward.py).
+#                   It builds only the new versions (scripts/build.sh
+#                   --skip-existing). It then re-indexes and signs the tree
+#                   (scripts/index.sh --keep 2). A pull request builds with a
+#                   throwaway key and publishes nothing.
 #   deploy          publishes the tree that `build` assembled.
-#   chromium-watch  scheduled: checks Alpine v3.24 armv7 for a newer chromium
-#                   and opens a pull request that bumps the pin.
+#   chromium-watch  runs on a schedule. It checks Alpine v3.24 armv7 for a
+#                   newer chromium and opens a pull request that changes
+#                   the pin.
 #
-# Needs, once, outside this file:
-#   - secret TSX_APORTS_PRIVKEY: the signing key, base64-encoded (the key
-#     itself is never committed);
-#   - Settings > Pages > source "GitHub Actions" and the custom domain;
+# These settings must exist once, outside this file:
+#   - The secret TSX_APORTS_PRIVKEY holds the signing key, base64-encoded.
+#     The key itself is never committed.
+#   - Settings > Pages > source "GitHub Actions", and the custom domain.
 #   - Settings > Actions > General > "Allow GitHub Actions to create and
-#     approve pull requests" (chromium-watch only).
+#     approve pull requests" (for chromium-watch only).
 #
-# First deploy: the live site is empty, so nothing would be carried forward
-# and the kernel packages (their release bundles may not exist yet) would be
-# missing. Upload a tarball of a published tree as the release asset named
-# below BEFORE the first push to main (README.md "CI"), or start a manual run
-# with the seed_url input. Later runs restore the live site instead.
+# First deploy: the live site is empty, so nothing is carried forward, and the
+# kernel packages are missing (their release bundles may not exist yet).
+# Before the first push to main, upload a tarball of a published tree as the
+# release asset named below (README.md "CI"). Or start a manual run with the
+# seed_url input. Later runs restore the live site instead.
 name: build
 
 on:
@@ -33,7 +34,7 @@ on:
   pull_request:
     paths: ['common/**', 'xx60/**', 'scripts/**', '.github/workflows/build.yml']
   schedule:
-    # chromium-watch only; the cron below is UTC, once a day
+    # Only chromium-watch uses this schedule. The time is UTC, once a day.
     - cron: '17 6 * * *'
   workflow_dispatch:
     inputs:
@@ -42,8 +43,8 @@ on:
         required: false
         default: ''
 
-# a publish is never cancelled part-way; pull-request builds do not queue
-# behind (or block) publishes
+# A publish is never cancelled part-way. A pull-request build does not wait
+# for a publish and does not block one.
 concurrency:
   group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'tsx-aports-publish' }}
   cancel-in-progress: false
@@ -65,7 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Decide whether this run publishes
+      - name: Decide if this run publishes
         id: mode
         run: |
           if [ "$GITHUB_EVENT_NAME" != pull_request ] && [ "$GITHUB_REF" = refs/heads/main ]; then
@@ -82,21 +83,21 @@ jobs:
           set -eu
           umask 077
           mkdir -p "$RUNNER_TEMP/keys"
-          # the key file must carry the committed public key's name
-          # (tsx-mainline-<id>.rsa): the index signature is named after it and
-          # panels look the key up in /etc/apk/keys by that name
+          # The key file must have the name of the committed public key
+          # (tsx-mainline-<id>.rsa). The index signature uses this name, and
+          # a panel finds the key in /etc/apk/keys by this name.
           PUB=$(ls common/tsx-keys/*.rsa.pub)
           KEYNAME=$(basename "$PUB" .pub)
           [ -n "$KEY_B64" ] || { echo "::error::secret TSX_APORTS_PRIVKEY is not set"; exit 1; }
           printf '%s' "$KEY_B64" | base64 -d > "$RUNNER_TEMP/keys/$KEYNAME"
           openssl rsa -in "$RUNNER_TEMP/keys/$KEYNAME" -pubout -out "$RUNNER_TEMP/keys/$KEYNAME.pub"
-          # the secret must be the key that belongs to the committed public
-          # key, or panels would reject every index this run signs
+          # The secret must be the key for the committed public key. If it is
+          # not, panels reject every index that this run signs.
           [ "$(openssl rsa -pubin -in "$PUB" -modulus -noout)" = "$(openssl rsa -pubin -in "$RUNNER_TEMP/keys/$KEYNAME.pub" -modulus -noout)" ] \
             || { echo "::error::TSX_APORTS_PRIVKEY does not match $PUB"; exit 1; }
           echo "TSX_APORTS_KEY=$RUNNER_TEMP/keys/$KEYNAME" >> "$GITHUB_ENV"
 
-      - name: Throwaway signing key (pull requests build only and publish nothing)
+      - name: Throwaway signing key (a pull request only builds and publishes nothing)
         if: steps.mode.outputs.publish != 'true'
         run: |
           umask 077
@@ -105,14 +106,15 @@ jobs:
           openssl rsa -in "$RUNNER_TEMP/keys/ci-throwaway.rsa" -pubout -out "$RUNNER_TEMP/keys/ci-throwaway.rsa.pub"
           echo "TSX_APORTS_KEY=$RUNNER_TEMP/keys/ci-throwaway.rsa" >> "$GITHUB_ENV"
 
-      - name: Set up QEMU (armv7 emulation)
+      - name: Install QEMU (armv7 emulation)
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm
 
-      # Start from what is already published, so that older versions
-      # (index.sh --keep 2) and packages this run does not rebuild survive
-      # the deploy. Every index is checked against the committed public key.
+      # Start from the published tree. Then the older versions
+      # (index.sh --keep 2) and the packages that this run does not rebuild
+      # stay after the deploy. The step checks every index against the
+      # committed public key.
       - name: Carry forward the published tree
         env:
           SEED_URL: ${{ inputs.seed_url }}
@@ -124,20 +126,21 @@ jobs:
               --fallback-seed "https://github.com/$GITHUB_REPOSITORY/releases/download/seed/tsx-aports-seed.tar.gz"
           fi
 
-      # --skip-existing: a version that is already published is not rebuilt
-      # (tensorflow-lite-c is a C++ build under QEMU); --skip-unreachable: a
-      # kernel package whose release bundle does not exist yet is skipped
-      # with a warning and its carried-forward copy stays.
-      - name: Build what is new
+      # --skip-existing: the build does not rebuild a published version
+      # (tensorflow-lite-c is a C++ build under QEMU).
+      # --skip-unreachable: the build skips a kernel package whose release
+      # bundle does not exist yet, with a warning. Its carried-forward copy
+      # stays.
+      - name: Build the new versions
         run: scripts/build.sh --skip-existing --skip-unreachable --all
 
-      - name: Assemble the published tree (latest + 1 previous version)
+      - name: Assemble the published tree (latest and one previous version)
         if: steps.mode.outputs.publish == 'true'
         run: |
           scripts/index.sh --keep 2 --out repo
           echo "$SITE_DOMAIN" > repo/CNAME
-          # last gate: every index signature and apk checksum in what is
-          # about to go live must verify against the committed key
+          # Last check: every index signature and apk checksum in the tree
+          # that goes live must verify against the committed key.
           scripts/carry-forward.py --from repo --dest "$RUNNER_TEMP/verify"
           du -sh repo
           find repo -name '*.apk' -exec du -h {} + | sort -rh | head -5
@@ -186,22 +189,22 @@ jobs:
             echo "version=$LATEST" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Bump the pin
+      - name: Change the pin
         if: steps.check.outputs.new == 'true'
         env:
           LATEST: ${{ steps.check.outputs.version }}
         run: |
           sed -i "s/^pkgver=.*/pkgver=${LATEST%-r*}/; s/^pkgrel=.*/pkgrel=${LATEST##*-r}/" xx60/tsx-xx60-chromium/APKBUILD
 
-      - name: Set up QEMU (armv7 emulation)
+      - name: Install QEMU (armv7 emulation)
         if: steps.check.outputs.new == 'true'
         uses: docker/setup-qemu-action@v4
         with:
           platforms: arm
 
-      # a throwaway key: this run only proves the repack works, it publishes
-      # nothing (the merged pull request triggers the real build)
-      - name: Repack (fails loudly and stops here if the patch site moved)
+      # This run uses a throwaway key. It only proves that the repack works,
+      # and it publishes nothing. The merged pull request starts the real build.
+      - name: Repack (fails and stops here if the patch site moved)
         if: steps.check.outputs.new == 'true'
         run: |
           umask 077
@@ -210,11 +213,11 @@ jobs:
           openssl rsa -in "$RUNNER_TEMP/keys/ci-throwaway.rsa" -pubout -out "$RUNNER_TEMP/keys/ci-throwaway.rsa.pub"
           TSX_APORTS_KEY="$RUNNER_TEMP/keys/ci-throwaway.rsa" scripts/build.sh xx60/tsx-xx60-chromium
 
-      # On success: commit the bumped pin (patch-chromium.py verified the
-      # site, so sigs.json already covers it -- if it DIDN'T, the previous
-      # step already failed and this never runs) and open a PR rather than
-      # pushing straight to main, so a human eyeballs the diff once.
-      - name: Open a PR with the bumped pin
+      # On success, commit the new pin and open a pull request. Do not push to
+      # main directly, so that a person reviews the diff once.
+      # patch-chromium.py verified the patch site, so sigs.json already covers
+      # it. If it did not, the previous step failed and this step does not run.
+      - name: Open a pull request with the new pin
         if: steps.check.outputs.new == 'true'
         uses: peter-evans/create-pull-request@v8
         with:

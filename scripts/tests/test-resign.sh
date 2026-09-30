@@ -1,21 +1,24 @@
 #!/bin/bash
 # Host tests for "the private signing key never leaves this workstation"
-# (README.md "Signing key" / "Building on a remote host", scripts/build.sh):
-#   1. the runtime guards scripts/build.sh's BUILD_HOST path relies on --
-#      to_build_host (refuses to rsync anything that looks like a private
-#      key) and assert_remote_cmd_safe (refuses a remote command string that
-#      embeds the local private key's path) -- no BUILD_HOST needed: this
-#      sources build.sh with TSX_APORTS_BUILD_SH_SOURCE_ONLY=1, which loads
-#      the functions and returns before touching a real target/docker/ssh.
-#   2. scripts/resign.sh actually replaces a throwaway signature with the
-#      project key's: `apk verify` (trusting ONLY a fixture "project" public
-#      key) fails against a package signed with a different (fixture
-#      "throwaway") key, and passes after scripts/resign.sh re-signs it.
-# Builds nothing heavy: the "package" is a handful of bytes of tar+gzip, put
-# together and signed inside disposable Alpine containers (abuild-sign / apk
-# verify -- the same operations scripts/build.sh's BUILD_HOST path and
-# scripts/resign.sh do for real, not a kernel/rootfs/qemu compile). Neither
-# key here is the real project key.
+# (README.md "Signing key" and "Building on a remote host", scripts/build.sh):
+#   1. The runtime guards that the BUILD_HOST path of scripts/build.sh uses.
+#      to_build_host refuses to rsync anything that looks like a private key.
+#      assert_remote_cmd_safe refuses a remote command string that contains
+#      the local path of the private key. The test needs no BUILD_HOST. It
+#      sources build.sh with TSX_APORTS_BUILD_SH_SOURCE_ONLY=1. This loads the
+#      functions and returns before the script touches a real target, docker,
+#      or ssh.
+#   2. scripts/resign.sh replaces a throwaway signature with the signature of
+#      the project key. `apk verify` trusts ONLY a fixture "project" public
+#      key. It fails for a package signed with a different (fixture
+#      "throwaway") key, and it passes after scripts/resign.sh re-signs the
+#      package.
+# The test builds nothing heavy. The "package" is a few bytes of tar and gzip.
+# Disposable Alpine containers assemble and sign it (abuild-sign and apk
+# verify). These are the same operations that the BUILD_HOST path of
+# scripts/build.sh and scripts/resign.sh do for real. The test does not
+# compile a kernel, a rootfs, or a qemu build. Neither key here is the real
+# project key.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
@@ -40,9 +43,9 @@ case "$OUT" in *"refusing to copy a private key"*) ok "to_build_host refuses any
 OUT=$(
 	TSX_APORTS_BUILD_SH_SOURCE_ONLY=1 . "$HERE/build.sh"
 	TSX_APORTS_KEY=/keys/tsx-mainline-real.rsa
-	# a local, no-network rsync (source and dest are both plain paths, no
-	# "host:" target) so this stays fast and offline either way; only the
-	# guard's own case check is under test here, not rsync itself
+	# A local rsync without network (source and destination are plain paths,
+	# with no "host:" target). It stays fast and offline. The test covers only
+	# the case check of the guard, not rsync.
 	to_build_host --dry-run /keys/tsx-mainline-real.rsa.pub /tmp/tsx-resign-test-nonexistent-dst 2>&1 || true
 )
 case "$OUT" in *"refusing to copy a private key"*) bad "to_build_host refused the PUBLIC key too: $OUT";; *) ok "to_build_host lets the public key (.rsa.pub) through";; esac
@@ -73,19 +76,19 @@ echo "== 2. resign.sh replaces a throwaway signature with the project key's =="
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 mkdir -p "$W/in" "$W/out" "$W/build"
 
-# Fixture keys (neither is the real project key): "project" is what a
-# workstation's TSX_APORTS_KEY would be; "throwaway" simulates the key a
+# Fixture keys (neither is the real project key). "project" stands for the
+# TSX_APORTS_KEY of a workstation. "throwaway" stands for the key that a
 # BUILD_HOST build generates and deletes.
 openssl genrsa -out "$W/project.rsa" 4096 >/dev/null 2>&1
 openssl rsa -in "$W/project.rsa" -pubout -out "$W/project.rsa.pub" >/dev/null 2>&1
 
-# A tiny REAL package (one static file, `abuild -F -r` the same way
-# scripts/build.sh's local path builds anything -- packaging, not
-# compiling), signed with the THROWAWAY key inside a disposable Alpine
-# container. A real `abuild -r` build is used (rather than hand-assembling
-# a .PKGINFO) so `apk verify` below is checking the genuine article: apk's
-# own PKGINFO/checksum requirements are whatever abuild itself produces,
-# not our guess at them.
+# A tiny REAL package (one static file). `abuild -F -r` builds it the same
+# way as the local path of scripts/build.sh builds any package. This is
+# packaging, not compiling. A disposable Alpine container signs it with the
+# THROWAWAY key. The test uses a real `abuild -r` build and does not assemble a
+# .PKGINFO by hand. Then `apk verify` below checks the genuine article. The
+# PKGINFO and checksum requirements of apk are what abuild produces, not our
+# guess.
 mkdir -p "$W/build/tsx-fixture"
 cat > "$W/build/tsx-fixture/APKBUILD" <<'APKBUILD'
 pkgname=tsx-fixture

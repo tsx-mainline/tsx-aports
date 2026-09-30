@@ -1,13 +1,14 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# Third-party software (Sendspin/sendspin-cpp-cli); keeps its own upstream
+# Third-party software (Sendspin/sendspin-cpp-cli). It keeps its own upstream
 # license (see license= below), not GPL-2.0-or-later.
 #
-# Built the same way as the project's rootfs used to build it by hand
-# (rootfs/src/sendspin/build.sh in tsx-xx60-linux, same pinned tag, same
-# cmake flags): musl/armv7, statically linked FetchContent deps
-# (ArduinoJson, micro-flac, micro-opus, IXWebSocket) fetched by CMake at
-# configure time, so this build needs network -- options="net".
+# This recipe builds the package the same way that the rootfs of the project
+# built it by hand (rootfs/src/sendspin/build.sh in tsx-xx60-linux, with the
+# same pinned tag and the same cmake flags). The target is musl/armv7. The
+# dependencies ArduinoJson, micro-flac, micro-opus, and IXWebSocket are
+# statically linked. CMake fetches them (FetchContent) at configure time, so
+# the build needs network access: options="net".
 pkgname=sendspin-cli
 pkgver=0.3.0
 pkgrel=0

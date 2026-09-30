@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """apk-split.py APK OUTDIR: split an apk v2 package into its gzip members
-sig.tar.gz (the signature), control.tar.gz, data.tar.gz (byte-exact).
+sig.tar.gz (the signature), control.tar.gz, and data.tar.gz (byte-exact).
 
-Used by scripts/resign.sh to re-sign a package built with a different
-(throwaway) key: split it, throw the old sig.tar.gz away, re-sign
-control.tar.gz with the real key, and concatenate control+data back into a
-package. An apk v2 package is exactly the concatenation of three gzip
-streams in that order; splitting on gzip member boundaries needs no
-knowledge of the tar contents.
+scripts/resign.sh uses this script to re-sign a package that was built with
+a different (throwaway) key. It splits the package and discards the old
+sig.tar.gz. It signs control.tar.gz again with the real key, and joins
+control and data into a package. An apk v2 package is the concatenation of
+three gzip streams in this order. The split uses the gzip member boundaries
+and needs no knowledge of the tar contents.
 """
 import os
 import sys

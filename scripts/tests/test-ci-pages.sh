@@ -1,16 +1,17 @@
 #!/bin/bash
 # Host tests for the CI publish path (.github/workflows/build.yml):
-#   1. scripts/carry-forward.py against a local HTTP server: fetch + verify,
-#      a 404 site, a tampered apk, a bad/unknown index signature, a trimmed
-#      seed tarball, the fallback seed.
+#   1. scripts/carry-forward.py against a local HTTP server: fetch and verify,
+#      a 404 site, a tampered apk, a bad or unknown index signature, a trimmed
+#      seed tarball, and the fallback seed.
 #   2. scripts/build.sh --skip-existing.
-#   3. scripts/build.sh --skip-unreachable (a kernel-style 404 source).
-#   4. scripts/index.sh --keep 2 over a tree mixing carried-forward and
-#      freshly built packages, and the result verifies again.
-# Packaging only: the fixture packages hold one text file and are built with
-# abuild in a disposable Alpine container (as test-resign.sh does); sections
-# 2 and 3 use a fake `docker` that only reports it was called. The signing
-# key is a throwaway fixture key, never the project's.
+#   3. scripts/build.sh --skip-unreachable (a 404 source, as for a kernel).
+#   4. scripts/index.sh --keep 2 over a tree with carried-forward packages and
+#      new packages, and the result verifies again.
+# The tests do packaging only. The fixture packages hold one text file. Each
+# test builds them with abuild in a disposable Alpine container (like
+# test-resign.sh). Sections 2 and 3 use a fake `docker` that only reports the
+# call. The signing key is a throwaway fixture key, never the key of the
+# project.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
@@ -27,7 +28,7 @@ mkdir -p "$W/keys" && cp "$W/project.rsa.pub" "$W/keys/"
 openssl genrsa -out "$W/other.rsa" 4096 >/dev/null 2>&1
 openssl rsa -in "$W/other.rsa" -pubout -out "$W/other.rsa.pub" >/dev/null 2>&1
 
-# mkpkg PKGREL DESTDIR: build tsx-fixture-1-r<PKGREL> signed with the fixture key
+# mkpkg PKGREL DESTDIR: build tsx-fixture-1-r<PKGREL>, signed with the fixture key
 mkpkg() {
 	local b="$W/b$1"; mkdir -p "$b/common/tsx-fixture"
 	cat > "$b/common/tsx-fixture/APKBUILD" <<APKBUILD
