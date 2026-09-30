@@ -1,26 +1,27 @@
 #!/bin/sh
-# tsx-kernel-flavor: show or switch the kernel flavor an installed xx60 panel
-# boots (tsx-xx60-kernel-lts / tsx-xx60-kernel-stable).
+# tsx-kernel-flavor: show or switch the kernel flavor that an installed xx60
+# panel boots (tsx-xx60-kernel-lts or tsx-xx60-kernel-stable).
 #
 #   tsx-kernel-flavor                 show the selected flavor, the running
-#                                     kernel and the packaged boot images
+#                                     kernel, and the packaged boot images
 #   tsx-kernel-flavor lts|stable      select FLAVOR (panel.conf KERNEL_FLAVOR)
 #                                     and write /boot/tsxboot-emmc-FLAVOR.img
-#                                     into the eMMC boot partition (mmcblk1p7,
-#                                     via tsx-update-boot: backup + readback
+#                                     into the eMMC boot partition (mmcblk1p7)
+#                                     with tsx-update-boot (backup and readback
 #                                     verify). Reboot to use it.
-#   tsx-kernel-flavor --hook FLAVOR   package install/upgrade scripts: write
-#                                     FLAVOR's image only when FLAVOR is the
-#                                     selected one and the image differs from
-#                                     what the boot partition already holds.
+#   tsx-kernel-flavor --hook FLAVOR   for package install and upgrade scripts.
+#                                     Write the image of FLAVOR only if FLAVOR
+#                                     is the selected flavor and the boot
+#                                     partition holds a different image.
 #
-# Both kernel packages can be installed at the same time: each ships its own
+# You can install both kernel packages at the same time. Each one has its own
 # /lib/modules/<release>/ tree and its own /boot/tsxboot-emmc-<flavor>.img, so
-# a switch only writes the boot image. The SELECTED flavor is, in order:
-# KERNEL_FLAVOR in the panel configuration (tsx-config), kernel_flavor= in
-# /etc/tsx/emmc-root.info (the installer's choice), the flavor whose release
-# series matches the running kernel.
-# Writes nothing anywhere but on an installed xx60 panel (tsx_is_installed_panel).
+# a switch writes only the boot image. The SELECTED flavor comes from these
+# sources, in this order:
+#   1. KERNEL_FLAVOR in the panel configuration (tsx-config).
+#   2. kernel_flavor= in /etc/tsx/emmc-root.info (the choice of the installer).
+#   3. The flavor whose release series matches the running kernel.
+# The script writes only on an installed xx60 panel (tsx_is_installed_panel).
 set -u
 . /usr/lib/tsx/tsx-is-panel.sh
 
@@ -58,8 +59,8 @@ part_sha() {
 write_image() {  # write_image FLAVOR
 	img=/boot/tsxboot-emmc-$1.img
 	[ -r "$img" ] || { say "no $img (is tsx-xx60-kernel-$1 installed?)"; return 1; }
-	# the image must carry this panel's DTB (a TSW-760 needs the multi-DTB
-	# container); tsx-update-boot checks again before it writes
+	# The image must have the DTB of this panel (a TSW-760 needs the multi-DTB
+	# container). tsx-update-boot checks again before it writes.
 	if chk=$(/usr/sbin/tsx-update-boot --check "$img" 2>&1); then say "$chk"; else
 		say "$chk"
 		say "the $1 image does not boot this panel; nothing written (tsx-xx60-kernel-$1 too old for this model?)"

@@ -1,42 +1,46 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# Third-party software (Chromium); keeps its own upstream license (see
-# license= below), not GPL-2.0-or-later. Our own patch-chromium.py and
-# sigs.json in this directory are GPL-2.0-or-later (see ../../LICENSE).
+# Third-party software (Chromium). It keeps its own upstream license (see
+# license= below), not GPL-2.0-or-later. The files patch-chromium.py and
+# sigs.json in this directory are our own work under GPL-2.0-or-later (see
+# ../../LICENSE).
 #
-# NOT a source build (a from-source Chromium build takes hours): this
-# repackages Alpine v3.24's own armv7 chromium .apk, byte-patches the
-# 2-byte ES3->ES2 EGL context fallback gate (see patch-chromium.py and
-# sigs.json -- carried over from tsx-xx60-linux rootfs/src/chromium-es2/,
-# same tool, same signature list) so Chromium's GPU process falls back to
-# GLES2 on the Mali-450 (lima, GLES2-only) instead of aborting GPU init, and
-# republishes the result signed with the project key. If the site is not
-# found (unknown sha256) or its bytes do not match the recorded instruction
-# pattern, the build FAILS LOUDLY and nothing is published -- see
-# ../../.github/workflows/build.yml's scheduled "chromium watch" job, and
+# This is NOT a source build, because a from-source Chromium build takes hours.
+# The recipe repackages the armv7 chromium .apk of Alpine v3.24 and patches
+# it at the byte level. The patch changes the 2-byte ES3->ES2 EGL context
+# fallback gate (see patch-chromium.py and sigs.json, which come from
+# rootfs/src/chromium-es2/ in tsx-xx60-linux, with the same tool and the same
+# signature list). With the patch, the GPU process of Chromium falls back to
+# GLES2 on the Mali-450 (lima, GLES2 only) and does not abort the GPU init.
+# The build then republishes the result, signed with the project key.
+# If the build does not find the patch site (unknown sha256), or its bytes do
+# not match the recorded instruction pattern, the build FAILS and publishes
+# nothing. See the scheduled "chromium watch" job in
+# ../../.github/workflows/build.yml. See also
 # rootfs/src/chromium-es2/README.md ("Re-deriving for a new Chromium
-# package") for what to do when Alpine ships a new Chromium build.
+# package") for the steps when Alpine ships a new Chromium build.
 #
-# provides=chromium=<same version> so `apk add chromium` resolves to this
-# package when this repo is listed (apk semantics: a real pkgname match and
-# a provides= virtual match of the same name+version are both eligible;
-# which one the solver actually picks depends on repository order -- see
-# README.md "Which chromium wins" for the order this repo's install
-# instructions use and how that was verified). replaces=chromium so
-# installing this over a machine that already has the real "chromium"
-# package cleanly takes over its files instead of a conflict.
+# provides=chromium=<same version> makes `apk add chromium` resolve to this
+# package when this repo is listed. With apk, a real pkgname match and a
+# provides= virtual match of the same name and version are both eligible.
+# The repository order decides which one the solver picks. See README.md
+# "Which chromium wins" for the order in the install instructions of this
+# repo, and for how we verified it. replaces=chromium lets this package take
+# over the files of a machine that already has the real "chromium" package,
+# without a conflict.
 #
-# depends= is copied VERBATIM (plain deps and so: soname deps alike) from
-# the real chromium-152.0.7977.82-r0 package's own .PKGINFO: since we ship
-# the identical binaries (2 patched bytes aside), its dependency set is
-# exactly ours too, and copying it is more correct than re-deriving it --
-# abuild's automatic ELF/soname scan (options="tracedeps", the default)
-# would need every one of these so: libraries actually present in the build
-# container to resolve names to package versions, which our makedepends
-# doesn't otherwise pull in (e.g. nothing here needs libFLAC at build time).
-# !tracedeps turns that scan off; if you touch package() such that the
-# shipped binaries change, re-derive this list from the new .apk's .PKGINFO
-# (`tar -xzf chromium-*.apk .PKGINFO && cat .PKGINFO`) instead of hand-editing.
+# depends= is a VERBATIM copy of the .PKGINFO of the real
+# chromium-152.0.7977.82-r0 package. It includes plain dependencies and so:
+# soname dependencies. We ship the identical binaries (except 2 patched
+# bytes), so the dependency set is the same as ours. A copy is more correct
+# than a new derivation. The automatic ELF and soname scan of abuild
+# (options="tracedeps", the default) would need every one of these so:
+# libraries in the build container, to resolve names to package versions.
+# Our makedepends does not install them (for example, nothing here needs
+# libFLAC at build time). !tracedeps turns the scan off. If you change
+# package() so that the shipped binaries change, derive the list again from
+# the .PKGINFO of the new .apk (`tar -xzf chromium-*.apk .PKGINFO && cat
+# .PKGINFO`). Do not edit it by hand.
 pkgname=tsx-xx60-chromium
 pkgver=152.0.7977.82
 pkgrel=0
@@ -120,10 +124,11 @@ depends="
 makedepends="python3"
 provides="chromium=$pkgver-r$pkgrel cmd:chromium=$pkgver-r$pkgrel cmd:chromium-browser=$pkgver-r$pkgrel"
 replaces="chromium"
-# suid: usr/lib/chromium/chrome-sandbox is intentionally setuid root (the
-# same as Alpine's own chromium package) -- it drops privileges again once
-# the sandbox is set up; without this option abuild's postcheck refuses to
-# package a setuid binary at all. !tracedeps: see the depends= comment above.
+# suid: usr/lib/chromium/chrome-sandbox is a setuid root binary on purpose,
+# like in the chromium package of Alpine. It drops its privileges again after
+# it sets up the sandbox. Without this option, the postcheck of abuild
+# refuses to package a setuid binary. !tracedeps: see the depends= comment
+# above.
 options="net suid !tracedeps"
 source="chromium-$pkgver-r$pkgrel.apk::https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/chromium-$pkgver-r$pkgrel.apk
 	patch-chromium.py
@@ -132,8 +137,9 @@ source="chromium-$pkgver-r$pkgrel.apk::https://dl-cdn.alpinelinux.org/alpine/v3.
 build() {
 	rm -rf extract
 	mkdir -p extract
-	# .apk = concatenated gzip members (signature/control/data); plain tar -xzf
-	# reads all of them. Drop the control-tar metadata files it also drops in.
+	# An .apk is a concatenation of gzip members (signature, control, data).
+	# A plain tar -xzf reads all of them. Remove the control metadata files
+	# that it also extracts.
 	tar -xzf "$srcdir"/chromium-$pkgver-r$pkgrel.apk -C extract
 	rm -f extract/.PKGINFO extract/.SIGN.RSA.*
 

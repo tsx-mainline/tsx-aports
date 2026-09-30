@@ -1,14 +1,17 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# Shared boot-image tooling for the xx60 platform: tsx-update-boot (vendored
-# from tsx-xx60-linux installer/emmc/tsx-update-boot, same script the
-# installer uses), tsx-kernel-flavor (show/switch the booted kernel flavor;
-# also the tsx-xx60-kernel-* install/upgrade hook) and the
-# tsx_is_installed_panel() detection helper. A separate package so both
-# kernel flavors (installable side by side) share one copy.
+# Shared boot-image tools for the xx60 platform:
+#   - tsx-update-boot, vendored from installer/emmc/tsx-update-boot in
+#     tsx-xx60-linux. It is the same script as the installer uses.
+#   - tsx-kernel-flavor, which shows or switches the booted kernel flavor.
+#     It is also the install and upgrade hook of the tsx-xx60-kernel-*
+#     packages.
+#   - The tsx_is_installed_panel() detection helper.
+# This is a separate package, so that both kernel flavors (which install side
+# by side) share one copy.
 pkgname=tsx-xx60-boot-tools
 pkgver=1
-pkgrel=5
+pkgrel=6
 pkgdesc="xx60 eMMC/card boot image update tools"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
@@ -24,7 +27,7 @@ package() {
 }
 
 sha512sums="
-4515b1ef8af4a84f8d140fa463e104df8b7d1e751a932f9c7b9d0d1e60a9c2036046960bcc05a0ad71192ebae43c209a7a0643b3d7778256e4545ec4c59e9438  tsx-update-boot
-c472647877fce188bd294db05b9b202301c8d422aa3242fe8f1b63144a321a709c3d1371d241d3806dba8d401a9ba9013149d24c898373ea0b459e87c60b653c  tsx-is-panel.sh
-148ada804e47d4a11637dccb342cd314353e3a8a81e309d94a0fd3c67f4203a1967ea8ba9f21dfff29d2a70b6c9dc3d035301088081e5baf6fa47b4cfeb018d7  tsx-kernel-flavor
+a4adec8384c71a7a8073dd1f17e8a932910aae73684b6eab7c5a66c2dd4fbe7f867e9e3f5ae3cb05a1932a776b5d4f97df28e57209a2f4a59bcfa4c9e2665aee  tsx-update-boot
+012ae3bc490a7e2611a2355c15e87642afebb19d36d635559f023489fb67a225d366114d3732c275c4f51dbf09aac1dc297f9b701ea04fe0dbbb89d0cf085bfc  tsx-is-panel.sh
+ddd77469440810a44c9614ad9665dc6d8019ff3020f2087565e9c973d88619dd43347e8c5450561558ffe4e5ec3003fbc22c20d68abcd429efeb13eac9e1a61e  tsx-kernel-flavor
 "

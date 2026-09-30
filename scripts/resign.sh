@@ -1,21 +1,24 @@
 #!/bin/bash
 # scripts/resign.sh IN_DIR OUT_DIR: re-sign every IN_DIR/*.apk with the
-# project's real signing key, LOCALLY. This is how scripts/build.sh's
-# BUILD_HOST path gets a properly-signed package without the private key
-# ever touching the build host: the remote build signs with a throwaway key
-# (generated there, deleted after the build), and this script splits each
-# resulting apk (scripts/apk-split.py) into sig/control/data, throws the old
-# (throwaway) signature away, re-signs control.tar.gz with the project key
-# inside a disposable Alpine container, reassembles it, and verifies the
-# result with `apk verify` -- against a trust store holding ONLY the
-# project's public key, so a package that still carried a foreign signature
-# would fail right here instead of silently getting published.
+# real signing key of the project, LOCALLY. With this script, the BUILD_HOST
+# path of scripts/build.sh gets a correctly signed package, and the private
+# key never reaches the build host. The remote build signs with a throwaway
+# key (generated there and deleted after the build). This script does these
+# steps:
+#   1. It splits each apk into sig, control, and data (scripts/apk-split.py).
+#   2. It discards the old (throwaway) signature.
+#   3. It re-signs control.tar.gz with the project key in a disposable
+#      Alpine container.
+#   4. It assembles the apk again.
+#   5. It runs `apk verify` against a trust store that holds ONLY the public
+#      key of the project. A package with a foreign signature fails here,
+#      and the build does not publish it.
 #
 #   TSX_APORTS_KEY=<path to the private key> scripts/resign.sh IN_DIR OUT_DIR
 #
-# Also used directly by scripts/build.sh after pulling a BUILD_HOST build
-# back; see that script and README.md "Signing key" / "Building on a remote
-# host" for the full flow.
+# scripts/build.sh also calls this script after it pulls back a BUILD_HOST
+# build. See that script, and README.md "Signing key" and "Building on a
+# remote host", for the full flow.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 : "${TSX_APORTS_KEY:?set TSX_APORTS_KEY (path to the private signing key)}"

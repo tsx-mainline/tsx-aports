@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""check-bootimg-dtbs.py IMG DTB_DIR: does the packed xx60 boot image carry
-the board DTBs of DTB_DIR, byte for byte, where U-Boot looks for them?
+"""check-bootimg-dtbs.py IMG DTB_DIR: check that the packed xx60 boot image
+has the board DTBs of DTB_DIR, byte for byte, at the places where U-Boot
+looks for them.
 
-The vendor U-Boot takes the DTB from the Android boot image's "second"
-payload: a plain FDT (booted on any panel) or an Amlogic AML_ multi-DTB
-container, searched for the env aml_dt. With a TSW-760 DTB in DTB_DIR
-(meson8m2-crestron-tsw760.dtb) the image must be a container whose
-yushan_one_10inch entry is the TSW-1060 DTB and whose yushan_one_7inch entry
-is the TSW-760 DTB (the vendor's old10inch/old7inch entries, if present, the
-same per size). Without it, the second payload must be the TSW-1060 DTB
-itself. Exit 0 = OK, 1 = mismatch (one line per problem), 2 = usage."""
+The vendor U-Boot reads the DTB from the "second" payload of the Android boot
+image. The payload is a plain FDT (which boots on any panel) or an Amlogic
+AML_ multi-DTB container. U-Boot searches the container for the env aml_dt.
+If DTB_DIR has a TSW-760 DTB (meson8m2-crestron-tsw760.dtb), the image must be
+a container. Its yushan_one_10inch entry must be the TSW-1060 DTB, and its
+yushan_one_7inch entry must be the TSW-760 DTB. The vendor entries
+old10inch and old7inch, if present, must match the same DTB for their size.
+If DTB_DIR has no TSW-760 DTB, the second payload must be the TSW-1060 DTB.
+Exit 0 means OK, 1 means a mismatch (one line for each problem), and
+2 means a usage error."""
 import os
 import struct
 import sys

@@ -1,9 +1,11 @@
 #!/bin/bash
 # Host tests for the multi-DTB boot image checks (no panel, no build host):
-#   - xx60/tsx-xx60-boot-tools/tsx-update-boot --check / --emmc (run with busybox sh
-#     when available): refuses an image without this panel's DTB, before any write
-#   - scripts/check-bootimg-dtbs.py (stage-kernel.sh's check of a staged image)
-# Fake inputs: minimal FDT blobs that carry the board compatible strings, and
+#   - xx60/tsx-xx60-boot-tools/tsx-update-boot --check and --emmc (run with
+#     busybox sh when it is available). The tool refuses an image without the
+#     DTB of this panel, before any write.
+#   - scripts/check-bootimg-dtbs.py (the check of stage-kernel.sh for a staged
+#     image).
+# The inputs are fake: minimal FDT blobs with the board compatible strings, and
 # Android boot images with a plain FDT or an AML_ container in "second".
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); REPO=$(cd "$HERE/../.." && pwd)
@@ -19,7 +21,7 @@ python3 - "$T" <<'PY'
 import os, struct, sys
 t = sys.argv[1]
 def fdt(compat, pad):
-    # FDT_PROP token, length, nameoff (low byte '2', as in a real DTB) before the value
+    # Before the value: FDT_PROP token, length, nameoff (low byte '2', as in a real DTB)
     body = b'\0' * 32 + struct.pack('>3I', 3, len(compat) + 18, 0x32) + compat + b'\0amlogic,meson8m2\0' \
         + b'\0\0\0\x03' + compat + b'-panel\0panel-lvds\0' + pad * 40
     return struct.pack('>2I', 0xd00dfeed, 8 + len(body)) + body
@@ -51,7 +53,7 @@ imgs = {
     'wrong7': bootimg(container([('yushan_one_10inch', d10), ('yushan_one_7inch', d10)])),
 }
 for n, b in imgs.items(): open(f'{t}/{n}.img', 'wb').write(b)
-# a card head with the U-Boot env at 1 MiB (only the aml_dt string matters here)
+# A card head with the U-Boot env at 1 MiB (only the aml_dt string matters here)
 env = b'\0\0\0\0' + b'bootcmd=x\0aml_dt=yushan_one_7inch\0lcdsize=7inch\0'
 open(f'{t}/card7.bin', 'wb').write(b'\0' * 0x100000 + env.ljust(65536, b'\0'))
 open(f'{t}/cmdline10', 'w').write('console=x androidboot.lcdsize=10inch androidboot.government=1\n')
@@ -77,7 +79,7 @@ check both "" 0 TSX_ENV_DEV="$T/card7.bin" TSX_CMDLINE=/dev/null
 check plain1060 "" 0 TSX_ENV_DEV=/dev/null TSX_CMDLINE="$T/cmdline10"
 check plain1060 "" 1 TSX_ENV_DEV=/dev/null TSX_CMDLINE=/dev/null
 
-# the write path refuses before it touches any device (no /dev/mmcblk1p7 on a host)
+# The write path refuses before it touches a device (a host has no /dev/mmcblk1p7)
 sha=$(sha256sum < "$T/plain1060.img" | cut -d' ' -f1)
 out=$(TSX_AML_DT=yushan_one_7inch $SH "$UB" --emmc "$T/plain1060.img" "$sha" 2>&1); rc=$?
 [ "$rc" = 1 ] && grep -q 'nothing written' <<<"$out" && ! grep -q 'saving the current' <<<"$out" \
@@ -89,7 +91,7 @@ grep -q 'board check: OK' <<<"$out" && grep -q 'not the 32 MiB eMMC boot partiti
 out=$(TSX_AML_DT=yushan_one_7inch $SH "$UB" --any-board --emmc "$T/plain1060.img" "$(sha256sum < "$T/plain1060.img" | cut -d' ' -f1)" 2>&1)
 grep -q 'board check skipped' <<<"$out" && ok "--any-board skips the check" || bad "--any-board ($out)"
 
-# stage-kernel.sh's check of a staged image
+# The check of stage-kernel.sh for a staged image
 cpy() { python3 "$CHK" "$T/$1.img" "$T/$2" >/dev/null 2>&1; echo $?; }
 [ "$(cpy both dtbs)" = 0 ] && ok "check-bootimg-dtbs: container with both DTBs" || bad "check-bootimg-dtbs: container with both DTBs"
 [ "$(cpy plain1060 dtbs)" = 1 ] && ok "check-bootimg-dtbs: plain FDT refused when the kernel has the TSW-760 DTB" || bad "check-bootimg-dtbs: plain FDT with a TSW-760 DTB"

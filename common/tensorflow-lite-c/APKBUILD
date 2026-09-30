@@ -1,25 +1,27 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# Third-party software (TensorFlow Lite); keeps its own upstream license
+# Third-party software (TensorFlow Lite). It keeps its own upstream license
 # (Apache-2.0), not GPL-2.0-or-later.
 #
-# Built the same way tsx-xx60-linux used to build it by hand
-# (rootfs/voice/build-tflite.sh): PyPI's pymicro-wakeword/pyopen-wakeword
-# wheels bundle an x86-64 glibc libtensorflowlite_c.so, which does not load
-# on an Alpine (musl) armv7 panel. This packages the same cmake route --
-# tensorflow/lite/c's own CMakeLists, XNNPACK/GPU/NNAPI off, no NEON assumed
-# (Cortex-A9 has none) -- as a normal apk instead of a rootfs-build-time
-# hand roll. Not arch-restricted for any technical reason beyond "only
-# tested on armv7" (the only hardware this project ships for); TFLite's
-# CMake build itself is not architecture-specific.
+# This recipe builds the package the same way that tsx-xx60-linux built it
+# by hand (rootfs/voice/build-tflite.sh). The wheels pymicro-wakeword and
+# pyopen-wakeword from PyPI contain an x86-64 glibc libtensorflowlite_c.so.
+# This library does not load on an Alpine (musl) armv7 panel. This recipe
+# uses the same cmake route as the script: the CMakeLists of tensorflow/lite/c,
+# with XNNPACK, GPU, and NNAPI off, and no NEON (the Cortex-A9 has none). The
+# result is a normal apk and not a hand-made part of the rootfs build.
+# The recipe has no technical reason to limit the architecture. It is only
+# tested on armv7, the only hardware that this project ships for. The CMake
+# build of TFLite is not specific to an architecture.
 #
-# musl has no strtoll_l: flatbuffers is built with
-# FLATBUFFERS_LOCALE_INDEPENDENT=0 (see build-tflite.sh).
+# musl has no strtoll_l. The build sets FLATBUFFERS_LOCALE_INDEPENDENT=0 for
+# flatbuffers (see build-tflite.sh).
 #
-# TFLite's CMake build fetches several third-party deps itself (abseil,
-# flatbuffers, farmhash, fft2d, gemmlowp, ruy, cpuinfo, ...) via CMake
-# FetchContent/ExternalProject at configure time -- hence options="net",
-# same reason sendspin-cli needs it for its own FetchContent deps.
+# The CMake build of TFLite fetches several third-party dependencies itself
+# (abseil, flatbuffers, farmhash, fft2d, gemmlowp, ruy, cpuinfo, and others).
+# It uses CMake FetchContent or ExternalProject at configure time. For this
+# reason the recipe has options="net", like sendspin-cli for its own
+# FetchContent dependencies.
 pkgname=tensorflow-lite-c
 pkgver=2.17.1
 pkgrel=0
@@ -45,18 +47,20 @@ build() {
 package() {
 	cd "$builddir"
 	install -Dm755 build/libtensorflowlite_c.so "$pkgdir"/usr/lib/libtensorflowlite_c.so
-	# soname symlink, only if upstream's build actually set one (it may not:
-	# tensorflow/lite/c's CMakeLists does not always set VERSION/SOVERSION)
+	# The soname symlink: create it only if the upstream build set a soname.
+	# It may not, because the CMakeLists of tensorflow/lite/c does not
+	# always set VERSION or SOVERSION.
 	soname=$(readelf -d build/libtensorflowlite_c.so 2>/dev/null | \
 		sed -n 's/.*(SONAME).*\[\(.*\)\].*/\1/p')
 	if [ -n "$soname" ] && [ "$soname" != "libtensorflowlite_c.so" ]; then
 		ln -s libtensorflowlite_c.so "$pkgdir/usr/lib/$soname"
 	fi
-	# C API headers. Recent TFLite splits the public C API headers between
-	# tensorflow/lite/c/ and tensorflow/lite/core/(async/)c/ (the former
-	# #includes the latter) -- install whichever of these dirs exist here,
-	# preserving the real tree, so both `#include <tensorflow/lite/c/*.h>`
-	# and its own internal includes resolve for other consumers.
+	# C API headers. Recent TFLite versions split the public C API headers
+	# between tensorflow/lite/c/ and tensorflow/lite/core/(async/)c/. The
+	# first directory includes the second. Install each of these directories
+	# that exists, and keep the real tree. Then both
+	# `#include <tensorflow/lite/c/*.h>` and the internal includes work for
+	# other consumers.
 	for d in tensorflow/lite/c tensorflow/lite/core/c tensorflow/lite/core/async/c; do
 		[ -d "$d" ] || continue
 		install -d "$pkgdir/usr/include/$d"

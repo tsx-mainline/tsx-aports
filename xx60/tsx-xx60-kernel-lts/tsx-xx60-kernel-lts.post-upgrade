@@ -1,7 +1,7 @@
 #!/bin/sh
-# Writes the boot image only on an installed xx60 panel whose selected flavor
-# is lts (see tsx-kernel-flavor in tsx-xx60-boot-tools); anywhere else (a
-# chroot, a container, the other flavor selected) it only reports.
+# Write the boot image only on an installed xx60 panel where the selected
+# flavor is lts (see tsx-kernel-flavor in tsx-xx60-boot-tools). In all other
+# cases (a chroot, a container, or the other flavor selected), only report.
 if [ -x /usr/sbin/tsx-kernel-flavor ]; then
 	/usr/sbin/tsx-kernel-flavor --hook lts
 else

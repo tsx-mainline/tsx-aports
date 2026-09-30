@@ -1,32 +1,38 @@
 #!/usr/bin/env python3
-"""carry-forward.py: seed packages/v3.24 with an already published tree.
+"""carry-forward.py: fill packages/v3.24 with an already published tree.
 
-CI starts every run with an empty packages/ and publishes only what that run
-holds, so without this step each deploy would drop the previous package
-versions and everything the run could not build. This fetches the published
-tree first; scripts/build.sh --skip-existing then builds only what is new and
-scripts/index.sh re-indexes and re-signs the merged result.
+Each CI run starts with an empty packages/ and publishes only what that run
+holds. Without this step, each deploy would drop the previous package versions
+and every package that the run cannot build. This script fetches the published
+tree first. Then scripts/build.sh --skip-existing builds only the new
+versions, and scripts/index.sh re-indexes and signs the merged result again.
 
   scripts/carry-forward.py [--from BASE_URL] [--seed URL_OR_FILE]
                            [--fallback-seed URL_OR_FILE] [--dest DIR]
                            [--keys DIR]
 
-  --from BASE_URL        published tree to fetch, i.e. BASE_URL/v3.24/<category>/<arch>/
-                         (default https://tsx-aports.unexceptional.net). A 404 on an
-                         index means "nothing published yet" and is fine; any other
-                         error fails.
-  --seed X               a .tar.gz of a published tree (v3.24/... inside) at a URL or a
-                         local path, used INSTEAD of --from. Must exist.
-  --fallback-seed X      like --seed, but only used when --from published nothing at
-                         all (the first deploy). A missing fallback is a warning.
-  --dest DIR             default packages/v3.24 in the repo.
-  --keys DIR             trusted public keys (default common/tsx-keys/*.rsa.pub).
+  --from BASE_URL        the published tree to fetch, as
+                         BASE_URL/v3.24/<category>/<arch>/
+                         (default https://tsx-aports.unexceptional.net).
+                         The status 404 for an index means that nothing is
+                         published yet. This is not an error. Any other
+                         error fails the run.
+  --seed X               a .tar.gz of a published tree (with v3.24/... inside)
+                         at a URL or a local path. The script uses it INSTEAD
+                         of --from. The file must exist.
+  --fallback-seed X      like --seed, but the script uses it only if --from
+                         published nothing (the first deploy). A missing
+                         fallback gives a warning.
+  --dest DIR             the destination (default packages/v3.24 in the repo).
+  --keys DIR             the trusted public keys (default
+                         common/tsx-keys/*.rsa.pub).
 
-Every APKINDEX.tar.gz is verified against the committed public key(s) before
-anything it lists is used, and every downloaded apk must match the checksum
-(C: line) its index records; a failure aborts the run. From a tarball, apks
-the index lists but the tarball leaves out (a trimmed seed) are skipped: the
-published index is rebuilt over what is present by scripts/index.sh anyway.
+The script verifies every APKINDEX.tar.gz against the committed public keys
+before it uses anything that the index lists. Every downloaded apk must match
+the checksum (C: line) in its index. A failure stops the run. A tarball can
+lack apks that its index lists (a trimmed seed). The script skips them,
+because scripts/index.sh builds the published index again over the packages
+that exist.
 """
 import argparse
 import base64
