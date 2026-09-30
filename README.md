@@ -337,9 +337,26 @@ see the sizes below).
 
 ## CI
 
-`.github/workflows/build.yml` is a sketch, not run: a normal job that builds
-whatever packages changed on push (via `scripts/build.sh`), publishes with
-`actions/upload-pages-artifact` + `actions/deploy-pages`; and a scheduled
-job that checks Alpine's v3.24 armv7 `chromium` for a new build and runs the
-repack (failing loudly, same as a local build, if the ES2 patch site isn't
-found).
+`.github/workflows/build.yml` builds and publishes the repository:
+
+- **build** (push to `main` touching `common/`, `xx60/`, `scripts/` or the
+  workflow; manual runs; pull requests): `scripts/carry-forward.py` first
+  restores the published tree into `packages/v3.24` (every index signature is
+  checked against the committed public key, every apk against the checksum in
+  its signed index), `scripts/build.sh --skip-existing --skip-unreachable
+  --all` builds only versions that are not published yet (a kernel package
+  whose tsx-xx60-linux release bundle does not exist yet is skipped with a
+  warning, its published copy stays), `scripts/index.sh --keep 2` re-indexes
+  and signs the merged tree. Pull requests build with a throwaway key and
+  publish nothing.
+- **deploy**: publishes that tree with `actions/deploy-pages`.
+- **chromium-watch** (daily): checks Alpine's v3.24 armv7 `chromium` and, if it
+  is newer, opens a pull request that bumps the pin (needs "Allow GitHub
+  Actions to create and approve pull requests" in the repo's Actions settings).
+
+First deploy: the site is empty, so there is nothing to carry forward. Put a
+tarball of a published tree (`v3.24/<category>/armv7/...` inside, public
+packages only) on the release `seed` as `tsx-aports-seed.tar.gz`; a run that
+finds the site empty uses it automatically. A manual run can name another
+tarball with the `seed_url` input. Locally: `scripts/carry-forward.py --help`.
+Tests: `scripts/tests/test-ci-pages.sh` (host, packaging only).
