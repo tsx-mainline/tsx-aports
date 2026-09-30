@@ -5,9 +5,22 @@
 # pattern as tsx-xx60-linux's tools/build/remote-build.sh) -- no default
 # value, so this repo names no build host.
 #
-#   scripts/build.sh <PKGDIR>|--all
+#   scripts/build.sh [--skip-existing] [--skip-unreachable] <PKGDIR>|--all
 #   PKGDIR is a package directory relative to the repo root, e.g.
 #   common/sendspin-cli or xx60/tsx-xx60-chromium.
+#
+#   --skip-existing     do not build a package whose
+#                       <pkgname>-<pkgver>-r<pkgrel>.apk is already in
+#                       packages/v3.24/<category>/ (CI: scripts/carry-forward.py
+#                       puts the published tree there first, so only new
+#                       versions are built -- tensorflow-lite-c and chromium
+#                       are never rebuilt just because something else changed).
+#   --skip-unreachable  skip (with a GitHub ::warning:: line, exit status
+#                       unaffected) a package with a download source= that
+#                       the server answers 404/410 for, e.g. a kernel package
+#                       whose tsx-xx60-linux release does not exist yet. Any
+#                       other network failure still fails the build. A source
+#                       already staged in the package's dist/ counts as present.
 #
 # Env:
 #   TSX_APORTS_KEY   path to the PRIVATE signing key (required), e.g.
@@ -89,11 +102,33 @@ assert_remote_cmd_safe() {
 	esac
 }
 
+# apkbuild_info PKGDIR: print "<pkgname> <pkgver> <pkgrel>" then one line per
+# download URL in source= (the optional "name::" prefix stripped), by
+# sourcing the APKBUILD in a subshell -- the same thing abuild does. The
+# APKBUILDs of this repo only define variables and functions at top level.
+apkbuild_info() {
+	(
+		set +eu
+		startdir="$REPO/$1" srcdir=/nonexistent
+		. "$REPO/$1/APKBUILD" >/dev/null 2>&1
+		echo "$pkgname $pkgver $pkgrel"
+		for s in $source; do
+			case "${s#*::}" in http://*|https://*) echo "${s#*::}";; esac
+		done
+	)
+}
+
 # Let a test load the two functions above without running the rest of this
 # script (no PKGDIR required, no docker, no ssh, no real BUILD_HOST).
 if [ "${TSX_APORTS_BUILD_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-TARGET=${1:?"usage: build.sh <PKGDIR>|--all"}
+SKIP_EXISTING=0 SKIP_UNREACHABLE=0 PASS=
+while :; do case ${1:-} in
+	--skip-existing) SKIP_EXISTING=1; PASS="$PASS $1"; shift;;
+	--skip-unreachable) SKIP_UNREACHABLE=1; PASS="$PASS $1"; shift;;
+	*) break;;
+esac; done
+TARGET=${1:?"usage: build.sh [--skip-existing] [--skip-unreachable] <PKGDIR>|--all"}
 
 if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	: "${BUILD_DIR:?BUILD_HOST needs BUILD_DIR (remote path this repo is mirrored to)}"
@@ -117,7 +152,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	# (e.g. tsx-xx60-boot-tools) is still signed with a key THIS call's
 	# container trusts when it resolves that package as a build dep out of
 	# packages/v3.24 (REPODEST) -- see the file header comment.
-	REMOTE_CMD="set -e; KD='$BUILD_DIR/.throwaway-key'; mkdir -p \"\$KD\"; [ -f \"\$KD/throwaway.rsa\" ] || { openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; }; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh' '$TARGET'"
+	REMOTE_CMD="set -e; KD='$BUILD_DIR/.throwaway-key'; mkdir -p \"\$KD\"; [ -f \"\$KD/throwaway.rsa\" ] || { openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; }; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh'$PASS '$TARGET'"
 	assert_remote_cmd_safe "$REMOTE_CMD"
 	ssh -o BatchMode=yes "$BUILD_HOST" "$REMOTE_CMD"
 
@@ -158,7 +193,38 @@ else
 	PKGDIRS="$TARGET"
 fi
 
+# want_build PKGDIR: 0 = build it, 1 = skip (says why).
+want_build() {
+	local info name ver rel url code cat n
+	info=$(apkbuild_info "$1")
+	read -r name ver rel <<<"$(echo "$info" | head -n1)"
+	cat=${1%%/*}
+	if [ "$SKIP_EXISTING" = 1 ]; then
+		for n in "$REPO/packages/v3.24/$cat"/*/"$name-$ver-r$rel.apk"; do
+			if [ -f "$n" ]; then
+				echo "[build.sh] $1: $name-$ver-r$rel.apk already in packages/v3.24/$cat -- skipping"
+				return 1
+			fi
+		done
+	fi
+	if [ "$SKIP_UNREACHABLE" = 1 ]; then
+		for url in $(echo "$info" | tail -n +2); do
+			[ -f "$REPO/$1/dist/$(basename "$url")" ] && continue
+			code=$(curl -sL -r 0-0 -o /dev/null -w '%{http_code}' "$url" || true)
+			case "$code" in
+			200|206) ;;
+			404|410)
+				echo "::warning title=$name skipped::$url does not exist yet (HTTP $code); $1 was not built"
+				return 1;;
+			*) echo "build.sh: $1: cannot check $url (HTTP $code)" >&2; exit 1;;
+			esac
+		done
+	fi
+	return 0
+}
+
 for PKGDIR in $PKGDIRS; do
+	want_build "$PKGDIR" || continue
 	echo "=== building $PKGDIR ==="
 	docker run --rm --platform linux/arm/v7 \
 		-v "$REPO:/repo" \
