@@ -52,6 +52,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` declar
 - `xx60/tsx-xx60-kernel-stable` and `xx60/tsx-xx60-kernel-lts` are BINARY packages of an already-built kernel (see "Kernel packages" below). They install side by side. The rootfs of a panel has both.
 - `common/tensorflow-lite-c` is the TFLite C library for the wakeword models of the voice satellite.
 - `xx60/tsx-xx60-chromium` is the armv7 `chromium` .apk from Alpine, repacked with the 2-byte ES3->ES2 EGL fallback patch. The build applies the patch (see "Chromium" below). The package has `provides=chromium=<same version>`.
+- `xx60/tsx-xx60-wlroots0.20` is the Alpine `wlroots0.20` recipe with one patch. The Meson CRTC has no gamma LUT. Without the patch, the first `output * power on` of sway after `output * power off` fails, and the screen stays off. The package has `provides=wlroots0.20=<same version>` and works like `tsx-xx60-chromium` (see "Which chromium wins"). Its `pkgver` and `pkgrel` must be equal to the Alpine package. Remove the package when Alpine ships a wlroots with the fix.
 
 ## Adding a package
 

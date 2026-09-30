@@ -1,0 +1,81 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Third-party software (wlroots). It keeps its own upstream license (see
+# license= below), not GPL-2.0-or-later. The build recipe is the recipe of
+# the Alpine v3.24 package wlroots0.20 (community/wlroots0.20), with one
+# patch and without the -dbg, -static and -dev subpackages.
+#
+# The patch (gamma-reset-no-lut.patch) fixes the first "output * power on"
+# after "output * power off" under sway. The Meson CRTC has no gamma LUT.
+# After a power off, the wlroots scene adds a gamma LUT reset to the next
+# output state. The DRM backend refuses a reset on a CRTC without a gamma
+# LUT, and it logs nothing. The commit fails ("Backend commit failed") and
+# the output stays off. The patch makes the reset a no-op on such a CRTC.
+# Remove this package when Alpine ships a wlroots with the fix.
+#
+# provides= and replaces= work like the ones of tsx-xx60-chromium (see
+# README.md "Which chromium wins"). pkgver and pkgrel must be equal to the
+# Alpine package. At the same version, the repository order decides, and the
+# repos of this project come first. If Alpine ships a newer wlroots0.20, its
+# version is higher and it wins. Update pkgver and pkgrel here to match it.
+pkgname=tsx-xx60-wlroots0.20
+pkgver=0.20.2
+_pkgver=${pkgver/_/-}
+pkgrel=0
+pkgdesc="Modular Wayland compositor library, with the gamma reset fix for Meson"
+url="https://gitlab.freedesktop.org/wlroots/wlroots"
+arch="armv7"
+license="MIT"
+provides="wlroots0.20=$pkgver-r$pkgrel wlroots=$pkgver-r$pkgrel"
+replaces="wlroots0.20 wlroots"
+makedepends="
+	eudev-dev
+	glslang-dev
+	hwdata-dev
+	libcap-dev
+	libdisplay-info-dev
+	libinput-dev
+	libseat-dev
+	libliftoff-dev
+	libxcb-dev
+	libxkbcommon-dev
+	lcms2-dev
+	mesa-dev
+	meson
+	ninja
+	pixman-dev
+	vulkan-loader-dev
+	wayland-dev
+	wayland-protocols
+	xcb-util-image-dev
+	xcb-util-renderutil-dev
+	xcb-util-wm-dev
+	xkeyboard-config-dev
+	xwayland-dev
+	"
+source="https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/$_pkgver/wlroots-$_pkgver.tar.gz
+	gamma-reset-no-lut.patch
+	"
+builddir="$srcdir/wlroots-$_pkgver"
+options="!check" # no test suite
+
+build() {
+	abuild-meson \
+		-Db_lto=true \
+		-Dexamples=false \
+		-Dcolor-management=enabled \
+		-Ddefault_library=shared \
+		. build
+	meson compile -C build
+}
+
+package() {
+	DESTDIR="$pkgdir" meson install --no-rebuild -C build
+	# The headers and the pkg-config file belong to the Alpine -dev package.
+	rm -rf "$pkgdir"/usr/include "$pkgdir"/usr/lib/pkgconfig
+}
+
+sha512sums="
+e96523a2b215e7d1f36bbe5e7fa3e65d15cb87e2f0d9c304d3c2fdc81b0ac0c7202cd955635c01072b34e70f08c6c00fa2cde8c277bd73fcabdcb19f7b579a12  wlroots-0.20.2.tar.gz
+5db999e27b3e4590c376e18f975bc5ee8402d2e191d52c110af55d0e48b355d90eacb36d0a29cb28adb638813b8d361c08bc7963021bf6c4b99e8a299129b0f2  gamma-reset-no-lut.patch
+"

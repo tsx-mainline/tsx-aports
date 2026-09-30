@@ -1,0 +1,47 @@
+From f9a29dea33709de7f363f3ceb3c6f42424dfa114 Mon Sep 17 00:00:00 2001
+From: unex <7575866+unex@users.noreply.github.com>
+Date: Wed, 30 Sep 2026 12:58:38 -0600
+Subject: [PATCH] backend/drm: allow a gamma LUT reset on a CRTC without gamma
+
+Some drivers do not support a gamma LUT on the CRTC. For example,
+meson has no GAMMA_LUT property and a legacy gamma size of 0.
+
+On such a CRTC, drm_legacy_crtc_set_gamma() returns false for a
+NULL LUT (a reset to the default LUT), and it logs nothing. There is
+no LUT to reset, so the request is already satisfied.
+
+The scene output sets gamma_lut_changed when the output is disabled.
+The next build of the output state then adds a NULL color transform
+to the state. wlr_output_test_state() drops this field, because it
+does not change the output state, and the test passes. But
+wlr_backend_commit() keeps all fields, and the DRM backend calls
+drm_legacy_crtc_set_gamma(). The commit fails before the atomic
+ioctl, with no log line.
+
+On sway, the first "output * power on" after "output * power off"
+fails with "Backend commit failed", and the output stays off. The
+second request works, because gamma_lut_changed is false by then.
+
+Return true when the CRTC has no gamma LUT and the caller requests a
+reset.
+---
+ backend/drm/legacy.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/backend/drm/legacy.c b/backend/drm/legacy.c
+index 223852e..48ec9ee 100644
+--- a/backend/drm/legacy.c
++++ b/backend/drm/legacy.c
+@@ -255,7 +255,8 @@ bool drm_legacy_crtc_set_gamma(struct wlr_drm_backend *drm,
+ 		// The legacy interface doesn't offer a way to reset the gamma LUT
+ 		size = drm_crtc_get_gamma_lut_size(drm, crtc);
+ 		if (size == 0) {
+-			return false;
++			// The CRTC has no gamma LUT, so there is nothing to reset
++			return true;
+ 		}
+ 
+ 		linear_lut = malloc(3 * size * sizeof(uint16_t));
+-- 
+2.55.0
+
