@@ -38,7 +38,7 @@ SRCDEST="$startdir/dist"
 # into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-lts
 pkgver=6.18.54_git20260928
-pkgrel=11
+pkgrel=12
 _kernelrelease=6.18.54-00121-gf521d0d9730e
 # The tsx-xx60-linux release tag whose "kbundle" CI asset this package pins.
 # UNRELEASED until that repo has a real tag with this job. Until then, the
@@ -66,5 +66,5 @@ package() {
 }
 
 sha512sums="
-425e952031b31c252537b4aba1d48641a112d726b9ffe0b0eaa2fc9cad62c176a612226b84d5657784db2d1781b1ed365e4a9e0903977f21fdb2e6729b404c6d  tsx-xx60-kernel-lts-bundle.tar.zst
+0e88cfa94307a36a1b03b05cdc19344c6b12ea0c753b5b524b78e6a522bf6f25e6109940ab3f2191a30b7227ad60981731ebbe03530f45ae41d8b29d246610c2  tsx-xx60-kernel-lts-bundle.tar.zst
 "
