@@ -1,13 +1,24 @@
 #!/bin/bash
-# Build one or all tsx-aports packages with abuild, in an Alpine v3.24 armv7
-# container (docker --platform linux/arm/v7, qemu-user). The build is local
-# by default, like the build tools of the main repo. BUILD_HOST is optional.
+# Build one or all tsx-aports packages with abuild, in an Alpine v3.24
+# container of the package architecture: armv7 (docker --platform
+# linux/arm/v7) or aarch64 (docker --platform linux/arm64). Both use qemu-user on a host of another architecture. The
+# build is local by default, like the build tools of the main repo.
+# BUILD_HOST is optional.
 # It uses the same push, run, and pull pattern as tools/build/remote-build.sh
 # in tsx-xx60-linux. It has no default value, so this repo names no build host.
 #
-#   scripts/build.sh [--skip-existing] [--skip-unreachable] <PKGDIR>|--all
+#   scripts/build.sh [--skip-existing] [--skip-unreachable] [--arch ARCH] <PKGDIR>|--all
 #   PKGDIR is a package directory relative to the repo root, for example
 #   common/sendspin-cli or xx60/tsx-xx60-chromium.
+#
+#   --arch ARCH         armv7 or aarch64. The default is the architecture in
+#                       the first architecture in the arch= of the package. It
+#                       matters for a noarch package (common/tsx-keys, armv7
+#                       by default) and for --all. With --all and no --arch,
+#                       the script builds two passes: armv7 (common/ and
+#                       xx60/) and aarch64 (common/). A package
+#                       whose arch= does not list the pass architecture is
+#                       left out of that pass.
 #
 #   --skip-existing     do not build a package if
 #                       <pkgname>-<pkgver>-r<pkgrel>.apk is already in
@@ -39,7 +50,7 @@
 # sendspin-cli). It changes nothing when all sources are local files with
 # a checksum. Then `abuild -r` fetches the missing build dependencies, builds,
 # packages, signs, and indexes.
-# Output: packages/v3.24/<common|xx60>/armv7/*.apk and APKINDEX.tar.gz.
+# Output: packages/v3.24/<common|xx60>/<arch>/*.apk and APKINDEX.tar.gz.
 # With BUILD_HOST, the script also copies the APKBUILD back, because the
 # checksum step can change it. Then the real checksum is what you commit.
 # Check the diff before you commit.
@@ -125,17 +136,50 @@ apkbuild_info() {
 	)
 }
 
+# apkbuild_arch PKGDIR: the arch= value of the APKBUILD.
+apkbuild_arch() {
+	(
+		set +eu
+		startdir="$REPO/$1" srcdir=/nonexistent
+		. "$REPO/$1/APKBUILD" >/dev/null 2>&1
+		echo "$arch"
+	)
+}
+
+# arch_platform ARCH: the docker platform for an apk architecture.
+arch_platform() {
+	case $1 in
+	armv7) echo linux/arm/v7;;
+	aarch64) echo linux/arm64;;
+	*) echo "build.sh: unsupported architecture: $1" >&2; return 1;;
+	esac
+}
+
+# pkg_arch PKGDIR WANT: the architecture to build PKGDIR for, or nothing when
+# its arch= does not allow WANT (WANT empty: the first one it lists).
+pkg_arch() {
+	local a w=$2 x
+	a=$(apkbuild_arch "$1")
+	case " $a " in *" noarch "*|*" all "*) echo "${w:-armv7}"; return;; esac
+	if [ -n "$w" ]; then
+		case " $a " in *" $w "*) echo "$w";; esac
+		return
+	fi
+	for x in $a; do case $x in armv7|aarch64) echo "$x"; return;; esac; done
+}
+
 # This lets a test load the functions above without the rest of the script.
 # It needs no PKGDIR, no docker, no ssh, and no real BUILD_HOST.
 if [ "${TSX_APORTS_BUILD_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-SKIP_EXISTING=0 SKIP_UNREACHABLE=0 PASS=
+SKIP_EXISTING=0 SKIP_UNREACHABLE=0 PASS= WANT_ARCH=
 while :; do case ${1:-} in
 	--skip-existing) SKIP_EXISTING=1; PASS="$PASS $1"; shift;;
 	--skip-unreachable) SKIP_UNREACHABLE=1; PASS="$PASS $1"; shift;;
+	--arch) WANT_ARCH=${2:?--arch needs armv7 or aarch64}; arch_platform "$WANT_ARCH" >/dev/null || exit 1; PASS="$PASS --arch $WANT_ARCH"; shift 2;;
 	*) break;;
 esac; done
-TARGET=${1:?"usage: build.sh [--skip-existing] [--skip-unreachable] <PKGDIR>|--all"}
+TARGET=${1:?"usage: build.sh [--skip-existing] [--skip-unreachable] [--arch ARCH] <PKGDIR>|--all"}
 
 if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	: "${BUILD_DIR:?BUILD_HOST needs BUILD_DIR (remote path this repo is mirrored to)}"
@@ -180,6 +224,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	else
 		for CAT in common xx60; do
 			for d in "$REPO/$CAT"/*/; do
+				[ -f "${d}APKBUILD" ] || continue
 				p="$CAT/$(basename "$d")/APKBUILD"
 				rsync -a "$BUILD_HOST:$BUILD_DIR/$p" "$REPO/$p"
 			done
@@ -193,11 +238,23 @@ fi
 [ -f "$TSX_APORTS_KEY.pub" ] || { echo "build.sh: no such file: $TSX_APORTS_KEY.pub" >&2; exit 1; }
 KEYNAME=$(basename "$TSX_APORTS_KEY")
 
+# JOBS: one "PKGDIR ARCH" line per build
+JOBS=
 if [ "$TARGET" = --all ]; then
-	PKGDIRS=$( (cd "$REPO" && find common xx60 -mindepth 1 -maxdepth 1 -type d) | sort)
+	for A in ${WANT_ARCH:-armv7 aarch64}; do
+		case $A in armv7) CATS="common xx60";; *) CATS="common";; esac
+		for D in $( (cd "$REPO" && for c in $CATS; do [ -d "$c" ] && find "$c" -mindepth 1 -maxdepth 1 -type d; done) | sort); do
+			[ -f "$REPO/$D/APKBUILD" ] || continue
+			[ -n "$(pkg_arch "$D" "$A")" ] && JOBS="$JOBS$D $A
+"
+		done
+	done
 else
 	[ -f "$REPO/$TARGET/APKBUILD" ] || { echo "build.sh: no $REPO/$TARGET/APKBUILD" >&2; exit 1; }
-	PKGDIRS="$TARGET"
+	A=$(pkg_arch "$TARGET" "$WANT_ARCH")
+	[ -n "$A" ] || { echo "build.sh: $TARGET is not built for ${WANT_ARCH:-any architecture} (arch=$(apkbuild_arch "$TARGET"))" >&2; exit 1; }
+	JOBS="$TARGET $A
+"
 fi
 
 # want_build PKGDIR: returns 0 to build the package, and 1 to skip it. It says why it skips.
@@ -230,10 +287,11 @@ want_build() {
 	return 0
 }
 
-for PKGDIR in $PKGDIRS; do
+while read -r PKGDIR PKGARCH; do
+	[ -n "$PKGDIR" ] || continue
 	want_build "$PKGDIR" || continue
-	echo "=== building $PKGDIR ==="
-	docker run --rm --platform linux/arm/v7 \
+	echo "=== building $PKGDIR ($PKGARCH) ==="
+	docker run --rm --platform "$(arch_platform "$PKGARCH")" \
 		-v "$REPO:/repo" \
 		-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 		-v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
@@ -258,6 +316,8 @@ for PKGDIR in $PKGDIRS; do
 			abuild -F checksum
 			abuild -F -r -P /repo/packages/v3.24
 		"
-done
+done <<EOF
+$JOBS
+EOF
 echo "=== packages/v3.24 ==="
 find "$REPO/packages/v3.24" -maxdepth 3 2>/dev/null || true

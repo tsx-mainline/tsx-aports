@@ -106,10 +106,10 @@ jobs:
           openssl rsa -in "$RUNNER_TEMP/keys/ci-throwaway.rsa" -pubout -out "$RUNNER_TEMP/keys/ci-throwaway.rsa.pub"
           echo "TSX_APORTS_KEY=$RUNNER_TEMP/keys/ci-throwaway.rsa" >> "$GITHUB_ENV"
 
-      - name: Install QEMU (armv7 emulation)
+      - name: Install QEMU (armv7 and aarch64 emulation)
         uses: docker/setup-qemu-action@v4
         with:
-          platforms: arm
+          platforms: arm,arm64
 
       # Start from the published tree. Then the older versions
       # (index.sh --keep 2) and the packages that this run does not rebuild
@@ -131,6 +131,9 @@ jobs:
       # --skip-unreachable: the build skips a kernel package whose release
       # bundle does not exist yet, with a warning. Its carried-forward copy
       # stays.
+      # --all builds two passes: armv7 (common, xx60) and aarch64 (common).
+      # A package builds in a pass only when its arch= lists that
+      # architecture. tensorflow-lite-c and sendspin-cli list both.
       - name: Build the new versions
         run: scripts/build.sh --skip-existing --skip-unreachable --all
 
@@ -230,11 +233,11 @@ jobs:
         run: |
           sed -i "s/^pkgver=.*/pkgver=${LATEST%-r*}/; s/^pkgrel=.*/pkgrel=${LATEST##*-r}/" xx60/tsx-xx60-chromium/APKBUILD
 
-      - name: Install QEMU (armv7 emulation)
+      - name: Install QEMU (armv7 and aarch64 emulation)
         if: steps.check.outputs.new == 'true'
         uses: docker/setup-qemu-action@v4
         with:
-          platforms: arm
+          platforms: arm,arm64
 
       # This run uses a throwaway key. It only proves that the repack works,
       # and it publishes nothing. The merged pull request starts the real build.
