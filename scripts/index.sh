@@ -27,7 +27,7 @@ OUT="$REPO/repo"
 while [ $# -gt 0 ]; do case $1 in
 	--keep) KEEP=$2; shift;;
 	--out) OUT=$2; shift;;
-	-h|--help) sed -n '2,19p' "$0"; exit 0;;
+	-h|--help) sed -n '2,21p' "$0"; exit 0;;
 	*) echo "unknown arg $1" >&2; exit 1;;
 esac; shift; done
 

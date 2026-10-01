@@ -1,6 +1,6 @@
 # tsx-aports
 
-This is an apk package repository for the tsx-mainline xx60 project. It holds signed Alpine packages. A panel's `apk upgrade` then updates the kernel, sendspin, and the ES2-patched Chromium, in addition to the Alpine packages.
+This is an apk package repository for the tsx-mainline xx60 project. It holds signed Alpine packages. A panel's `apk upgrade` then updates the kernel, sendspin, the ES2-patched Chromium and the wlroots fix, in addition to the Alpine packages.
 
 The xx60 packages stay separate from any future platform (for example xx70). A panel's `/etc/apk/repositories` lists the Alpine repos, the `common` repo of this project, and only its own platform repo (`xx60`). An xx60 panel can therefore never resolve an xx70 package, even on the same CPU architecture. Package names carry the platform for the same reason (`tsx-xx60-*`).
 
@@ -8,13 +8,16 @@ The xx60 packages stay separate from any future platform (for example xx70). A p
 
 ```
 common/<pkg>/APKBUILD      hardware-independent packages
-xx60/<pkg>/APKBUILD        Meson8m2 (xx60/TSW-1060) packages
+xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
 scripts/build.sh           build one package or all, in an armv7 container
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
 scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
 scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
-.github/workflows/build.yml   CI sketch (build + publish, chromium watch)
+scripts/carry-forward.py   restore the published tree and check its signatures (CI)
+scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps)
+.github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
 A panel fetches the published tree. It has one directory for each Alpine branch:
@@ -37,7 +40,7 @@ https://dl-cdn.alpinelinux.org/alpine/v3.24/community
 
 This order is safe for every other package name. Only `tsx-xx60-chromium` declares a `provides=` that collides with a real Alpine package, and it does so on purpose. A plain `apk add <alpine-package>` installs the same package as before. Never list the repo of a different platform (for example `v3.24/xx70`) on an xx60 panel.
 
-## Packages (first round)
+## Packages
 
 - `common/tsx-keys` installs the public signing key of this repo into `/etc/apk/keys`. It has `arch=noarch`.
 - `common/sendspin-cli` builds from source. It uses the same pinned tag and the same cmake flags as the old `rootfs/src/sendspin/build.sh` in tsx-xx60-linux.
@@ -52,7 +55,12 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` declar
 - `xx60/tsx-xx60-kernel-stable` and `xx60/tsx-xx60-kernel-lts` are BINARY packages of an already-built kernel (see "Kernel packages" below). They install side by side. The rootfs of a panel has both.
 - `common/tensorflow-lite-c` is the TFLite C library for the wakeword models of the voice satellite.
 - `xx60/tsx-xx60-chromium` is the armv7 `chromium` .apk from Alpine, repacked with the 2-byte ES3->ES2 EGL fallback patch. The build applies the patch (see "Chromium" below). The package has `provides=chromium=<same version>`.
-- `xx60/tsx-xx60-wlroots0.20` is the Alpine `wlroots0.20` recipe with one patch. The Meson CRTC has no gamma LUT. Without the patch, the first `output * power on` of sway after `output * power off` fails, and the screen stays off. The package has `provides=wlroots0.20=<same version>` and works like `tsx-xx60-chromium` (see "Which chromium wins"). Its `pkgver` and `pkgrel` must be equal to the Alpine package. Remove the package when Alpine ships a wlroots with the fix.
+- `xx60/tsx-xx60-wlroots0.20` is the Alpine `wlroots0.20` recipe with one patch. The Meson CRTC has no gamma LUT. Without the patch, the first `output * power on` of sway after `output * power off` fails, and the screen stays off. The package has `provides=wlroots0.20=<same version>` and works like `tsx-xx60-chromium` (see "Which chromium wins"). Its `pkgver` and `pkgrel` must be equal to the Alpine package. The job `wlroots-watch` opens an issue when Alpine publishes another `wlroots0.20` build.
+
+  To go back to the Alpine package when it has the fix:
+  1. Publish one more `tsx-xx60-wlroots0.20` with a higher `pkgrel`. It has no files and no `provides` or `replaces`, and it depends on `wlroots0.20>=<the fixed Alpine version>`. On the next `apk upgrade`, the panels install the Alpine package.
+  2. Remove `tsx-xx60-wlroots0.20` from `rootfs/packages-tsx.txt` in tsx-xx60-linux.
+  3. After all panels have upgraded, remove the package from the panels (`apk del tsx-xx60-wlroots0.20`) and remove its directory here.
 
 ## Adding a package
 
@@ -203,7 +211,7 @@ We tested this on a TSW-1060 that ran the stable flavor. A workstation served th
 - `apk add tsx-xx60-chromium` on a panel with the Alpine `chromium` installed removes it and installs ours. Then `apk del chromium` removes the `chromium=<ver>` world pin, which `tsx-xx60-chromium` satisfies until then.
 - The package keeps an existing, unowned `/etc/tsx/chromium-es2-patched`, and its own copy arrives as `.apk-new`. Move the copy over the old file. tsx-autoupdate in tsx-xx60-linux does all three steps.
 
-apk-tools 3 (Alpine 3.24) refuses every upgrade while a listed repository is unavailable ("Not continuing due to stale/unavailable repositories"). Until this repository is published, a panel that lists it needs `--force-missing-repositories`. It can also use `APK_URL=off` in its panel configuration. tsx-autoupdate adds the option by itself and reports the repository as unreachable.
+apk-tools 3 (Alpine 3.24) refuses every upgrade while a listed repository is unavailable ("Not continuing due to stale/unavailable repositories"). While this repository is not reachable, a panel that lists it needs `--force-missing-repositories`. It can also use `APK_URL=off` in its panel configuration. tsx-autoupdate adds the option by itself and reports the repository as unreachable.
 
 ## Hosting and size
 
@@ -211,11 +219,11 @@ GitHub Actions builds and publishes the packages. GitHub Pages serves them behin
 
 `scripts/index.sh --keep 2` (the CI default) keeps the newest version and one previous version of every package. It then re-signs the pruned index.
 
-On the FIRST publish, confirm that the full tree fits well under the limit. The tree has all packages, both kernel flavors, and two chromium versions if a second one exists by then. Do this before you rely on the setup long-term. Today one version of everything is about 190 MB.
+Watch the size of the published tree. It has all packages, both kernel flavors, and two chromium versions while a second one exists. One version of everything is about 190 MB.
 
 ## CI
 
-`.github/workflows/build.yml` builds and publishes the repository. It has three jobs:
+`.github/workflows/build.yml` builds and publishes the repository. It has four jobs:
 
 - **build** runs on a push to `main` that changes `common/`, `xx60/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
@@ -224,6 +232,7 @@ On the FIRST publish, confirm that the full tree fits well under the limit. The 
 
   A pull request builds with a throwaway key and publishes nothing.
 - **deploy** publishes that tree with `actions/deploy-pages`.
+- **wlroots-watch** runs daily. It compares `tsx-xx60-wlroots0.20` with the Alpine v3.24 armv7 `wlroots0.20`. If Alpine has another build, it opens an issue (once for each version). A person then checks the fix and rebases the package, or switches the panels back (see "Packages" above).
 - **chromium-watch** runs daily. It checks the Alpine v3.24 armv7 `chromium`. If that is newer, it opens a pull request that changes the pin. It needs the setting "Allow GitHub Actions to create and approve pull requests" in the Actions settings of the repo.
 
 At the first deploy, the site is empty and nothing exists to carry forward. Put a tarball of a published tree on the release `seed` as `tsx-aports-seed.tar.gz`. The tree is `v3.24/<category>/armv7/...`, with public packages only. A run that finds the site empty uses the tarball automatically. A manual run can name another tarball with the `seed_url` input. To see the local options, run `scripts/carry-forward.py --help`. The test is `scripts/tests/test-ci-pages.sh` (host, packaging only).
