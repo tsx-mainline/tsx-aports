@@ -257,19 +257,20 @@ else
 "
 fi
 
-# want_build PKGDIR: returns 0 to build the package, and 1 to skip it. It says why it skips.
+# want_build PKGDIR ARCH: returns 0 to build the package, and 1 to skip it. It says why it skips.
+# --skip-existing looks only in the directory of ARCH, so an armv7 build does not hide a
+# missing aarch64 build.
 want_build() {
 	local info name ver rel url code cat n
 	info=$(apkbuild_info "$1")
 	read -r name ver rel <<<"$(echo "$info" | head -n1)"
 	cat=${1%%/*}
 	if [ "$SKIP_EXISTING" = 1 ]; then
-		for n in "$REPO/packages/v3.24/$cat"/*/"$name-$ver-r$rel.apk"; do
-			if [ -f "$n" ]; then
-				echo "[build.sh] $1: $name-$ver-r$rel.apk already in packages/v3.24/$cat -- skipping"
-				return 1
-			fi
-		done
+		n="$REPO/packages/v3.24/$cat/$2/$name-$ver-r$rel.apk"
+		if [ -f "$n" ]; then
+			echo "[build.sh] $1: $name-$ver-r$rel.apk already in packages/v3.24/$cat/$2 -- skipping"
+			return 1
+		fi
 	fi
 	if [ "$SKIP_UNREACHABLE" = 1 ]; then
 		for url in $(echo "$info" | tail -n +2); do
@@ -289,7 +290,7 @@ want_build() {
 
 while read -r PKGDIR PKGARCH; do
 	[ -n "$PKGDIR" ] || continue
-	want_build "$PKGDIR" || continue
+	want_build "$PKGDIR" "$PKGARCH" || continue
 	echo "=== building $PKGDIR ($PKGARCH) ==="
 	docker run --rm --platform "$(arch_platform "$PKGARCH")" \
 		-v "$REPO:/repo" \
