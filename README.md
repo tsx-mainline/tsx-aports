@@ -9,7 +9,7 @@ The xx60 packages stay separate from any future platform (for example xx70). A p
 ```
 common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
-scripts/build.sh           build one package or all, in an armv7 container
+scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
 scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
 scripts/index.sh           prune old versions + assemble the published tree
@@ -25,6 +25,7 @@ A panel fetches the published tree. It has one directory for each Alpine branch:
 ```
 v3.24/common/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/xx60/armv7/{*.apk, APKINDEX.tar.gz}
+v3.24/common/aarch64/{*.apk, APKINDEX.tar.gz}
 ```
 
 ## A panel's /etc/apk/repositories

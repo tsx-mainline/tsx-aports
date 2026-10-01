@@ -50,7 +50,7 @@ import urllib.request
 import zlib
 
 CATEGORIES = ('common', 'xx60')
-ARCHES = ('armv7',)
+ARCHES = ('armv7', 'aarch64')
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 

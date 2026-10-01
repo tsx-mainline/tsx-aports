@@ -76,7 +76,8 @@ for cat_dir in "$SRC"/*/; do
 		# package (tsx-keys) goes in the <arch> directory, and apk fetches
 		# from <repo>/<arch recorded in the index>/.
 		KEYNAME=$(basename "$TSX_APORTS_KEY")
-		docker run --rm --platform linux/arm/v7 \
+		case $arch in aarch64) PLATFORM=linux/arm64;; *) PLATFORM=linux/arm/v7;; esac
+		docker run --rm --platform "$PLATFORM" \
 			-v "$arch_dir:/repo" -v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 			-v "$TSX_APORTS_KEY.pub:/etc/apk/keys/$KEYNAME.pub:ro" \
 			alpine:3.24 sh -euc "

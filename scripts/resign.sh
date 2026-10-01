@@ -43,7 +43,10 @@ for f in "${APKS[@]}"; do
 	python3 "$HERE/apk-split.py" "$f" "$WORK/$b"
 done
 
-docker run --rm --platform linux/arm/v7 \
+# the container matches the packages' architecture (the last part of IN:
+# .../<category>/<arch>); armv7 when IN is named otherwise
+case $(basename "$IN") in aarch64) PLATFORM=linux/arm64;; *) PLATFORM=linux/arm/v7;; esac
+docker run --rm --platform "$PLATFORM" \
 	-v "$WORK:/w" -v "$OUT:/out" \
 	-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" -v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
 	alpine:3.24 sh -euc "
