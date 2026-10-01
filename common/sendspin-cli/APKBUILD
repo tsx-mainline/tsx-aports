@@ -5,7 +5,7 @@
 #
 # This recipe builds the package the same way that the rootfs of the project
 # built it by hand (rootfs/src/sendspin/build.sh in tsx-xx60-linux, with the
-# same pinned tag and the same cmake flags). The target is musl/armv7. The
+# same pinned tag and the same cmake flags). The targets are musl/armv7 and musl/aarch64. The
 # dependencies ArduinoJson, micro-flac, micro-opus, and IXWebSocket are
 # statically linked. CMake fetches them (FetchContent) at configure time, so
 # the build needs network access: options="net".
@@ -14,7 +14,7 @@ pkgver=0.3.0
 pkgrel=0
 pkgdesc="Sendspin CLI client (C++)"
 url="https://github.com/Sendspin/sendspin-cpp-cli"
-arch="armv7"
+arch="armv7 aarch64"
 license="MIT"
 depends="alsa-lib avahi avahi-compat-libdns_sd dbus"
 makedepends="build-base cmake samurai git linux-headers alsa-lib-dev avahi-compat-libdns_sd avahi-dev"
@@ -23,10 +23,18 @@ source="$pkgname-$pkgver.tar.gz::https://github.com/Sendspin/sendspin-cpp-cli/ar
 builddir="$srcdir/sendspin-cpp-cli-$pkgver"
 
 build() {
+	# Pick the CPU flags for each architecture. armv7 is the Cortex-A9 with
+	# NEON. aarch64 is the Cortex-A53 (APQ8053), which has NEON in the base
+	# ISA, so it needs no FPU flag.
+	case "$CARCH" in
+	armv7) cpuflags="-mcpu=cortex-a9 -mfpu=neon";;
+	aarch64) cpuflags="-mcpu=cortex-a53";;
+	*) cpuflags="";;
+	esac
 	cmake -B build -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release \
-		-DCMAKE_C_FLAGS="$CFLAGS -mcpu=cortex-a9 -mfpu=neon" \
-		-DCMAKE_CXX_FLAGS="$CXXFLAGS -mcpu=cortex-a9 -mfpu=neon" \
+		-DCMAKE_C_FLAGS="$CFLAGS $cpuflags" \
+		-DCMAKE_CXX_FLAGS="$CXXFLAGS $cpuflags" \
 		-DSENDSPIN_CLI_WITH_PORTAUDIO=OFF \
 		-DSENDSPIN_CLI_WITH_PULSE=OFF \
 		-DSENDSPIN_CLI_WITH_PIPEWIRE=OFF
