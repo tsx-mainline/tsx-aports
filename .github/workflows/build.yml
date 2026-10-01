@@ -34,7 +34,7 @@ on:
   pull_request:
     paths: ['common/**', 'xx60/**', 'scripts/**', '.github/workflows/build.yml']
   schedule:
-    # Only chromium-watch uses this schedule. The time is UTC, once a day.
+    # chromium-watch and wlroots-watch use this schedule. The time is UTC, once a day.
     - cron: '17 6 * * *'
   workflow_dispatch:
     inputs:
@@ -163,6 +163,40 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+  # tsx-xx60-wlroots0.20 holds back Alpine's wlroots0.20 on the panels, also
+  # its security updates. When Alpine publishes another wlroots0.20 build,
+  # open an issue (once for each version). A person then checks the fix and
+  # rebases the package, or switches the panels back (README.md).
+  wlroots-watch:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compare with the Alpine wlroots0.20 build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OURS=$(sed -n 's/^pkgver=//p' xx60/tsx-xx60-wlroots0.20/APKBUILD)-r$(sed -n 's/^pkgrel=//p' xx60/tsx-xx60-wlroots0.20/APKBUILD)
+          ALPINE=$(curl -fsSL https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/APKINDEX.tar.gz \
+            | tar -xzO APKINDEX | awk '/^P:wlroots0.20$/{p=1} p&&/^V:/{print substr($0,3); exit}')
+          echo "ours=$OURS alpine=$ALPINE"
+          if [ -z "$ALPINE" ]; then echo "::error::no wlroots0.20 in the Alpine index"; exit 1; fi
+          [ "$OURS" != "$ALPINE" ] || exit 0
+          TITLE="wlroots0.20: Alpine has $ALPINE, tsx-xx60-wlroots0.20 is $OURS"
+          if [ "$(gh issue list --state all --search "in:title \"$TITLE\"" --json number --jq length)" != 0 ]; then
+            echo "an issue for $ALPINE exists already"; exit 0
+          fi
+          gh issue create --title "$TITLE" --body "Alpine published wlroots0.20 $ALPINE. The panels still run tsx-xx60-wlroots0.20 $OURS, so they do not get the Alpine build.
+
+          1. Find out if $ALPINE has the gamma reset fix (upstream, or as an Alpine patch).
+          2. If it has the fix, switch the panels back to the Alpine package (README.md, \"tsx-xx60-wlroots0.20\").
+          3. If it does not have the fix, set pkgver and pkgrel of xx60/tsx-xx60-wlroots0.20 to $ALPINE, copy the other changes of the Alpine APKBUILD, and keep the patch."
 
   chromium-watch:
     if: github.event_name == 'schedule'
