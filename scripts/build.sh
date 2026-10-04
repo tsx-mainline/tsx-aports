@@ -1,8 +1,10 @@
 #!/bin/bash
 # Build one or all tsx-aports packages with abuild, in an Alpine v3.24
 # container of the package architecture: armv7 (docker --platform
-# linux/arm/v7) or aarch64 (docker --platform linux/arm64). Both use qemu-user on a host of another architecture. The
-# build is local by default, like the build tools of the main repo.
+# linux/arm/v7) or aarch64 (docker --platform linux/arm64). A host of another
+# architecture runs the container under qemu-user. An arm64 host with 32-bit
+# support runs both natively. The build is local by default, like the build
+# tools of the main repo.
 # BUILD_HOST is optional.
 # It uses the same push, run, and pull pattern as tools/build/remote-build.sh
 # in tsx-xx60-linux. It has no default value, so this repo names no build host.
@@ -155,6 +157,16 @@ arch_platform() {
 	esac
 }
 
+# arm32_prefix ARCH: prints "linux32" when an ARCH container needs it, and
+# nothing otherwise. A 32-bit ARM (armv7) container on an arm64 host runs
+# natively, and its uname -m says aarch64 because the kernel is 64-bit. Build
+# tools (CMake, for example) then pick the 64-bit code. linux32 makes uname -m
+# say armv8l, like a 32-bit ARM machine. A container under qemu-user already
+# says armv7l and needs nothing.
+arm32_prefix() {
+	if [ "$1" = armv7 ] && [ "$(uname -m)" = aarch64 ]; then echo linux32; fi
+}
+
 # pkg_arch PKGDIR WANT: the architecture to build PKGDIR for, or nothing when
 # its arch= does not allow WANT (WANT empty: the first one it lists).
 pkg_arch() {
@@ -296,7 +308,7 @@ while read -r PKGDIR PKGARCH; do
 		-v "$REPO:/repo" \
 		-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 		-v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
-		alpine:3.24 sh -euc "
+		alpine:3.24 $(arm32_prefix "$PKGARCH") sh -euc "
 			apk update >/dev/null
 			# zstd: alpine-sdk does not install it. The unpack step of
 			# abuild needs the zstd binary for each .tar.zst source, for

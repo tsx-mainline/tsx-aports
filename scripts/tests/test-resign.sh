@@ -65,6 +65,19 @@ OUT=$(
 )
 case "$OUT" in *"embeds the local private key path"*) bad "assert_remote_cmd_safe refused a safe (throwaway-only) command: $OUT";; *"ran ok"*) ok "assert_remote_cmd_safe allows a command naming only the throwaway key";; *) bad "unexpected: $OUT";; esac
 
+echo "== 1b. arm32_prefix (an armv7 container on a native arm64 host runs under linux32) =="
+a32() {  # HOST_UNAME ARCH: what arm32_prefix prints
+	(
+		TSX_APORTS_BUILD_SH_SOURCE_ONLY=1 . "$HERE/build.sh"
+		FAKE_MACHINE=$1
+		uname() { echo "$FAKE_MACHINE"; }
+		arm32_prefix "$2"
+	)
+}
+[ "$(a32 aarch64 armv7)" = linux32 ] && ok "armv7 on an aarch64 host: linux32" || bad "armv7 on an aarch64 host: '$(a32 aarch64 armv7)'"
+[ -z "$(a32 aarch64 aarch64)" ] && ok "aarch64 on an aarch64 host: no prefix" || bad "aarch64 on an aarch64 host: '$(a32 aarch64 aarch64)'"
+[ -z "$(a32 x86_64 armv7)" ] && ok "armv7 on an x86_64 host (qemu-user): no prefix" || bad "armv7 on an x86_64 host: '$(a32 x86_64 armv7)'"
+
 if ! command -v docker >/dev/null 2>&1; then
 	echo "== 2. skipped (no docker on this host) =="
 	echo "== $N ok, $F failed"
