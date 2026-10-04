@@ -11,6 +11,7 @@ common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
 scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
+scripts/arch-image.sh      the container image of each architecture (used by build.sh, index.sh and resign.sh)
 scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
 scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging

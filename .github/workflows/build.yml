@@ -115,12 +115,18 @@ jobs:
 
       # The runner has no qemu-user binfmt. If it could not run the containers
       # natively, these commands would fail. The log lines show the host
-      # architecture and the architecture of each container.
+      # architecture and the architecture of each container. The step fails
+      # when a container reports another architecture than its own.
+      # scripts/arch-image.sh gives each architecture its own image tag.
       - name: Check that the armv7 and aarch64 containers run natively
         run: |
+          set -eu
           echo "host $(uname -m), qemu-arm binfmt $([ -e /proc/sys/fs/binfmt_misc/qemu-arm ] && echo registered || echo absent)"
-          echo "armv7 container: $(docker run --rm --platform linux/arm/v7 alpine:3.24 apk --print-arch)"
-          echo "aarch64 container: $(docker run --rm --platform linux/arm64 alpine:3.24 apk --print-arch)"
+          . scripts/arch-image.sh
+          for a in armv7 aarch64; do
+            ensure_image "$a"
+            check_image_arch "$a"
+          done
 
       # Start from the published tree. Then the older versions
       # (index.sh --keep 2) and the packages that this run does not rebuild

@@ -21,6 +21,7 @@
 # remote host", for the full flow.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
+. "$HERE/arch-image.sh"
 : "${TSX_APORTS_KEY:?set TSX_APORTS_KEY (path to the private signing key)}"
 [ -f "$TSX_APORTS_KEY" ] || { echo "resign.sh: no such file: $TSX_APORTS_KEY" >&2; exit 1; }
 [ -f "$TSX_APORTS_KEY.pub" ] || { echo "resign.sh: no such file: $TSX_APORTS_KEY.pub" >&2; exit 1; }
@@ -45,11 +46,12 @@ done
 
 # the container matches the packages' architecture (the last part of IN:
 # .../<category>/<arch>); armv7 when IN is named otherwise
-case $(basename "$IN") in aarch64) PLATFORM=linux/arm64;; *) PLATFORM=linux/arm/v7;; esac
-docker run --rm --platform "$PLATFORM" \
+case $(basename "$IN") in aarch64) IARCH=aarch64;; *) IARCH=armv7;; esac
+ensure_image "$IARCH"; check_image_arch "$IARCH"
+docker run --rm --platform "$(arch_platform "$IARCH")" \
 	-v "$WORK:/w" -v "$OUT:/out" \
 	-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" -v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
-	alpine:3.24 sh -euc "
+	"$(arch_image "$IARCH")" sh -euc "
 		apk add --no-cache abuild apk-tools >/dev/null
 		rm -f /etc/apk/keys/*
 		cp /keys/$KEYNAME.pub /etc/apk/keys/

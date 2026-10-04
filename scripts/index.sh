@@ -22,6 +22,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
+. "$HERE/arch-image.sh"
 KEEP=2
 OUT="$REPO/repo"
 while [ $# -gt 0 ]; do case $1 in
@@ -57,6 +58,7 @@ prune_dir() {  # ARCH_DIR
 	return $pruned
 }
 
+READY=   # the architectures whose image is pulled and checked in this run
 for cat_dir in "$SRC"/*/; do
 	cat=$(basename "$cat_dir")
 	for arch_dir in "$cat_dir"*/; do
@@ -76,11 +78,15 @@ for cat_dir in "$SRC"/*/; do
 		# package (tsx-keys) goes in the <arch> directory, and apk fetches
 		# from <repo>/<arch recorded in the index>/.
 		KEYNAME=$(basename "$TSX_APORTS_KEY")
-		case $arch in aarch64) PLATFORM=linux/arm64;; *) PLATFORM=linux/arm/v7;; esac
-		docker run --rm --platform "$PLATFORM" \
+		case $arch in aarch64) IARCH=aarch64;; *) IARCH=armv7;; esac
+		case " $READY " in
+		*" $IARCH "*) ;;
+		*) ensure_image "$IARCH"; check_image_arch "$IARCH"; READY="$READY $IARCH";;
+		esac
+		docker run --rm --platform "$(arch_platform "$IARCH")" \
 			-v "$arch_dir:/repo" -v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 			-v "$TSX_APORTS_KEY.pub:/etc/apk/keys/$KEYNAME.pub:ro" \
-			alpine:3.24 sh -euc "
+			"$(arch_image "$IARCH")" sh -euc "
 				apk add --no-cache abuild >/dev/null
 				cd /repo
 				rm -f APKINDEX.tar.gz APKINDEX.unsigned.tar.gz

@@ -78,6 +78,37 @@ a32() {  # HOST_UNAME ARCH: what arm32_prefix prints
 [ -z "$(a32 aarch64 aarch64)" ] && ok "aarch64 on an aarch64 host: no prefix" || bad "aarch64 on an aarch64 host: '$(a32 aarch64 aarch64)'"
 [ -z "$(a32 x86_64 armv7)" ] && ok "armv7 on an x86_64 host (qemu-user): no prefix" || bad "armv7 on an x86_64 host: '$(a32 x86_64 armv7)'"
 
+echo "== 1c. arch-image.sh (one image tag for each architecture; a fake docker records the calls) =="
+OUT=$(
+	. "$HERE/arch-image.sh"
+	CALLS=$(mktemp); trap 'rm -f "$CALLS"' EXIT
+	docker() { echo "docker $*" >> "$CALLS"; return 0; }
+	ensure_image armv7; ensure_image aarch64
+	cat "$CALLS"
+)
+EXP="docker pull -q --platform linux/arm/v7 alpine:3.24
+docker tag alpine:3.24 tsx-aports-alpine:3.24-armv7
+docker pull -q --platform linux/arm64 alpine:3.24
+docker tag alpine:3.24 tsx-aports-alpine:3.24-aarch64"
+[ "$OUT" = "$EXP" ] && ok "ensure_image tags each platform right after its pull, with its own tag" || bad "ensure_image calls: $OUT"
+
+OUT=$(
+	. "$HERE/arch-image.sh"
+	docker() { case "$*" in *"tsx-aports-alpine:3.24-armv7 apk"*) echo armv7;; *"tsx-aports-alpine:3.24-aarch64 apk"*) echo armv7;; esac; }
+	check_image_arch armv7 2>&1; echo "rc=$?"
+	check_image_arch aarch64 2>&1; echo "rc=$?"
+)
+case "$OUT" in *"armv7 container: armv7"*"rc=0"*"the aarch64 container (tsx-aports-alpine:3.24-aarch64) says armv7"*"rc=1"*) ok "check_image_arch passes a right container and stops on a wrong one";; *) bad "check_image_arch: $OUT";; esac
+
+OUT=$(
+	. "$HERE/arch-image.sh"
+	docker() { case "$1" in pull) return 1;; image) return 1;; esac; }
+	ensure_image armv7 2>&1; echo "rc=$?"
+	docker() { case "$1" in pull) return 1;; image) return 0;; esac; }
+	ensure_image armv7 2>&1; echo "rc=$?"
+)
+case "$OUT" in *"and tsx-aports-alpine:3.24-armv7 does not exist"*"rc=1"*"using the local tsx-aports-alpine:3.24-armv7"*"rc=0"*) ok "ensure_image uses an earlier tag when the pull fails, and stops when there is none";; *) bad "ensure_image without network: $OUT";; esac
+
 if ! command -v docker >/dev/null 2>&1; then
 	echo "== 2. skipped (no docker on this host) =="
 	echo "== $N ok, $F failed"

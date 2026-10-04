@@ -3,8 +3,10 @@
 # container of the package architecture: armv7 (docker --platform
 # linux/arm/v7) or aarch64 (docker --platform linux/arm64). A host of another
 # architecture runs the container under qemu-user. An arm64 host with 32-bit
-# support runs both natively. The build is local by default, like the build
-# tools of the main repo.
+# support runs both natively. Each architecture has its own image tag, made
+# by scripts/arch-image.sh, and the script checks the architecture of the
+# container before the first build of a pass. The build is local by default,
+# like the build tools of the main repo.
 # BUILD_HOST is optional.
 # It uses the same push, run, and pull pattern as tools/build/remote-build.sh
 # in tsx-xx60-linux. It has no default value, so this repo names no build host.
@@ -91,6 +93,9 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
+# arch_platform, ensure_image, check_image_arch and arch_image. Each
+# architecture has its own image tag (see that file).
+. "$(dirname "${BASH_SOURCE[0]}")/arch-image.sh"
 
 # to_build_host ARGS...: runs `rsync -a ARGS...`. It refuses if any argument
 # names a private key. This is $TSX_APORTS_KEY itself, or anything that ends
@@ -146,15 +151,6 @@ apkbuild_arch() {
 		. "$REPO/$1/APKBUILD" >/dev/null 2>&1
 		echo "$arch"
 	)
-}
-
-# arch_platform ARCH: the docker platform for an apk architecture.
-arch_platform() {
-	case $1 in
-	armv7) echo linux/arm/v7;;
-	aarch64) echo linux/arm64;;
-	*) echo "build.sh: unsupported architecture: $1" >&2; return 1;;
-	esac
 }
 
 # arm32_prefix ARCH: prints "linux32" when an ARCH container needs it, and
@@ -300,15 +296,23 @@ want_build() {
 	return 0
 }
 
+# READY: the architectures whose image is pulled and checked in this run. The
+# check stops the build when a container of one pass reports another
+# architecture (scripts/arch-image.sh says why this can happen).
+READY=
 while read -r PKGDIR PKGARCH; do
 	[ -n "$PKGDIR" ] || continue
 	want_build "$PKGDIR" "$PKGARCH" || continue
+	case " $READY " in
+	*" $PKGARCH "*) ;;
+	*) ensure_image "$PKGARCH"; check_image_arch "$PKGARCH"; READY="$READY $PKGARCH";;
+	esac
 	echo "=== building $PKGDIR ($PKGARCH) ==="
 	docker run --rm --platform "$(arch_platform "$PKGARCH")" \
 		-v "$REPO:/repo" \
 		-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 		-v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
-		alpine:3.24 $(arm32_prefix "$PKGARCH") sh -euc "
+		"$(arch_image "$PKGARCH")" $(arm32_prefix "$PKGARCH") sh -euc "
 			apk update >/dev/null
 			# zstd: alpine-sdk does not install it. The unpack step of
 			# abuild needs the zstd binary for each .tar.zst source, for
