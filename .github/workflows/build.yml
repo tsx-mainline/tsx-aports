@@ -13,6 +13,13 @@
 #                   newer chromium and opens a pull request that changes
 #                   the pin.
 #
+# Runners. The jobs that run ARM code (build and chromium-watch) run on the
+# hosted arm64 runner ubuntu-24.04-arm. This runner runs the armv7 and aarch64
+# containers of scripts/build.sh and scripts/index.sh natively
+# (docker --platform linux/arm/v7 and linux/arm64). The jobs need no qemu-user
+# binfmt (docker/setup-qemu-action). The other jobs run no ARM code and stay
+# on ubuntu-latest.
+#
 # These settings must exist once, outside this file:
 #   - The secret TSX_APORTS_PRIVKEY holds the signing key, base64-encoded.
 #     The key itself is never committed.
@@ -59,7 +66,7 @@ env:
 jobs:
   build:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     outputs:
       publish: ${{ steps.mode.outputs.publish }}
@@ -106,10 +113,14 @@ jobs:
           openssl rsa -in "$RUNNER_TEMP/keys/ci-throwaway.rsa" -pubout -out "$RUNNER_TEMP/keys/ci-throwaway.rsa.pub"
           echo "TSX_APORTS_KEY=$RUNNER_TEMP/keys/ci-throwaway.rsa" >> "$GITHUB_ENV"
 
-      - name: Install QEMU (armv7 and aarch64 emulation)
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm,arm64
+      # The runner has no qemu-user binfmt. If it could not run the containers
+      # natively, these commands would fail. The log lines show the host
+      # architecture and the architecture of each container.
+      - name: Check that the armv7 and aarch64 containers run natively
+        run: |
+          echo "host $(uname -m), qemu-arm binfmt $([ -e /proc/sys/fs/binfmt_misc/qemu-arm ] && echo registered || echo absent)"
+          echo "armv7 container: $(docker run --rm --platform linux/arm/v7 alpine:3.24 apk --print-arch)"
+          echo "aarch64 container: $(docker run --rm --platform linux/arm64 alpine:3.24 apk --print-arch)"
 
       # Start from the published tree. Then the older versions
       # (index.sh --keep 2) and the packages that this run does not rebuild
@@ -127,7 +138,7 @@ jobs:
           fi
 
       # --skip-existing: the build does not rebuild a published version
-      # (tensorflow-lite-c is a C++ build under QEMU).
+      # (tensorflow-lite-c is a long C++ build).
       # --skip-unreachable: the build skips a kernel package whose release
       # bundle does not exist yet, with a warning. Its carried-forward copy
       # stays.
@@ -203,7 +214,7 @@ jobs:
 
   chromium-watch:
     if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 120
     permissions:
       contents: write
@@ -232,12 +243,6 @@ jobs:
           LATEST: ${{ steps.check.outputs.version }}
         run: |
           sed -i "s/^pkgver=.*/pkgver=${LATEST%-r*}/; s/^pkgrel=.*/pkgrel=${LATEST##*-r}/" xx60/tsx-xx60-chromium/APKBUILD
-
-      - name: Install QEMU (armv7 and aarch64 emulation)
-        if: steps.check.outputs.new == 'true'
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: arm,arm64
 
       # This run uses a throwaway key. It only proves that the repack works,
       # and it publishes nothing. The merged pull request starts the real build.
