@@ -12,22 +12,28 @@
 # archive. See "Source of the board package" in README.md.
 #
 # The subpackage tsx-xx60-board-kiosk holds the files that only the kiosk
-# profiles need: the patched cage and the Chromium patch tool. The console
-# profile does not pull them (they need wlroots).
+# profiles need: the patched cage, the Chromium patch tool and the ES2 browser
+# hook of kiosk-session (kiosk.d/es2.sh). The console profile does not pull
+# them (they need wlroots).
+#
+# The subpackage tsx-xx60-board-ha holds the camera plugins of the Home
+# Assistant layer (esphome.d/camera.py and setup.d/camera.py). Only the ha
+# profile pulls it, so only that profile gets libturbojpeg.
 pkgname=tsx-xx60-board
-pkgver=0.1.5
+pkgver=0.2.0
 pkgrel=0
-pkgdesc="TSX xx60 board layer: board file, hardware tools, services, LED bar, TFA9890 and audio"
+pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
 license="GPL-2.0-or-later"
-depends="alsa-utils busybox i2c-tools libusb python3 u-boot-tools"
-makedepends="libusb-dev linux-headers meson samurai pkgconf wlroots0.20-dev wayland-dev
+depends="alsa-utils busybox i2c-tools python3 u-boot-tools"
+makedepends="linux-headers meson samurai pkgconf wlroots0.20-dev wayland-dev
 	wayland-protocols libxkbcommon-dev libdrm-dev patch"
 # The board file /etc/conf.d/watchdog replaces the one of busybox-openrc (the
-# watchdog of the Meson SoC has its own timeout).
-replaces="busybox-openrc"
-subpackages="$pkgname-kiosk:_kiosk"
+# watchdog of the Meson SoC has its own timeout). Up to 0.1.7, tsx-ha held the
+# CSR8811 chip file and its PSR loader (bt-chip-csr8811.sh, csr_psload.py).
+replaces="busybox-openrc tsx-ha"
+subpackages="$pkgname-kiosk:_kiosk $pkgname-ha:_ha"
 # The panel software lives in /usr/local, as in the image.
 options="!check !fhs"
 _cage=0.3.1
@@ -41,34 +47,41 @@ builddir="$srcdir/tsx-xx60-linux-$pkgver"
 # overlay belongs to the common packages.
 _files="
 etc/asound.conf
+etc/conf.d/tsx-esphome
+etc/conf.d/tsx-mqtt
+etc/conf.d/tsx-panelctl
 etc/conf.d/watchdog
 etc/init.d/tsx-als
 etc/init.d/tsx-audio
 etc/init.d/tsx-boot-ok
 etc/init.d/tsx-cpufreq
-etc/init.d/tsx-ledbar
 etc/init.d/tsx-tfa-dsp
 etc/logrotate.d/tsx-als
 etc/logrotate.d/tsx-cpufreq
 etc/periodic/hourly/tsx-emmc-state
 etc/tsx/als.conf
 etc/tsx/audio.conf
-etc/tsx/ledbar.conf
+etc/tsx/buttons-board.conf
 etc/tsx/motd.board
 etc/tsx/panel-board.conf
 etc/tsx/tfa-dsp.conf
 etc/tsx/uboot-env.conf
 usr/local/bin/tsx-audio
 usr/local/lib/tsx/board.sh
+usr/local/lib/tsx/bt-chip-csr8811.sh
+usr/local/lib/tsx/config.d/camera.sh
+usr/local/lib/tsx/csr_psload.py
+usr/local/lib/tsx/kiosk.d/es2.sh
 usr/local/lib/tsx/tfa_dsp.py
 usr/local/sbin/tsx-als
 usr/local/sbin/tsx-boot-ok
 usr/local/sbin/tsx-cpufreqd
 usr/local/sbin/tsx-emmc-state
 usr/local/sbin/tsx-hw
-usr/local/sbin/tsx-ledbard
 usr/local/sbin/tsx-tfa-dsp
 usr/local/sbin/tsx-update-boot
+usr/local/share/tsx/esphome.d/camera.py
+usr/local/share/tsx/setup.d/camera.py
 "
 
 prepare() {
@@ -79,7 +92,6 @@ prepare() {
 
 build() {
 	cd "$builddir"/rootfs/src
-	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-ledbar tsx-ledbar.c -lusb-1.0
 	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-peak tsx-peak.c -lm
 	cd "$srcdir"
 	meson setup cage-build cage-$_cage -Dman-pages=disabled --prefix=/usr --buildtype=release
@@ -92,7 +104,6 @@ package() {
 		[ -f "$builddir"/rootfs/overlay/$f ] || { echo "board file missing in the source: $f" >&2; return 1; }
 		install -Dm"$(stat -c %a "$builddir"/rootfs/overlay/$f)" "$builddir"/rootfs/overlay/$f "$pkgdir"/$f
 	done
-	install -Dm755 "$builddir"/rootfs/src/tsx-ledbar "$pkgdir"/usr/local/bin/tsx-ledbar
 	install -Dm755 "$builddir"/rootfs/src/tsx-peak "$pkgdir"/usr/local/bin/tsx-peak
 	# Files of the kiosk subpackage (moved by _kiosk).
 	install -Dm755 "$srcdir"/cage-build/cage "$pkgdir"/usr/bin/cage
@@ -104,12 +115,22 @@ package() {
 }
 
 _kiosk() {
-	pkgdesc="TSX xx60 kiosk glue: patched cage and the Chromium patch tool"
-	depends="$pkgname=$pkgver-r$pkgrel wlroots0.20 python3"
-	amove usr/bin/cage usr/local/sbin/tsx-chromium-es2 usr/local/share/tsx/chromium-es2 usr/share/tsx-cage.version
+	pkgdesc="TSX xx60 kiosk glue: patched cage, the Chromium patch tool and the ES2 browser hook"
+	# kiosk-session of tsx-kiosk 0.2.0 runs the hooks in kiosk.d.
+	depends="$pkgname=$pkgver-r$pkgrel tsx-kiosk>=0.2.0 wlroots0.20 python3"
+	amove usr/bin/cage usr/local/sbin/tsx-chromium-es2 usr/local/share/tsx/chromium-es2 usr/share/tsx-cage.version \
+		usr/local/lib/tsx/kiosk.d
+}
+
+_ha() {
+	pkgdesc="TSX xx60 Home Assistant glue: the camera of the ESPHome device and its setup field"
+	# tsx-ha 0.2.0 loads the plugins in esphome.d and setup.d. camera.py
+	# encodes JPEG with libturbojpeg 3 and uses numpy.
+	depends="$pkgname=$pkgver-r$pkgrel tsx-ha>=0.2.0 libturbojpeg>=3 py3-numpy"
+	amove usr/local/share/tsx/esphome.d usr/local/share/tsx/setup.d
 }
 
 sha512sums="
-255805dbe87cadf6b013afbe1d7332c4b397dbdef950d3f1fa7857c3f93ffe7b4d27d9724841c70d14e684674c034f1d11b7c8e9a2255d1d89d4d1875a6b9ccd  tsx-xx60-linux-0.1.5.tar.gz
+387412d30320e8cc638193a999bae2c555dcbc0f7f2f6ee6689f33055e87ba696639ef84ad572de06c8d7c2f75b9732e167b5fe467c84e41280903fca0e3bbe7  tsx-xx60-linux-0.2.0.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "

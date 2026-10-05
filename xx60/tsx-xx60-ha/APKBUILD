@@ -3,13 +3,13 @@
 # Meta package: it holds no files. It pulls the packages of the ha image profile.
 # Run apk add tsx-xx60-ha and a kernel package to get the full xx60 image.
 pkgname=tsx-xx60-ha
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=0
-pkgdesc="TSX xx60 Home Assistant profile: kiosk plus the Home Assistant layer"
+pkgdesc="TSX xx60 Home Assistant profile: kiosk plus the Home Assistant layer and the camera"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
 license="GPL-2.0-or-later"
-depends="tsx-xx60-kiosk tsx-ha"
+depends="tsx-xx60-kiosk>=0.2.0 tsx-ha>=0.2.0 tsx-xx60-board-ha>=0.2.0"
 options="!check"
 
 package() {

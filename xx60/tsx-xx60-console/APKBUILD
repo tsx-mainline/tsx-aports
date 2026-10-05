@@ -3,14 +3,16 @@
 # Meta package: it holds no files. It pulls the packages of the console image profile.
 # tsx-xx60-board holds the board files of the xx60. tsx-idled is a package of its own, because the console profile runs it too.
 # tsx-rescue-ui is not here: only the initramfs runs the rescue screen, and the initramfs build installs that package itself.
+# The version floors keep the 0.2.0 layout together: the keys are in buttons-board.conf of the board package, and the
+# LED bar tools are in tsx-ledbar. A partial upgrade must not mix packages of the old and the new layout.
 pkgname=tsx-xx60-console
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=0
-pkgdesc="TSX xx60 console profile: text login on the panel, SSH, update and buttons"
+pkgdesc="TSX xx60 console profile: text login on the panel, SSH, update, keys and LED bar"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
 license="GPL-2.0-or-later"
-depends="tsx-xx60-board tsx-base tsx-autoupdate tsx-buttons tsx-idled tsx-splash"
+depends="tsx-xx60-board>=0.2.0 tsx-base>=0.2.0 tsx-autoupdate tsx-buttons>=0.2.0 tsx-idled>=0.2.0 tsx-splash tsx-ledbar>=0.2.0"
 options="!check"
 
 package() {
