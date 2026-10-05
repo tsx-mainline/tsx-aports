@@ -17,6 +17,16 @@
 # musl has no strtoll_l. The build sets FLATBUFFERS_LOCALE_INDEPENDENT=0 for
 # flatbuffers (see build-tflite.sh).
 #
+# The armv7 library is the pinned library of tsx-xx60-linux
+# (rootfs/voice/tflite/SHA256SUMS), byte for byte. The recipe uses the flags
+# of build-tflite.sh and not the flags of abuild: -O2 -fPIC, no LDFLAGS, and
+# a plain strip. The source paths and the paths of the parts that CMake
+# fetches get into the library (__FILE__, assert texts). So the build maps the
+# source folder to /build/tensorflow-$pkgver and the CMake build folder to
+# /build/tflite, the two folder names of build-tflite.sh. package() stops when
+# the armv7 library does not have the sha256 of _pin_armv7. Change the pin in
+# both repositories together.
+#
 # The CMake build of TFLite fetches several third-party dependencies itself
 # (abseil, flatbuffers, farmhash, fft2d, gemmlowp, ruy, cpuinfo, and others).
 # It uses CMake FetchContent or ExternalProject at configure time. For this
@@ -24,37 +34,50 @@
 # FetchContent dependencies.
 pkgname=tensorflow-lite-c
 pkgver=2.17.1
-pkgrel=0
+pkgrel=1
 pkgdesc="TensorFlow Lite C API shared library and headers"
 url="https://www.tensorflow.org/lite"
 arch="armv7 aarch64"
 license="Apache-2.0"
 makedepends="build-base cmake samurai git curl python3 linux-headers patch"
-options="net !check"
+options="net !check !strip"
 source="tensorflow-$pkgver.tar.gz::https://github.com/tensorflow/tensorflow/archive/refs/tags/v$pkgver.tar.gz"
 builddir="$srcdir/tensorflow-$pkgver"
+_pin_armv7=e3fb7cad5bafd7ce39d5efd16774f1a0c4361ffd576c26c1102bf49a8d3f6b64
 
 build() {
+	local opt="-O2"
 	case "$CARCH" in
-	aarch64) cpuflags="-mcpu=cortex-a53";;
-	*) cpuflags="";;
+	aarch64) opt="-O2 -mcpu=cortex-a53";;
 	esac
-	cmake -S "$builddir/tensorflow/lite/c" -B build -G Ninja \
+	# CMake reads these from the environment. The pinned build has none.
+	unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+	local b="$srcdir"/tflite-build
+	local map="-ffile-prefix-map=$builddir=/build/tensorflow-$pkgver -ffile-prefix-map=$b=/build/tflite"
+	cmake -S "$builddir/tensorflow/lite/c" -B "$b" -G Ninja \
 		-DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
 		-DTFLITE_ENABLE_XNNPACK=OFF -DTFLITE_ENABLE_GPU=OFF \
 		-DTFLITE_ENABLE_NNAPI=OFF -DTFLITE_ENABLE_MMAP=ON \
-		-DCMAKE_C_FLAGS="$CFLAGS $cpuflags -fPIC" \
-		-DCMAKE_CXX_FLAGS="$CXXFLAGS $cpuflags -fPIC -Wno-error -DFLATBUFFERS_LOCALE_INDEPENDENT=0"
-	cmake --build build --target tensorflowlite_c
+		-DCMAKE_C_FLAGS="$opt -fPIC $map" \
+		-DCMAKE_CXX_FLAGS="$opt -fPIC -Wno-error -DFLATBUFFERS_LOCALE_INDEPENDENT=0 $map"
+	cmake --build "$b" --target tensorflowlite_c
 }
 
 package() {
 	cd "$builddir"
-	install -Dm755 build/libtensorflowlite_c.so "$pkgdir"/usr/lib/libtensorflowlite_c.so
+	local lib="$pkgdir"/usr/lib/libtensorflowlite_c.so sum
+	install -Dm755 "$srcdir"/tflite-build/libtensorflowlite_c.so "$lib"
+	strip "$lib"
+	sum=$(sha256sum "$lib" | cut -d' ' -f1)
+	echo "libtensorflowlite_c.so $CARCH sha256 $sum"
+	if [ "$CARCH" = armv7 ] && [ "$sum" != "$_pin_armv7" ]; then
+		error "libtensorflowlite_c.so does not match the pin $_pin_armv7"
+		return 1
+	fi
 	# The soname symlink: create it only if the upstream build set a soname.
 	# It may not, because the CMakeLists of tensorflow/lite/c does not
 	# always set VERSION or SOVERSION.
-	soname=$(readelf -d build/libtensorflowlite_c.so 2>/dev/null | \
+	soname=$(readelf -d "$lib" 2>/dev/null | \
 		sed -n 's/.*(SONAME).*\[\(.*\)\].*/\1/p')
 	if [ -n "$soname" ] && [ "$soname" != "libtensorflowlite_c.so" ]; then
 		ln -s libtensorflowlite_c.so "$pkgdir/usr/lib/$soname"
