@@ -37,9 +37,9 @@ SRCDEST="$startdir/dist"
 # /boot/tsxboot-emmc-<flavor>.img. Only the image of the SELECTED flavor goes
 # into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-stable
-pkgver=7.2.8_git20260928
-pkgrel=13
-_kernelrelease=7.2.8-00119-ga67b2346cec5
+pkgver=7.2.8_git20261004
+pkgrel=0
+_kernelrelease=7.2.8-00117-g897da326e03e
 # The tsx-xx60-linux release tag whose "kbundle" CI asset this package pins.
 # UNRELEASED until that repo has a real tag with this job. Until then, the
 # package builds only from a local dist/ stage (see the header comment).
@@ -66,5 +66,5 @@ package() {
 }
 
 sha512sums="
-2605a64c0c3b534b37ab994cfb6758a7587876956d6d7a3b1108a389aecf042d423b86eee8460f6b511495fb3a8ac4b693e41db2405145ae6861f2c62ddba3c6  tsx-xx60-kernel-stable-bundle.tar.zst
+4bdc4b15599baa3cf0ce07cc9fc001ab74826c00b22a87472e45c6f8dced96db757cdeaa035f9f7527317847acf1fb509b4af0eb28f28aa7e16ac5959fe6defb  tsx-xx60-kernel-stable-bundle.tar.zst
 "
