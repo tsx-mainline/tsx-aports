@@ -1,12 +1,12 @@
 #!/bin/sh
 # Make the local source tarball of a release tag of tsx-ledbar-fw for the
-# recipe xx60/tsx-ledbar-fw. Use it until that repo is on GitHub.
+# recipe common/tsx-ledbar-fw. Use it until that repo is on GitHub.
 #
 #   scripts/ledbar-fw-source.sh REPO TAG
 #   REPO  path of a tsx-ledbar-fw checkout
 #   TAG   a signed tag of that repo, for example v0.1.1
 #
-# The script writes tsx-ledbar-fw-<version>.tar.gz into xx60/tsx-ledbar-fw/
+# The script writes tsx-ledbar-fw-<version>.tar.gz into common/tsx-ledbar-fw/
 # (git ignores it). The archive holds fw, tools, panel, tests and LICENSE of
 # the tag. Its top directory is tsx-ledbar-fw-<version>/, as in a GitHub tag
 # archive. gzip -n and tar.umask=0022 keep the file and its sha512 the same
@@ -24,5 +24,5 @@ T=$(mktemp)
 chmod 644 "$T"
 trap 'rm -f "$T"' EXIT
 git -C "$REPO" -c tar.umask=0022 archive --format=tar --prefix="tsx-ledbar-fw-$VER/" "$TAG" fw tools panel tests LICENSE | gzip -n -9 > "$T"
-install -m 644 "$T" "$HERE/../xx60/tsx-ledbar-fw/$NAME"
+install -m 644 "$T" "$HERE/../common/tsx-ledbar-fw/$NAME"
 echo "$(sha512sum "$T" | cut -d' ' -f1)  $NAME"

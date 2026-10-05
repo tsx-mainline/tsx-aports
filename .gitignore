@@ -31,4 +31,4 @@ common/*/tsx-linux-common-*.tar.gz
 xx60/tsx-xx60-board/tsx-xx60-linux-*.tar.gz
 
 # local source tarball of the tsx-ledbar-fw tag (scripts/ledbar-fw-source.sh)
-xx60/tsx-ledbar-fw/tsx-ledbar-fw-*.tar.gz
+common/tsx-ledbar-fw/tsx-ledbar-fw-*.tar.gz
