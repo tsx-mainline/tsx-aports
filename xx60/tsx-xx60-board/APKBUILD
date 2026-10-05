@@ -21,7 +21,7 @@
 # profile pulls it, so only that profile gets libturbojpeg.
 pkgname=tsx-xx60-board
 pkgver=0.2.0
-pkgrel=0
+pkgrel=1
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
@@ -131,6 +131,6 @@ _ha() {
 }
 
 sha512sums="
-387412d30320e8cc638193a999bae2c555dcbc0f7f2f6ee6689f33055e87ba696639ef84ad572de06c8d7c2f75b9732e167b5fe467c84e41280903fca0e3bbe7  tsx-xx60-linux-0.2.0.tar.gz
+75df67cb4be1a925e1f2b76f7718d96174ed7081014af9051164438f0641dec2c6fafeed7c6c1057d5d43bddaa74ecb02c45d5438ba161fe24ce8033008d915c  tsx-xx60-linux-0.2.0.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "

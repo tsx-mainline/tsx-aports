@@ -10,7 +10,7 @@
 # and run `abuild checksum`. See "Source of the common packages" in README.md.
 pkgname=tsx-setup
 pkgver=0.2.0
-pkgrel=0
+pkgrel=1
 pkgdesc="TSX on-panel setup page and its root helper"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
@@ -28,5 +28,5 @@ package() {
 }
 
 sha512sums="
-5b843bc58e8be13c533b0139f15b2482d2071f7ef67519b806a49c57ddc2e7e0b7bb45f89a78494165660cec500341358eafbcc188504f70dba195bc5a8e26b9  tsx-linux-common-0.2.0.tar.gz
+a9cdb5970fc35763d500a32e859853eb2ced4cedcf40be2ac508bf3c446b12e95d5c95bfd95d05dcdf98bdec02b8049cb9137f3538e2796389c7248939171da4  tsx-linux-common-0.2.0.tar.gz
 "
