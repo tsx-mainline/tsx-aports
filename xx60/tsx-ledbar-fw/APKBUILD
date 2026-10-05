@@ -1,0 +1,65 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Open firmware for the USB LED bar of the xx60 panels (TSW-760, TSW-1060,
+# TSS-10), and the tools that load it. The package is optional. The stock
+# bar firmware stays the default.
+#
+# The recipe builds the image from source with the Alpine cross compiler
+# (gcc-arm-none-eabi, newlib-arm-none-eabi) and libopencm3, pinned by commit.
+# The package holds no Crestron file. The stock image stays on the panel
+# (/data/tsx/vendor/), and tsx-ledbar-fw-uninstall loads it back.
+#
+# Source: the signed tag v$pkgver of tsx-ledbar-fw. Until that repo is on
+# GitHub, the build reads a tarball that scripts/ledbar-fw-source.sh writes
+# into this directory. When the repo is public, change the first source= item
+# to tsx-ledbar-fw-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
+# and run `abuild checksum`.
+#
+# The install does not touch the bar. An upgrade loads the new image only when
+# the bar already runs the tsx-ledbar firmware (see the post-upgrade file).
+pkgname=tsx-ledbar-fw
+pkgver=0.1.3
+pkgrel=0
+pkgdesc="TSX xx60 open firmware for the USB LED bar, with its loader and install scripts"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="noarch"
+license="GPL-2.0-or-later"
+depends="python3"
+makedepends="gcc-arm-none-eabi newlib-arm-none-eabi binutils-arm-none-eabi make python3"
+# The panel tools live in /usr/local, as in the image.
+options="!fhs"
+install="$pkgname.post-upgrade"
+_lcm3=ddcbb2889fa018626c604e27ea50e66db5755b78
+source="tsx-ledbar-fw-$pkgver.tar.gz
+	libopencm3-$_lcm3.tar.gz::https://github.com/libopencm3/libopencm3/archive/$_lcm3.tar.gz"
+builddir="$srcdir/tsx-ledbar-fw-$pkgver"
+
+_lib=/usr/local/lib/tsx-ledbar-fw
+
+build() {
+	# The firmware has its own flags. Do not pass the flags of the host.
+	unset CFLAGS CPPFLAGS CXXFLAGS LDFLAGS
+	make -C "$srcdir"/libopencm3-$_lcm3 TARGETS=stm32/f2 -j${JOBS:-1}
+	make -C "$builddir"/fw LIBOPENCM3_DIR="$srcdir"/libopencm3-$_lcm3
+}
+
+check() {
+	python3 "$builddir"/tests/test_upg.py
+}
+
+package() {
+	cd "$builddir"
+	install -Dm644 fw/build/tsx-ledbar.upg "$pkgdir"/usr/share/tsx-ledbar-fw/tsx-ledbar.upg
+	install -Dm644 LICENSE "$pkgdir"/usr/share/licenses/$pkgname/LICENSE
+	install -Dm755 tools/tsx-ledbar-flash "$pkgdir"$_lib/tsx-ledbar-flash
+	install -Dm755 tools/tsx-upg.py "$pkgdir"$_lib/tsx-upg.py
+	install -Dm755 panel/tsx-ledbar-fw.post-upgrade "$pkgdir"$_lib/tsx-ledbar-fw.post-upgrade
+	install -Dm755 panel/tsx-ledbar-fw-install "$pkgdir"/usr/local/sbin/tsx-ledbar-fw-install
+	install -Dm755 panel/tsx-ledbar-fw-uninstall "$pkgdir"/usr/local/sbin/tsx-ledbar-fw-uninstall
+	ln -s ../lib/tsx-ledbar-fw/tsx-ledbar-flash "$pkgdir"/usr/local/sbin/tsx-ledbar-flash
+}
+
+sha512sums="
+8a21c928db11cf5cf2333a5e68050b555161cef09db09654630a5e00d3d0518ad78c02238531735c55ec7782a58a561a2f069421b8d90ec5db357bac3218d909  tsx-ledbar-fw-0.1.3.tar.gz
+43327101d67c2cceeec4a75f611ad755cfec2bdb9d35aa36c2c367c38330e62a9e7e5db58db273664085e15d9ef1b5d6255d7db6b2ac64dff4c825cf1ef0b00a  libopencm3-ddcbb2889fa018626c604e27ea50e66db5755b78.tar.gz
+"

@@ -1,0 +1,44 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Home Assistant layer.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
+# GitHub, the build reads a tarball that scripts/common-source.sh writes
+# into this directory (git archive of the tag). When the repo is public,
+# change source= to
+#   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
+# and run `abuild checksum`. See "Source of the common packages" in README.md.
+pkgname=tsx-ha
+pkgver=0.1.7
+pkgrel=0
+pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="noarch"
+license="GPL-2.0-or-later"
+# tsx-panelctl (the hardware seam) is in tsx-base. The voice satellite
+# (linux-voice-assistant) and its Python wheels are not in this package: the
+# image build installs them with install-lva.sh. This package ships that script
+# as /usr/share/tsx/install-lva.sh. Only the image build runs it (mkrootfs.sh,
+# after apk add). A panel never runs it.
+depends="tsx-base tsx-kiosk tsx-setup alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
+	mosquitto-clients mpv-libs py3-aiohappyeyeballs py3-cryptography py3-mpv py3-numpy
+	py3-protobuf py3-tzlocal py3-zeroconf python3 sendspin-cli tensorflow-lite-c"
+# The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a "$builddir"/ha/. "$pkgdir"/
+	rm -rf "$pkgdir"/voice
+	install -Dm755 "$builddir"/ha/voice/install-lva.sh "$pkgdir"/usr/share/tsx/install-lva.sh
+	# The ESPHome shim sits where the image build puts it (LVA_ROOT=/opt/lva).
+	install -d "$pkgdir"/opt/lva
+	cp -a "$builddir"/ha/voice/shim "$pkgdir"/opt/lva/shim
+	find "$pkgdir"/opt/lva -name __pycache__ -prune -exec rm -rf {} +
+}
+
+sha512sums="
+a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+"

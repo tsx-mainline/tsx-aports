@@ -1,0 +1,4 @@
+#!/bin/sh
+mkdir -p /var/lib/kiosk
+chown kiosk:kiosk /var/lib/kiosk
+exit 0

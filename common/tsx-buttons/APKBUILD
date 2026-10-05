@@ -1,0 +1,38 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Front-panel buttons daemon.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
+# GitHub, the build reads a tarball that scripts/common-source.sh writes
+# into this directory (git archive of the tag). When the repo is public,
+# change source= to
+#   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
+# and run `abuild checksum`. See "Source of the common packages" in README.md.
+pkgname=tsx-buttons
+pkgver=0.1.7
+pkgrel=0
+pkgdesc="TSX front-panel button daemon with its key map"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="armv7 aarch64"
+license="GPL-2.0-or-later"
+depends="tsx-base"
+makedepends="linux-headers"
+# The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+build() {
+	${CC:-gcc} $CFLAGS -O2 -Wall -o "$builddir"/buttons/src/tsx-buttons "$builddir"/buttons/src/tsx-buttons.c
+}
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a "$builddir"/buttons/. "$pkgdir"/
+	rm -rf "$pkgdir"/src
+	install -Dm755 "$builddir"/buttons/src/tsx-buttons "$pkgdir"/usr/local/sbin/tsx-buttons
+}
+
+sha512sums="
+a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+"

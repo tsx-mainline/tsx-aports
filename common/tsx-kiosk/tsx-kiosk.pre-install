@@ -1,0 +1,11 @@
+#!/bin/sh
+# The kiosk browser runs as the user "kiosk". The image build makes the same user.
+addgroup -S seat 2>/dev/null || true
+addgroup -S render 2>/dev/null || true
+if ! getent passwd kiosk >/dev/null; then
+	adduser -D -H -h /var/lib/kiosk -s /sbin/nologin -g "kiosk browser" kiosk
+fi
+for g in video input seat render audio; do
+	addgroup kiosk $g 2>/dev/null || true
+done
+exit 0

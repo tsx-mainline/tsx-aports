@@ -1,0 +1,40 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Boot splash tool and frames.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
+# GitHub, the build reads a tarball that scripts/common-source.sh writes
+# into this directory (git archive of the tag). When the repo is public,
+# change source= to
+#   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
+# and run `abuild checksum`. See "Source of the common packages" in README.md.
+pkgname=tsx-splash
+pkgver=0.1.7
+pkgrel=0
+pkgdesc="TSX boot splash: framebuffer tool, splash frames and console fonts"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="armv7 aarch64"
+license="GPL-2.0-or-later"
+makedepends="font-jetbrains-mono font-terminus fontconfig librsvg linux-headers py3-pillow"
+# The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+build() {
+	cd "$builddir"/splash
+	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-splash src/tsx-splash.c
+	# mksplash.sh renders the frames for every panel size and copies the fonts.
+	sh ./mksplash.sh "$builddir"/splash-out
+}
+
+package() {
+	install -Dm755 "$builddir"/splash/tsx-splash "$pkgdir"/usr/local/bin/tsx-splash
+	install -d "$pkgdir"/usr/share/tsx/splash
+	install -m644 "$builddir"/splash-out/*.ppm "$builddir"/splash-out/*.psf \
+		"$pkgdir"/usr/share/tsx/splash/
+}
+
+sha512sums="
+a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+"

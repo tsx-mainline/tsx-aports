@@ -1,0 +1,115 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Board layer of the xx60 panels (TSW-760, TSW-1060, TSS-10): the board file,
+# the hardware tools and services, and the C tools of the board.
+#
+# Source: the signed tag board-v$pkgver of tsx-xx60-linux. Until that repo is
+# on GitHub, the build reads a tarball that scripts/board-source.sh writes
+# into this directory (a git archive of rootfs/overlay, rootfs/src and LICENSE
+# of the tag). When the repo is public, change the first source= item to
+#   tsx-xx60-linux-$pkgver.tar.gz::<repo URL>/archive/refs/tags/board-v$pkgver.tar.gz
+# and run `abuild checksum`. The paths below then need the prefix of that
+# archive. See "Source of the board package" in README.md.
+#
+# The subpackage tsx-xx60-board-kiosk holds the files that only the kiosk
+# profiles need: the patched cage and the Chromium patch tool. The console
+# profile does not pull them (they need wlroots).
+pkgname=tsx-xx60-board
+pkgver=0.1.5
+pkgrel=0
+pkgdesc="TSX xx60 board layer: board file, hardware tools, services, LED bar, TFA9890 and audio"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="armv7"
+license="GPL-2.0-or-later"
+depends="alsa-utils busybox i2c-tools libusb python3 u-boot-tools"
+makedepends="libusb-dev linux-headers meson samurai pkgconf wlroots0.20-dev wayland-dev
+	wayland-protocols libxkbcommon-dev libdrm-dev patch"
+# The board file /etc/conf.d/watchdog replaces the one of busybox-openrc (the
+# watchdog of the Meson SoC has its own timeout).
+replaces="busybox-openrc"
+subpackages="$pkgname-kiosk:_kiosk"
+# The panel software lives in /usr/local, as in the image.
+options="!check !fhs"
+_cage=0.3.1
+_cagesha256=6dc1619665acd367e0174c93b234002549a66f55f1de9197d67f0305415babc8
+source="tsx-xx60-linux-$pkgver.tar.gz
+	cage-$_cage.tar.gz::https://github.com/cage-kiosk/cage/archive/refs/tags/v$_cage.tar.gz"
+builddir="$srcdir/tsx-xx60-linux-$pkgver"
+
+# Files below rootfs/overlay of the tag that this package owns. The image keeps
+# only its own files (fstab, inittab, the profile marker). The rest of the
+# overlay belongs to the common packages.
+_files="
+etc/asound.conf
+etc/conf.d/watchdog
+etc/init.d/tsx-als
+etc/init.d/tsx-audio
+etc/init.d/tsx-boot-ok
+etc/init.d/tsx-cpufreq
+etc/init.d/tsx-ledbar
+etc/init.d/tsx-tfa-dsp
+etc/logrotate.d/tsx-als
+etc/logrotate.d/tsx-cpufreq
+etc/periodic/hourly/tsx-emmc-state
+etc/tsx/als.conf
+etc/tsx/audio.conf
+etc/tsx/ledbar.conf
+etc/tsx/motd.board
+etc/tsx/panel-board.conf
+etc/tsx/tfa-dsp.conf
+etc/tsx/uboot-env.conf
+usr/local/bin/tsx-audio
+usr/local/lib/tsx/board.sh
+usr/local/lib/tsx/tfa_dsp.py
+usr/local/sbin/tsx-als
+usr/local/sbin/tsx-boot-ok
+usr/local/sbin/tsx-cpufreqd
+usr/local/sbin/tsx-emmc-state
+usr/local/sbin/tsx-hw
+usr/local/sbin/tsx-ledbard
+usr/local/sbin/tsx-tfa-dsp
+usr/local/sbin/tsx-update-boot
+"
+
+prepare() {
+	default_prepare
+	echo "$_cagesha256  $srcdir/cage-$_cage.tar.gz" | sha256sum -c -
+	patch -d "$srcdir/cage-$_cage" -p1 < "$builddir"/rootfs/src/cage-$_cage-argb8888-fallback.patch
+}
+
+build() {
+	cd "$builddir"/rootfs/src
+	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-ledbar tsx-ledbar.c -lusb-1.0
+	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-peak tsx-peak.c -lm
+	cd "$srcdir"
+	meson setup cage-build cage-$_cage -Dman-pages=disabled --prefix=/usr --buildtype=release
+	ninja -C cage-build
+}
+
+package() {
+	local f
+	for f in $_files; do
+		[ -f "$builddir"/rootfs/overlay/$f ] || { echo "board file missing in the source: $f" >&2; return 1; }
+		install -Dm"$(stat -c %a "$builddir"/rootfs/overlay/$f)" "$builddir"/rootfs/overlay/$f "$pkgdir"/$f
+	done
+	install -Dm755 "$builddir"/rootfs/src/tsx-ledbar "$pkgdir"/usr/local/bin/tsx-ledbar
+	install -Dm755 "$builddir"/rootfs/src/tsx-peak "$pkgdir"/usr/local/bin/tsx-peak
+	# Files of the kiosk subpackage (moved by _kiosk).
+	install -Dm755 "$srcdir"/cage-build/cage "$pkgdir"/usr/bin/cage
+	install -Dm755 "$builddir"/rootfs/overlay/usr/local/sbin/tsx-chromium-es2 "$pkgdir"/usr/local/sbin/tsx-chromium-es2
+	install -Dm644 "$builddir"/rootfs/src/chromium-es2/patch-chromium.py "$pkgdir"/usr/local/share/tsx/chromium-es2/patch-chromium.py
+	install -Dm644 "$builddir"/rootfs/src/chromium-es2/sigs.json "$pkgdir"/usr/local/share/tsx/chromium-es2/sigs.json
+	mkdir -p "$pkgdir"/usr/share
+	echo "cage $_cage + argb8888-fallback.patch (built from source, sha256 $_cagesha256)" > "$pkgdir"/usr/share/tsx-cage.version
+}
+
+_kiosk() {
+	pkgdesc="TSX xx60 kiosk glue: patched cage and the Chromium patch tool"
+	depends="$pkgname=$pkgver-r$pkgrel wlroots0.20 python3"
+	amove usr/bin/cage usr/local/sbin/tsx-chromium-es2 usr/local/share/tsx/chromium-es2 usr/share/tsx-cage.version
+}
+
+sha512sums="
+255805dbe87cadf6b013afbe1d7332c4b397dbdef950d3f1fa7857c3f93ffe7b4d27d9724841c70d14e684674c034f1d11b7c8e9a2255d1d89d4d1875a6b9ccd  tsx-xx60-linux-0.1.5.tar.gz
+b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
+"

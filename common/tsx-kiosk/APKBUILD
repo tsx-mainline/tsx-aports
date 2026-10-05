@@ -1,0 +1,79 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Kiosk session and its C helper (the quick-settings overlay). tsx-idled is a package of its own.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
+# GitHub, the build reads a tarball that scripts/common-source.sh writes
+# into this directory (git archive of the tag). When the repo is public,
+# change source= to
+#   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
+# and run `abuild checksum`. See "Source of the common packages" in README.md.
+pkgname=tsx-kiosk
+pkgver=0.1.7
+pkgrel=0
+pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="armv7 aarch64"
+license="GPL-2.0-or-later"
+# The browser and the compositor patch are family packages (the meta package
+# tsx-<family>-kiosk adds them).
+depends="tsx-base tsx-idled tsx-splash brightnessctl cairo curl font-dejavu libinput mesa-dri-gallium mesa-egl
+	mesa-gbm mesa-gles python3 seatd seatd-openrc squeekboard sway swaybg wayland-libs-client wlr-randr
+	wvkbd-mobintl"
+makedepends="cairo-dev linux-headers wayland-dev wayland-protocols wlr-protocols"
+install="$pkgname.pre-install $pkgname.post-install"
+# The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
+replaces="alpine-baselayout"
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+build() {
+	cd "$builddir"/kiosk/src
+	# tsx-overlay is a layer-shell client. The layer-shell protocol comes from
+	# wlr-protocols. The overlay also needs the xdg-shell glue code.
+	mkdir -p proto
+	local ls=/usr/share/wlr-protocols/unstable/wlr-layer-shell-unstable-v1.xml
+	wayland-scanner client-header $ls proto/wlr-layer-shell-unstable-v1-client-protocol.h
+	wayland-scanner private-code $ls proto/wlr-layer-shell-unstable-v1-protocol.c
+	wayland-scanner private-code /usr/share/wayland-protocols/stable/xdg-shell/xdg-shell.xml \
+		proto/xdg-shell-protocol.c
+	${CC:-gcc} $CFLAGS -O2 -Wall -Iproto -o tsx-overlay tsx-overlay.c proto/*.c \
+		$(pkg-config --cflags --libs cairo wayland-client) -lm
+}
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a "$builddir"/kiosk/. "$pkgdir"/
+	rm -rf "$pkgdir"/src
+	# tsx-idled and its two tools are the package tsx-idled (every profile runs them).
+	rm -f "$pkgdir"/etc/init.d/tsx-idled "$pkgdir"/usr/local/bin/tsx-blank "$pkgdir"/usr/local/bin/tsx-display-power
+	install -Dm755 "$builddir"/kiosk/src/tsx-overlay "$pkgdir"/usr/local/bin/tsx-overlay
+	_cursors
+}
+
+# The blank cursor theme (/usr/share/tsx/cursors). The kiosk hides the pointer
+# with it. The theme has one 1x1 fully transparent Xcursor image. The image
+# build made it before. The package makes it now.
+_cursors() {
+	local t="$pkgdir"/usr/share/tsx/cursors n
+	local c="$t"/blank/cursors
+	mkdir -p "$c"
+	printf 'Xcur\020\000\000\000\000\000\001\000\001\000\000\000' > "$c"/left_ptr
+	printf '\002\000\375\377\030\000\000\000\034\000\000\000' >> "$c"/left_ptr
+	printf '\044\000\000\000\002\000\375\377\030\000\000\000\001\000\000\000' >> "$c"/left_ptr
+	printf '\001\000\000\000\001\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000' >> "$c"/left_ptr
+	printf '\000\000\000\000' >> "$c"/left_ptr
+	for n in default arrow top_left_arrow pointer hand hand1 hand2 text xterm ibeam crosshair \
+		 wait watch progress grab grabbing move all-scroll not-allowed col-resize row-resize \
+		 e-resize w-resize n-resize s-resize ns-resize ew-resize nesw-resize nwse-resize \
+		 context-menu help cell copy alias no-drop vertical-text zoom-in zoom-out; do
+		ln -sf left_ptr "$c"/$n
+	done
+	printf '[Icon Theme]\nName=blank\n' > "$t"/blank/index.theme
+	ln -sfn blank "$t"/default
+}
+
+sha512sums="
+a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+"

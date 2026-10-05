@@ -1,0 +1,17 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Meta package: it holds no files. It pulls the packages of the kiosk image profile.
+# The browser and the compositor library of the xx60 are family packages.
+pkgname=tsx-xx60-kiosk
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="TSX xx60 kiosk profile: console plus the Chromium kiosk and the setup page"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="armv7"
+license="GPL-2.0-or-later"
+depends="tsx-xx60-console tsx-kiosk tsx-setup tsx-xx60-board-kiosk tsx-xx60-chromium tsx-xx60-wlroots0.20"
+options="!check"
+
+package() {
+	mkdir -p "$pkgdir"
+}

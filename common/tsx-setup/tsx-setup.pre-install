@@ -1,0 +1,7 @@
+#!/bin/sh
+# The setup page has its own unprivileged user. It talks to root only through
+# the FIFOs of tsx-setup-helper (group tsx-setup, which that service makes).
+if ! getent passwd tsx-setup >/dev/null; then
+	adduser -D -H -s /sbin/nologin -g "on-panel setup page" tsx-setup
+fi
+exit 0

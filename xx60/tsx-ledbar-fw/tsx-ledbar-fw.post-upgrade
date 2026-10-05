@@ -1,0 +1,7 @@
+#!/bin/sh
+# Runs after a package upgrade. The hook of the package updates the bar only
+# when the user installed the tsx-ledbar firmware (marker in /data/tsx).
+# apk gives scripts a short PATH, so add the directories of the panel tools.
+PATH=/usr/local/sbin:/usr/local/bin:$PATH
+export PATH
+exec /usr/local/lib/tsx-ledbar-fw/tsx-ledbar-fw.post-upgrade
