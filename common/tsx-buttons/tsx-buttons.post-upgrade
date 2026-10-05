@@ -1,0 +1,19 @@
+#!/bin/sh
+# Runs after a package upgrade ($1 = new version, $2 = old version).
+# Since 0.2.0, the keys of the panel come from the board layer
+# (/etc/tsx/buttons-board.conf). buttons.conf is a template with no keys and
+# no local actions. apk keeps a buttons.conf of 0.1.x that the user changed,
+# with its old keys, local actions and slide, and writes the new template as
+# buttons.conf.apk-new. Keep the old file as buttons.conf.pre-0.2.0 and take
+# the new template.
+conf=/etc/tsx/buttons.conf
+case $2 in
+0.1.*)
+	if [ -f "$conf.apk-new" ]; then
+		mv -f "$conf" "$conf.pre-0.2.0" && mv -f "$conf.apk-new" "$conf" || exit 0
+		echo "tsx-buttons: the keys come from /etc/tsx/buttons-board.conf now."
+		echo "tsx-buttons: your old $conf is $conf.pre-0.2.0. Copy your own settings and actions into $conf."
+	fi
+	;;
+esac
+exit 0

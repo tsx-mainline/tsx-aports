@@ -10,13 +10,16 @@
 # and run `abuild checksum`. See "Source of the common packages" in README.md.
 pkgname=tsx-buttons
 pkgver=0.2.0
-pkgrel=0
+pkgrel=1
 pkgdesc="TSX front-panel button daemon with its key map"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
 license="GPL-2.0-or-later"
 depends="tsx-base"
 makedepends="linux-headers"
+# The upgrade from 0.1.x takes the new buttons.conf template (see the
+# post-upgrade file).
+install="$pkgname.post-upgrade"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz"
