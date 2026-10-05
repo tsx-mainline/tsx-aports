@@ -308,11 +308,21 @@ while read -r PKGDIR PKGARCH; do
 	*) ensure_image "$PKGARCH"; check_image_arch "$PKGARCH"; READY="$READY $PKGARCH";;
 	esac
 	echo "=== building $PKGDIR ($PKGARCH) ==="
+	# A family package (xx60/...) depends on common packages (tsx-base,
+	# tsx-ledbar and more). abuild -r resolves a dependency only from the
+	# repository of the package itself, so the build adds the common packages
+	# that an earlier build wrote to packages/v3.24/common.
+	COMMON_REPO=
+	case ${PKGDIR%%/*} in
+	common) ;;
+	*) [ -f "$REPO/packages/v3.24/common/$PKGARCH/APKINDEX.tar.gz" ] && COMMON_REPO=/repo/packages/v3.24/common;;
+	esac
 	docker run --rm --platform "$(arch_platform "$PKGARCH")" \
 		-v "$REPO:/repo" \
 		-v "$TSX_APORTS_KEY:/keys/$KEYNAME:ro" \
 		-v "$TSX_APORTS_KEY.pub:/keys/$KEYNAME.pub:ro" \
 		"$(arch_image "$PKGARCH")" $(arm32_prefix "$PKGARCH") sh -euc "
+			[ -z '$COMMON_REPO' ] || echo '$COMMON_REPO' >> /etc/apk/repositories
 			apk update >/dev/null
 			# zstd: alpine-sdk does not install it. The unpack step of
 			# abuild needs the zstd binary for each .tar.zst source, for
