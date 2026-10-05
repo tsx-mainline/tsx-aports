@@ -9,7 +9,7 @@
 #   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
 # and run `abuild checksum`. See "Source of the common packages" in README.md.
 pkgname=tsx-rescue-ui
-pkgver=0.1.7
+pkgver=0.2.0
 pkgrel=0
 pkgdesc="TSX rescue screen: status text, console font and login choice"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -26,5 +26,5 @@ package() {
 }
 
 sha512sums="
-a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+5b843bc58e8be13c533b0139f15b2482d2071f7ef67519b806a49c57ddc2e7e0b7bb45f89a78494165660cec500341358eafbcc188504f70dba195bc5a8e26b9  tsx-linux-common-0.2.0.tar.gz
 "

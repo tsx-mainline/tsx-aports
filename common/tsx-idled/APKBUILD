@@ -14,7 +14,7 @@
 # own, and tsx-kiosk does not install them. The console, kiosk and ha meta
 # packages of each family pull this package.
 pkgname=tsx-idled
-pkgver=0.1.7
+pkgver=0.2.0
 pkgrel=0
 pkgdesc="TSX idle daemon: backlight timeout, blank and wake, and the tsx-blank and tsx-display-power tools"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -41,5 +41,5 @@ package() {
 }
 
 sha512sums="
-a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+5b843bc58e8be13c533b0139f15b2482d2071f7ef67519b806a49c57ddc2e7e0b7bb45f89a78494165660cec500341358eafbcc188504f70dba195bc5a8e26b9  tsx-linux-common-0.2.0.tar.gz
 "

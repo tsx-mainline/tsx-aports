@@ -1,6 +1,9 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# Automatic update.
+# Host tools of the USB LED bar: the tool tsx-ledbar, the service tsx-ledbard
+# with its init script, and ledbar.conf. The board file of the family gives
+# the LED map of the bar (tsx_board_ledbar_map). The firmware of the bar is
+# the separate package tsx-ledbar-fw.
 #
 # Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
 # GitHub, the build reads a tarball that scripts/common-source.sh writes
@@ -8,22 +11,32 @@
 # change source= to
 #   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
 # and run `abuild checksum`. See "Source of the common packages" in README.md.
-pkgname=tsx-autoupdate
+pkgname=tsx-ledbar
 pkgver=0.2.0
 pkgrel=0
-pkgdesc="TSX automatic update of the panel packages"
+pkgdesc="TSX USB LED bar: control tool, service and settings"
 url="https://github.com/tsx-mainline/tsx-aports"
-arch="noarch"
+arch="armv7 aarch64"
 license="GPL-2.0-or-later"
-depends="tsx-base apk-tools curl python3"
-# The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
+depends="tsx-base libusb"
+makedepends="libusb-dev linux-headers"
+# Up to 0.1.5, the xx60 board package held these files.
+replaces="tsx-xx60-board"
+# The panel software lives in /usr/local, as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz"
 builddir="$srcdir/tsx-linux-common-$pkgver"
 
+build() {
+	cd "$builddir"/ledbar/src
+	${CC:-gcc} $CFLAGS -O2 -Wall -o tsx-ledbar tsx-ledbar.c -lusb-1.0
+}
+
 package() {
 	mkdir -p "$pkgdir"
-	cp -a "$builddir"/autoupdate/. "$pkgdir"/
+	cp -a "$builddir"/ledbar/. "$pkgdir"/
+	rm -rf "$pkgdir"/src
+	install -Dm755 "$builddir"/ledbar/src/tsx-ledbar "$pkgdir"/usr/local/bin/tsx-ledbar
 }
 
 sha512sums="

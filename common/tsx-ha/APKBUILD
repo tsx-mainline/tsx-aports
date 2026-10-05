@@ -9,7 +9,7 @@
 #   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
 # and run `abuild checksum`. See "Source of the common packages" in README.md.
 pkgname=tsx-ha
-pkgver=0.1.7
+pkgver=0.2.0
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -20,9 +20,12 @@ license="GPL-2.0-or-later"
 # image build installs them with install-lva.sh. This package ships that script
 # as /usr/share/tsx/install-lva.sh. Only the image build runs it (mkrootfs.sh,
 # after apk add). A panel never runs it.
+# tensorflow-lite-c 2.17.1-r1 is the first build that is equal to the pinned
+# library of the board repository (rootfs/voice/tflite/SHA256SUMS of
+# tsx-xx60-linux). Older builds hold the path of their build folder.
 depends="tsx-base tsx-kiosk tsx-setup alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
 	mosquitto-clients mpv-libs py3-aiohappyeyeballs py3-cryptography py3-mpv py3-numpy
-	py3-protobuf py3-tzlocal py3-zeroconf python3 sendspin-cli tensorflow-lite-c"
+	py3-protobuf py3-tzlocal py3-zeroconf python3 sendspin-cli tensorflow-lite-c>=2.17.1-r1"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz"
@@ -40,5 +43,5 @@ package() {
 }
 
 sha512sums="
-a25f5e3dbbf973899def852366f9e327cc2004fae095e09cf6d1feec6f4dbb1a1b8d128d88acd2298ff835d211d7d5e8a68c0da9dd1feeb58ae4d58802a05fdd  tsx-linux-common-0.1.7.tar.gz
+5b843bc58e8be13c533b0139f15b2482d2071f7ef67519b806a49c57ddc2e7e0b7bb45f89a78494165660cec500341358eafbcc188504f70dba195bc5a8e26b9  tsx-linux-common-0.2.0.tar.gz
 "
