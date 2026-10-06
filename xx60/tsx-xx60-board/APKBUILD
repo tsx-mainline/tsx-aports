@@ -3,13 +3,11 @@
 # Board layer of the xx60 panels (TSW-760, TSW-1060, TSS-10): the board file,
 # the hardware tools and services, and the C tools of the board.
 #
-# Source: the signed tag board-v$pkgver of tsx-xx60-linux. Until that repo is
-# on GitHub, the build reads a tarball that scripts/board-source.sh writes
-# into this directory (a git archive of rootfs/overlay, rootfs/src and LICENSE
-# of the tag). When the repo is public, change the first source= item to
-#   tsx-xx60-linux-$pkgver.tar.gz::<repo URL>/archive/refs/tags/board-v$pkgver.tar.gz
-# and run `abuild checksum`. The paths below then need the prefix of that
-# archive. See "Source of the board package" in README.md.
+# Source: the signed tag board-v$pkgver of tsx-xx60-linux. The build downloads
+# the GitHub archive of that tag. Its top directory is
+# tsx-xx60-linux-board-v$pkgver. The package uses only rootfs/overlay,
+# rootfs/src and LICENSE of it. sha512sums holds the sum of the archive. After
+# a new tag, run `abuild checksum` (README.md, "Source of the packages").
 #
 # The subpackage tsx-xx60-board-kiosk holds the files that only the kiosk
 # profiles need: the patched cage, the Chromium patch tool and the ES2 browser
@@ -38,9 +36,9 @@ subpackages="$pkgname-kiosk:_kiosk $pkgname-ha:_ha"
 options="!check !fhs"
 _cage=0.3.1
 _cagesha256=6dc1619665acd367e0174c93b234002549a66f55f1de9197d67f0305415babc8
-source="tsx-xx60-linux-$pkgver.tar.gz
+source="tsx-xx60-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-xx60-linux/archive/refs/tags/board-v$pkgver.tar.gz
 	cage-$_cage.tar.gz::https://github.com/cage-kiosk/cage/archive/refs/tags/v$_cage.tar.gz"
-builddir="$srcdir/tsx-xx60-linux-$pkgver"
+builddir="$srcdir/tsx-xx60-linux-board-v$pkgver"
 
 # Files below rootfs/overlay of the tag that this package owns. The image keeps
 # only its own files (fstab, inittab, the profile marker). The rest of the
@@ -131,6 +129,6 @@ _ha() {
 }
 
 sha512sums="
-75df67cb4be1a925e1f2b76f7718d96174ed7081014af9051164438f0641dec2c6fafeed7c6c1057d5d43bddaa74ecb02c45d5438ba161fe24ce8033008d915c  tsx-xx60-linux-0.2.0.tar.gz
+ea21c4374ab6a387b62279bdf0c0d7e5f75bfec9238ad15a3e5d5d201acdc41093c3d9de9553991aa57e0a07f0e3bf0470b79d8e8446f57bf902e2b35f600e96  tsx-xx60-linux-0.2.0.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "

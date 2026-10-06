@@ -11,11 +11,9 @@
 # The package holds no Crestron file. The stock image stays on the panel
 # (/data/tsx/vendor/), and tsx-ledbar-fw-uninstall loads it back.
 #
-# Source: the signed tag v$pkgver of tsx-ledbar-fw. Until that repo is on
-# GitHub, the build reads a tarball that scripts/ledbar-fw-source.sh writes
-# into this directory. When the repo is public, change the first source= item
-# to tsx-ledbar-fw-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
-# and run `abuild checksum`.
+# Source: the signed tag v$pkgver of tsx-ledbar-fw. The build downloads the
+# GitHub archive of that tag. sha512sums holds the sum of the archive. After a
+# new tag, run `abuild checksum` (README.md, "Source of the packages").
 #
 # The install does not touch the bar. An upgrade loads the new image only when
 # the bar already runs the tsx-ledbar firmware (see the post-upgrade file).
@@ -32,7 +30,7 @@ makedepends="gcc-arm-none-eabi newlib-arm-none-eabi binutils-arm-none-eabi make 
 options="!fhs"
 install="$pkgname.post-upgrade"
 _lcm3=ddcbb2889fa018626c604e27ea50e66db5755b78
-source="tsx-ledbar-fw-$pkgver.tar.gz
+source="tsx-ledbar-fw-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-ledbar-fw/archive/refs/tags/v$pkgver.tar.gz
 	libopencm3-$_lcm3.tar.gz::https://github.com/libopencm3/libopencm3/archive/$_lcm3.tar.gz"
 builddir="$srcdir/tsx-ledbar-fw-$pkgver"
 
@@ -62,6 +60,6 @@ package() {
 }
 
 sha512sums="
-678e138be1cab6f2e5d5ad6bfe0b10715b61feddb31d6d5fae3ffe0bb30980ffa6fe3306858803d294a5312ed8ebad03d2b08e2bf4d042fca142612f56635a3b  tsx-ledbar-fw-0.1.5.tar.gz
+0f3744f6b0eb9cc4c9e07d36c3911c21a1f28c9473235a858a5de4658dd455474ac552b3b6f5014cb78fc68a18e5445f6e5d67e40694a20fff80f3c1afbc9fba  tsx-ledbar-fw-0.1.5.tar.gz
 43327101d67c2cceeec4a75f611ad755cfec2bdb9d35aa36c2c367c38330e62a9e7e5db58db273664085e15d9ef1b5d6255d7db6b2ac64dff4c825cf1ef0b00a  libopencm3-ddcbb2889fa018626c604e27ea50e66db5755b78.tar.gz
 "

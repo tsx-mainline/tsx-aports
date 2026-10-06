@@ -17,7 +17,7 @@ scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -69,7 +69,30 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 1. Make the directory `common/<name>` (hardware-independent) or `xx60/<name>` (platform-specific). Write the `APKBUILD` in it. Third-party software keeps its own `license=`. The recipes and scripts of this repo use `GPL-2.0-or-later` (see LICENSE).
 2. To iterate locally, run `TSX_APORTS_KEY=<path to the private key> scripts/build.sh <dir>`.
 3. To build on another machine, add `BUILD_HOST=<host> BUILD_DIR=<remote path>`. Use a build host for any package that compiles. Set `BUILD_HOST` on the command line of `scripts/build.sh`.
-4. Commit the `APKBUILD` and any small local source files next to it. Never commit `packages/`, `repo/`, or the `src/`, `pkg/`, `extract/`, and `dist/` directories of a package. Git ignores them, and the scripts rebuild them.
+4. Make `source=` a public URL, and run `abuild checksum` (see "Source of the packages").
+5. Commit the `APKBUILD` and any small local source files next to it. Never commit `packages/`, `repo/`, or the `src/`, `pkg/`, `extract/`, and `dist/` directories of a package. Git ignores them, and the scripts rebuild them.
+
+## Source of the packages
+
+Every recipe builds from public sources. CI and a local build download the same files. No recipe reads a tarball that a person made on a workstation.
+
+- The recipes of `common/` (all `tsx-*` packages that have a `tsx-linux-common-$pkgver.tar.gz` source) use the GitHub archive of the signed tag `v$pkgver` of tsx-linux-common.
+- `xx60/tsx-xx60-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx60-linux. The top directory of this archive is `tsx-xx60-linux-board-v$pkgver`.
+- `common/tsx-ledbar-fw` uses the GitHub archive of the signed tag `v$pkgver` of tsx-ledbar-fw.
+- The kernel packages use a release asset (see "Kernel packages").
+
+The tag fixes the content of an archive. `sha512sums` fixes the bytes. GitHub makes the archive again on each request, with its own gzip. The bytes are the same on each download, but they are not the same as the output of `git archive | gzip`. A change of the GitHub gzip program changes the sum. The build then fails and nothing is signed. To fix this, run `abuild checksum` and check that the content is the same as before.
+
+CI runs `scripts/build.sh --verify`. This option leaves out `abuild checksum`, so the build checks the sums of the APKBUILD. A build without `--verify` writes new sums. Look at the diff before you commit it.
+
+To release a new version of a package:
+
+1. Push the signed tag to the source repo. A tag that is not public cannot be downloaded.
+2. Set `pkgver` and `pkgrel` in the recipe.
+3. Run `scripts/build.sh <PKGDIR>` (it writes the new `sha512sums`).
+4. Commit the recipe.
+
+`scripts/tests/test-sources.sh` checks each recipe. Each `source=` needs a sum, and the `builddir` must be the top directory of the archive.
 
 ## Signing key
 
@@ -134,7 +157,7 @@ The job `kbundle` in `.github/workflows/release.yml` of that repo builds the bun
   3. It packs the bundle in the same format into `dist/`.
   4. It updates `pkgver`, `_kernelrelease`, and `sha512sums` in place. It never changes `_kbundle_tag`.
 
-  The line `SRCDEST="$startdir/dist"` in each package makes `abuild` use this local file. `sha512sums` verifies it, and `abuild` never fetches it again. `_kbundle_tag` has no effect here. It is only for CI. Change it by hand when a matching tsx-xx60-linux release exists.
+  The line `SRCDEST="$startdir/dist"` in each package makes `abuild` use this local file. `sha512sums` verifies it, and `abuild` never fetches it again. `_kbundle_tag` has no effect here. It is only for CI.
 
 **pkgver scheme**: `<upstream kernel version>_git<YYYYMMDD>`, for example `7.2.8_git20260927`. The suffix of `make kernelrelease` (`-NNNNN-gHASH`, a commit count and a short hash) contains `-`. The apk version syntax does not allow `-` in `pkgver`. The staging date replaces the suffix. The `_kernelrelease` variable of the package records the exact commit for a `pkgver`. This is build provenance only, and nothing on the panel reads it. To reproduce an exact build, read that variable and not the date. Two different commits that you stage on the same day have the same `pkgver`. In that case, increase `pkgrel` or stage again the next day.
 

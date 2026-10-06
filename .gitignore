@@ -23,12 +23,3 @@ xx60/tsx-xx60-kernel-lts/dist/
 abuild.conf
 APKBUILD.orig
 *~
-
-# local source tarball of tsx-linux-common (scripts/common-source.sh)
-common/*/tsx-linux-common-*.tar.gz
-
-# local source tarball of the xx60 board tag (scripts/board-source.sh)
-xx60/tsx-xx60-board/tsx-xx60-linux-*.tar.gz
-
-# local source tarball of the tsx-ledbar-fw tag (scripts/ledbar-fw-source.sh)
-common/tsx-ledbar-fw/tsx-ledbar-fw-*.tar.gz

@@ -2,12 +2,9 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 # Kiosk session and its C helper (the quick-settings overlay). tsx-idled is a package of its own.
 #
-# Source: the signed tag v$pkgver of tsx-linux-common. Until that repo is on
-# GitHub, the build reads a tarball that scripts/common-source.sh writes
-# into this directory (git archive of the tag). When the repo is public,
-# change source= to
-#   tsx-linux-common-$pkgver.tar.gz::<repo URL>/archive/refs/tags/v$pkgver.tar.gz
-# and run `abuild checksum`. See "Source of the common packages" in README.md.
+# Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
+# GitHub archive of that tag. sha512sums holds the sum of the archive. After a
+# new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-kiosk
 pkgver=0.2.0
 pkgrel=1
@@ -25,7 +22,7 @@ install="$pkgname.pre-install $pkgname.post-install"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 replaces="alpine-baselayout"
 options="!check !fhs"
-source="tsx-linux-common-$pkgver.tar.gz"
+source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
 builddir="$srcdir/tsx-linux-common-$pkgver"
 
 build() {
@@ -75,5 +72,5 @@ _cursors() {
 }
 
 sha512sums="
-a9cdb5970fc35763d500a32e859853eb2ced4cedcf40be2ac508bf3c446b12e95d5c95bfd95d05dcdf98bdec02b8049cb9137f3538e2796389c7248939171da4  tsx-linux-common-0.2.0.tar.gz
+97123b7ac4fa1b72deb20291a562b3d0159ec1577efbf8ae1eead721de43b355f9a66cdf46db1a00742866fda83926a9448e39f7443cb688a0e0a64957c28d3e  tsx-linux-common-0.2.0.tar.gz
 "
