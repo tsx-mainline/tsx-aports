@@ -53,6 +53,11 @@
 #   BUILD_DIR        remote path that mirrors this repo (required with
 #                    BUILD_HOST).
 #
+# Order: with --all, a package is built after the packages of this repo that it
+# depends on or makes depends on (order_dirs below). A pass builds the packages
+# in packages/v3.24/<category>/<arch>, and a family package also sees the
+# common packages that an earlier build of this run made there.
+#
 # Steps for each package: `abuild checksum` writes real sha512sums for each
 # source= (for example the tag archive of tsx-linux-common). With --verify,
 # the script leaves this step out, and `abuild -r` checks the sums that the
@@ -157,6 +162,60 @@ apkbuild_arch() {
 	)
 }
 
+# apkbuild_graph PKGDIR: two lines. The first holds the names that the recipe
+# makes (pkgname, the subpackages, the provides). The second holds the names
+# that it needs (depends and makedepends, as written).
+apkbuild_graph() {
+	(
+		set +eu
+		startdir="$REPO/$1" srcdir=/nonexistent
+		. "$REPO/$1/APKBUILD" >/dev/null 2>&1
+		names=$pkgname
+		for s in $subpackages; do names="$names ${s%%:*}"; done
+		for s in $provides; do names="$names ${s%%[<>=~]*}"; done
+		echo "$names"
+		echo $depends $makedepends
+	)
+}
+
+# order_dirs: reads package directories (one on each line), prints them in
+# build order. A package comes after every package of the list that it needs
+# (depends or makedepends, also through a subpackage or a provides). abuild
+# installs the depends of a package before the build, so a package that is
+# not built yet makes the build fail ("no such package"). Entries that name no
+# recipe of the list (Alpine packages, so: and cmd: names) are not important.
+# Packages without a relation keep their input order. A cycle stops the script.
+order_dirs() {
+	local -A owner=() deps=() state=()
+	local -a dirs=() out=() g=()
+	local d n
+	while IFS= read -r d; do [ -n "$d" ] && dirs+=("$d"); done
+	for d in "${dirs[@]}"; do
+		mapfile -t g < <(apkbuild_graph "$d")
+		for n in ${g[0]}; do [ -n "${owner[$n]:-}" ] || owner[$n]=$d; done
+		deps[$d]=${g[1]:-}
+	done
+	order_visit() {
+		local d=$1 x n o
+		state[$d]=1
+		for x in ${deps[$d]}; do
+			n=${x%%[<>=~]*}; n=${n#!}
+			case $n in ""|*:*) continue;; esac
+			o=${owner[$n]:-}
+			{ [ -n "$o" ] && [ "$o" != "$d" ]; } || continue
+			case ${state[$o]:-0} in
+			1) echo "build.sh: dependency cycle between $d and $o" >&2; exit 1;;
+			0) order_visit "$o";;
+			esac
+		done
+		state[$d]=2
+		out+=("$d")
+	}
+	for d in "${dirs[@]}"; do [ "${state[$d]:-0}" = 0 ] && order_visit "$d"; done
+	[ ${#out[@]} = 0 ] || printf '%s\n' "${out[@]}"
+	return 0
+}
+
 # arm32_prefix ARCH: prints "linux32" when an ARCH container needs it, and
 # nothing otherwise. A 32-bit ARM (armv7) container on an arm64 host runs
 # natively, and its uname -m says aarch64 because the kernel is 64-bit. Build
@@ -256,11 +315,16 @@ JOBS=
 if [ "$TARGET" = --all ]; then
 	for A in ${WANT_ARCH:-armv7 aarch64}; do
 		case $A in armv7) CATS="common xx60";; *) CATS="common";; esac
+		LIST=
 		for D in $( (cd "$REPO" && for c in $CATS; do [ -d "$c" ] && find "$c" -mindepth 1 -maxdepth 1 -type d; done) | sort); do
 			[ -f "$REPO/$D/APKBUILD" ] || continue
-			[ -n "$(pkg_arch "$D" "$A")" ] && JOBS="$JOBS$D $A
+			[ -n "$(pkg_arch "$D" "$A")" ] && LIST="$LIST$D
 "
 		done
+		# Build in dependency order (order_dirs), not in the order of the names.
+		ORDERED=$(printf '%s' "$LIST" | order_dirs) || exit 1
+		for D in $ORDERED; do JOBS="$JOBS$D $A
+"; done
 	done
 else
 	[ -f "$REPO/$TARGET/APKBUILD" ] || { echo "build.sh: no $REPO/$TARGET/APKBUILD" >&2; exit 1; }
@@ -301,6 +365,7 @@ want_build() {
 	return 0
 }
 
+echo "[build.sh] build order:$(printf '%s\n' "$JOBS" | awk 'NF{printf " %s(%s)", $1, $2}')"
 # READY: the architectures whose image is pulled and checked in this run. The
 # check stops the build when a container of one pass reports another
 # architecture (scripts/arch-image.sh says why this can happen).

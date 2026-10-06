@@ -18,7 +18,7 @@ scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -271,7 +271,7 @@ Watch the size of the published tree. It has all packages, both kernel flavors, 
 
 - **build** runs on a push to `main` that changes `common/`, `xx60/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
-  2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a kernel package with a warning when its tsx-xx60-linux release bundle does not exist. The published copy of that package stays.
+  2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a kernel package with a warning when its tsx-xx60-linux release bundle does not exist. The published copy of that package stays.
   3. `scripts/index.sh --keep 2` re-indexes and signs the merged tree.
 
   A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`.
