@@ -18,8 +18,9 @@
 # abuild does not fetch it again. In both cases, stage-kernel.sh writes
 # pkgver, pkgrel, _kernelrelease, and sha512sums below. Do not edit them by
 # hand. stage-kernel.sh does not change _kbundle_tag, and only CI uses it.
-# Change it by hand when a matching tsx-xx60-linux release exists (see
-# ../../README.md).
+# After a new tsx-xx60-linux release, run scripts/pin-kernel.sh TAG. It writes
+# _kbundle_tag, _kernelrelease and sha512sums from the bundle of that release
+# (see ../../README.md).
 SRCDEST="$startdir/dist"
 #
 # pkgver scheme: <upstream kernel version>_git<YYYYMMDD>, for example
@@ -38,12 +39,12 @@ SRCDEST="$startdir/dist"
 # into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-stable
 pkgver=7.2.8_git20261004
-pkgrel=0
-_kernelrelease=7.2.8-00117-g897da326e03e
+pkgrel=1
+_kernelrelease=7.2.8-00117-g4015a085d1a4
 # The tsx-xx60-linux release tag whose "kbundle" CI asset this package pins.
-# UNRELEASED until that repo has a real tag with this job. Until then, the
-# package builds only from a local dist/ stage (see the header comment).
-_kbundle_tag=UNRELEASED
+# release.yml of that repo builds the asset when the tag is pushed. The tag
+# builds the kernel of its kernel/KERNEL_REV.stable.
+_kbundle_tag=v0.2.0
 pkgdesc="xx60 mainline kernel, latest stable line"
 url="https://github.com/tsx-mainline/tsx-xx60-linux"
 arch="armv7"
@@ -66,5 +67,5 @@ package() {
 }
 
 sha512sums="
-4bdc4b15599baa3cf0ce07cc9fc001ab74826c00b22a87472e45c6f8dced96db757cdeaa035f9f7527317847acf1fb509b4af0eb28f28aa7e16ac5959fe6defb  tsx-xx60-kernel-stable-bundle.tar.zst
+78efbb9d534d0eb7f9eaeab8fa413dc3a553c32fb28dee14fbdef0d05612d4cfa24e10a86fed31bbc0407309e5aea1c2f5dcd329aee23eea50fff513bd67f555  tsx-xx60-kernel-stable-bundle.tar.zst
 "

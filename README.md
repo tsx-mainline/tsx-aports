@@ -10,6 +10,7 @@ The repository has two repos. `common` holds the hardware-independent packages. 
 common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
 scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
+scripts/pin-kernel.sh      pin a kernel package to the bundle of a tsx-xx60-linux release
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
 scripts/arch-image.sh      the container image of each architecture (used by build.sh, index.sh and resign.sh)
 scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
@@ -92,7 +93,7 @@ To release a new version of a package:
 3. Run `scripts/build.sh <PKGDIR>` (it writes the new `sha512sums`).
 4. Commit the recipe.
 
-`scripts/tests/test-sources.sh` checks each recipe. Each `source=` needs a sum, and the `builddir` must be the top directory of the archive.
+`scripts/tests/test-sources.sh` checks each recipe. Each `source=` that has a URL needs a sum, and a `_kbundle_tag` must name a release.
 
 ## Signing key
 
@@ -158,6 +159,15 @@ The job `kbundle` in `.github/workflows/release.yml` of that repo builds the bun
   4. It updates `pkgver`, `_kernelrelease`, and `sha512sums` in place. It never changes `_kbundle_tag`.
 
   The line `SRCDEST="$startdir/dist"` in each package makes `abuild` use this local file. `sha512sums` verifies it, and `abuild` never fetches it again. `_kbundle_tag` has no effect here. It is only for CI.
+
+To pin the packages to a release, run `scripts/pin-kernel.sh <TAG>`. The tag is a tag of tsx-xx60-linux that started `release.yml`, for example `v0.2.0`. For each flavor, the script does these steps:
+
+1. It downloads the bundle of the release.
+2. It checks `CHECKSUMS.sha256` inside the bundle.
+3. It checks that `kernel.release` starts with the kernel version of `pkgver`.
+4. It writes `_kbundle_tag`, `_kernelrelease` and `sha512sums` into the APKBUILD.
+
+The bundle that CI builds and the bundle of `stage-kernel.sh` have different bytes, also for the same commit. So run `scripts/pin-kernel.sh` after each release, and do not keep the sum of a local stage. Raise `pkgrel` when the same `pkgver` is already published.
 
 **pkgver scheme**: `<upstream kernel version>_git<YYYYMMDD>`, for example `7.2.8_git20260927`. The suffix of `make kernelrelease` (`-NNNNN-gHASH`, a commit count and a short hash) contains `-`. The apk version syntax does not allow `-` in `pkgver`. The staging date replaces the suffix. The `_kernelrelease` variable of the package records the exact commit for a `pkgver`. This is build provenance only, and nothing on the panel reads it. To reproduce an exact build, read that variable and not the date. Two different commits that you stage on the same day have the same `pkgver`. In that case, increase `pkgrel` or stage again the next day.
 
