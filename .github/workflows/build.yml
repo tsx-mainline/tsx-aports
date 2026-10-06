@@ -27,11 +27,21 @@
 #   - Settings > Actions > General > "Allow GitHub Actions to create and
 #     approve pull requests" (for chromium-watch only).
 #
-# First deploy: the live site is empty, so nothing is carried forward, and the
-# kernel packages are missing (their release bundles may not exist yet).
-# Before the first push to main, upload a tarball of a published tree as the
-# release asset named below (README.md "CI"). Or start a manual run with the
-# seed_url input. Later runs restore the live site instead.
+# Sources. Every recipe downloads public files: the GitHub archive of a signed
+# tag (tsx-linux-common, tsx-xx60-linux, tsx-ledbar-fw), upstream archives, and
+# the kernel bundles of a tsx-xx60-linux release. The build runs with --verify,
+# so it checks each download against the sha512sums of the APKBUILD and stops
+# on a difference (README.md, "Source of the packages").
+#
+# A run on a branch (workflow_dispatch) builds the same packages, signs with a
+# throwaway key and publishes nothing: the key and the Pages steps need the
+# ref main (step "Decide if this run publishes").
+#
+# First deploy: the live site holds only the first packages, so most of the
+# tree is built new. A kernel package whose release bundle does not exist is
+# skipped with a warning. Upload a tarball of a published tree as the release
+# asset named below (README.md "CI"), or start a manual run with the seed_url
+# input. Later runs restore the live site instead.
 name: build
 
 on:
@@ -143,6 +153,8 @@ jobs:
               --fallback-seed "https://github.com/$GITHUB_REPOSITORY/releases/download/seed/tsx-aports-seed.tar.gz"
           fi
 
+      # --verify: the build does not write new sha512sums. It fails when a
+      # download does not match the APKBUILD.
       # --skip-existing: the build does not rebuild a published version
       # (tensorflow-lite-c is a long C++ build).
       # --skip-unreachable: the build skips a kernel package whose release
@@ -152,7 +164,7 @@ jobs:
       # A package builds in a pass only when its arch= lists that
       # architecture. tensorflow-lite-c and sendspin-cli list both.
       - name: Build the new versions
-        run: scripts/build.sh --skip-existing --skip-unreachable --all
+        run: scripts/build.sh --verify --skip-existing --skip-unreachable --all
 
       - name: Assemble the published tree (latest and one previous version)
         if: steps.mode.outputs.publish == 'true'

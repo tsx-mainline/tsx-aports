@@ -238,10 +238,10 @@ Watch the size of the published tree. It has all packages, both kernel flavors, 
 
 - **build** runs on a push to `main` that changes `common/`, `xx60/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
-  2. `scripts/build.sh --skip-existing --skip-unreachable --all` builds only the versions that are not in the published tree. It skips a kernel package with a warning when its tsx-xx60-linux release bundle does not exist. The published copy of that package stays.
+  2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a kernel package with a warning when its tsx-xx60-linux release bundle does not exist. The published copy of that package stays.
   3. `scripts/index.sh --keep 2` re-indexes and signs the merged tree.
 
-  A pull request builds with a throwaway key and publishes nothing.
+  A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`.
 - **deploy** publishes that tree with `actions/deploy-pages`.
 - **wlroots-watch** runs daily. It compares `tsx-xx60-wlroots0.20` with the Alpine v3.24 armv7 `wlroots0.20`. If Alpine has another build, it opens an issue (once for each version). A person then checks the fix and rebases the package, or switches the panels back (see "Packages" above).
 - **chromium-watch** runs daily. It checks the Alpine v3.24 armv7 `chromium`. If that is newer, it opens a pull request that changes the pin. It needs the setting "Allow GitHub Actions to create and approve pull requests" in the Actions settings of the repo.

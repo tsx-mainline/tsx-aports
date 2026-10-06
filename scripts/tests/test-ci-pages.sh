@@ -5,6 +5,7 @@
 #      seed tarball, and the fallback seed.
 #   2. scripts/build.sh --skip-existing.
 #   3. scripts/build.sh --skip-unreachable (a 404 source, as for a kernel).
+#      scripts/build.sh --verify (no `abuild -F checksum` before the build).
 #   4. scripts/index.sh --keep 2 over a tree with carried-forward packages and
 #      new packages, and the result verifies again.
 # The tests do packaging only. The fixture packages hold one text file. Each
@@ -94,8 +95,21 @@ $CF --from $URL --fallback-seed "$W/none.tar.gz" --dest "$W/d10" 2>&1 | grep -q 
 
 echo "== 2/3. build.sh --skip-existing / --skip-unreachable (fake docker) =="
 R=$W/repo; mkdir -p "$R/scripts" "$R/common/tsx-fixture" "$R/xx60/tsx-fixture-kernel" "$R/packages/v3.24/common/armv7" "$W/bin"
-cp "$HERE/build.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
-printf '#!/bin/sh\necho DOCKER-CALLED\n' > "$W/bin/docker"; chmod +x "$W/bin/docker"
+cp "$HERE/build.sh" "$HERE/arch-image.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
+# The fake docker answers the image steps of scripts/arch-image.sh (pull, tag,
+# and `apk --print-arch`). A build (`docker run ... sh -euc SCRIPT`) prints
+# DOCKER-CALLED and its script.
+cat > "$W/bin/docker" <<'DOCKER'
+#!/bin/sh
+case "$1" in pull|tag|image) exit 0;; esac
+case "$*" in
+*"apk --print-arch"*) case "$*" in *arm/v7*) echo armv7;; *) echo aarch64;; esac; exit 0;;
+esac
+for a in "$@"; do last=$a; done
+echo DOCKER-CALLED
+echo "DOCKER-SCRIPT: $last"
+DOCKER
+chmod +x "$W/bin/docker"
 touch "$W/k" "$W/k.pub"
 BS() { (cd "$R" && PATH="$W/bin:$PATH" TSX_APORTS_KEY="$W/k" scripts/build.sh "$@" 2>&1); }
 mkapk() { printf 'pkgname=%s\npkgver=1\npkgrel=%s\narch=armv7\nsource="%s"\n' "$2" "$3" "$4" > "$R/$1/APKBUILD"; }
@@ -126,9 +140,18 @@ mkapk xx60/tsx-fixture-kernel tsx-fixture-kernel 1 "http://127.0.0.1:1/x.tar.zst
 OUT=$(BS --skip-unreachable xx60/tsx-fixture-kernel); RC=$?
 [ $RC != 0 ] && ok "a network failure (not 404) still fails the run" || bad "connection refused was skipped: $OUT"
 
+# --verify leaves out the checksum step. The fake docker prints the script of
+# the build, so the test can read the steps.
+mkapk common/tsx-fixture tsx-fixture 5 ""
+OUT=$(BS common/tsx-fixture)
+case "$OUT" in *"abuild -F checksum"*) ok "a plain build runs abuild checksum";; *) bad "plain build has no checksum step: $OUT";; esac
+OUT=$(BS --verify common/tsx-fixture)
+case "$OUT" in *"abuild -F -r"*) ok "--verify: the build still runs";; *) bad "--verify: no build: $OUT";; esac
+case "$OUT" in *"abuild -F checksum"*) bad "--verify still runs abuild checksum";; *) ok "--verify: no abuild checksum";; esac
+
 echo "== 4. index.sh --keep 2 over carried-forward + fresh packages =="
 P=$W/idx; mkdir -p "$P/scripts" "$P/packages/v3.24"
-cp "$HERE/index.sh" "$P/scripts/"; cp -r "$W/d1/." "$P/packages/v3.24/"
+cp "$HERE/index.sh" "$HERE/arch-image.sh" "$P/scripts/"; cp -r "$W/d1/." "$P/packages/v3.24/"
 mkpkg 3 "$P/packages/v3.24"   # the "fresh build" of this run, next to the carried r0..r2
 ls "$P"/packages/v3.24/common/armv7/*.apk | wc -l | grep -qx 4 && ok "mixed tree holds r0-r2 (carried) + r3 (built)" || bad "mixed tree wrong"
 if OUT=$(TSX_APORTS_KEY="$W/project.rsa" "$P/scripts/index.sh" --keep 2 --out "$P/repo" 2>&1); then

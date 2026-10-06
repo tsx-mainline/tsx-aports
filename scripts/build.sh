@@ -11,7 +11,7 @@
 # It uses the same push, run, and pull pattern as tools/build/remote-build.sh
 # in tsx-xx60-linux. It has no default value, so this repo names no build host.
 #
-#   scripts/build.sh [--skip-existing] [--skip-unreachable] [--arch ARCH] <PKGDIR>|--all
+#   scripts/build.sh [--skip-existing] [--skip-unreachable] [--verify] [--arch ARCH] <PKGDIR>|--all
 #   PKGDIR is a package directory relative to the repo root, for example
 #   common/sendspin-cli or xx60/tsx-xx60-chromium.
 #
@@ -38,6 +38,10 @@
 #                       does not change the exit status. Any other network
 #                       failure fails the build. A source that is already in
 #                       the dist/ of the package counts as present.
+#   --verify            do not write new sha512sums. The build fails when a
+#                       downloaded source does not match the sha512sums of the
+#                       APKBUILD. CI uses this, so a changed archive or a
+#                       wrong sum stops the build and nothing is signed.
 #
 # Environment:
 #   TSX_APORTS_KEY   path to the PRIVATE signing key (required), for example
@@ -50,10 +54,10 @@
 #                    BUILD_HOST).
 #
 # Steps for each package: `abuild checksum` writes real sha512sums for each
-# source= that comes from a URL (for example the pinned tarball of
-# sendspin-cli). It changes nothing when all sources are local files with
-# a checksum. Then `abuild -r` fetches the missing build dependencies, builds,
-# packages, signs, and indexes.
+# source= (for example the tag archive of tsx-linux-common). With --verify,
+# the script leaves this step out, and `abuild -r` checks the sums that the
+# APKBUILD has. Then `abuild -r` fetches the missing build dependencies,
+# builds, packages, signs, and indexes.
 # Output: packages/v3.24/<common|xx60>/<arch>/*.apk and APKINDEX.tar.gz.
 # With BUILD_HOST, the script also copies the APKBUILD back, because the
 # checksum step can change it. Then the real checksum is what you commit.
@@ -180,14 +184,15 @@ pkg_arch() {
 # It needs no PKGDIR, no docker, no ssh, and no real BUILD_HOST.
 if [ "${TSX_APORTS_BUILD_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-SKIP_EXISTING=0 SKIP_UNREACHABLE=0 PASS= WANT_ARCH=
+SKIP_EXISTING=0 SKIP_UNREACHABLE=0 VERIFY=0 PASS= WANT_ARCH=
 while :; do case ${1:-} in
 	--skip-existing) SKIP_EXISTING=1; PASS="$PASS $1"; shift;;
 	--skip-unreachable) SKIP_UNREACHABLE=1; PASS="$PASS $1"; shift;;
+	--verify) VERIFY=1; PASS="$PASS $1"; shift;;
 	--arch) WANT_ARCH=${2:?--arch needs armv7 or aarch64}; arch_platform "$WANT_ARCH" >/dev/null || exit 1; PASS="$PASS --arch $WANT_ARCH"; shift 2;;
 	*) break;;
 esac; done
-TARGET=${1:?"usage: build.sh [--skip-existing] [--skip-unreachable] [--arch ARCH] <PKGDIR>|--all"}
+TARGET=${1:?"usage: build.sh [--skip-existing] [--skip-unreachable] [--verify] [--arch ARCH] <PKGDIR>|--all"}
 
 if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	: "${BUILD_DIR:?BUILD_HOST needs BUILD_DIR (remote path this repo is mirrored to)}"
@@ -300,6 +305,8 @@ want_build() {
 # check stops the build when a container of one pass reports another
 # architecture (scripts/arch-image.sh says why this can happen).
 READY=
+CHECKSUM_CMD='abuild -F checksum'
+[ "$VERIFY" = 0 ] || CHECKSUM_CMD=true
 while read -r PKGDIR PKGARCH; do
 	[ -n "$PKGDIR" ] || continue
 	want_build "$PKGDIR" "$PKGARCH" || continue
@@ -340,7 +347,7 @@ while read -r PKGDIR PKGARCH; do
 			echo 'PACKAGER_PRIVKEY=/keys/$KEYNAME' > /root/.abuild/abuild.conf
 			echo 'PACKAGER=\"unex <7575866+unex@users.noreply.github.com>\"' >> /root/.abuild/abuild.conf
 			cd /repo/$PKGDIR
-			abuild -F checksum
+			$CHECKSUM_CMD
 			abuild -F -r -P /repo/packages/v3.24
 		"
 done <<EOF
