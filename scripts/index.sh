@@ -20,7 +20,7 @@
 # Environment: TSX_APORTS_KEY (the private key). The script always rebuilds
 # and signs the index.
 set -euo pipefail
-HERE=$(cd "$(dirname "$0")" && pwd)
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
 . "$HERE/arch-image.sh"
 KEEP=2
@@ -32,19 +32,22 @@ while [ $# -gt 0 ]; do case $1 in
 	*) echo "unknown arg $1" >&2; exit 1;;
 esac; shift; done
 
-SRC="$REPO/packages/v3.24"
-[ -d "$SRC" ] || { echo "index.sh: no $SRC -- run scripts/build.sh first" >&2; exit 1; }
+# apk_names DIR: one line "<pkgname><TAB><file>" for each .apk in DIR. The
+# pkgname is the file name without -<pkgver>-r<pkgrel>.apk.
+apk_names() {
+	(cd "$1" && ls -- *.apk 2>/dev/null) | sed -E 's/^(.*)-([0-9][^-]*-r[0-9]+)\.apk$/\1\t\1-\2.apk/'
+}
 
 prune_dir() {  # ARCH_DIR
-	local d="$1" pruned=0
-	# Group the files by pkgname (without -<pkgver>-r<pkgrel>.apk). Keep the
-	# KEEP newest files. The order comes from a plain version sort. This is
-	# close enough for a prune, and the prune alone does nothing that
-	# affects security.
-	for pkgname in $(cd "$d" && ls -- *.apk 2>/dev/null | sed -E 's/-[0-9][^-]*-r[0-9]+\.apk$//' | sort -u); do
-		local files
-		files=$(cd "$d" && ls -- "$pkgname"-*.apk 2>/dev/null | sort -V)
-		local n old
+	local d="$1" pruned=0 pkgname files n old f
+	# Group the files by the whole pkgname, and keep the KEEP newest files
+	# of each group. Do not use a glob such as "<pkgname>-*.apk": it also
+	# matches the subpackages (tsx-xx60-board-ha, tsx-ledbar-fw), and then
+	# the prune deleted the newest main package. The order comes from a
+	# plain version sort. This is close enough for a prune, and the prune
+	# alone does nothing that affects security.
+	for pkgname in $(apk_names "$d" | cut -f1 | sort -u); do
+		files=$(apk_names "$d" | awk -F'\t' -v p="$pkgname" '$1 == p { print $2 }' | sort -V)
 		n=$(printf '%s\n' "$files" | wc -l)
 		if [ "$n" -gt "$KEEP" ]; then
 			old=$(printf '%s\n' "$files" | head -n $((n - KEEP)))
@@ -57,6 +60,12 @@ prune_dir() {  # ARCH_DIR
 	done
 	return $pruned
 }
+
+# The host test loads the functions only.
+if [ "${TSX_APORTS_INDEX_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
+
+SRC="$REPO/packages/v3.24"
+[ -d "$SRC" ] || { echo "index.sh: no $SRC -- run scripts/build.sh first" >&2; exit 1; }
 
 READY=   # the architectures whose image is pulled and checked in this run
 for cat_dir in "$SRC"/*/; do

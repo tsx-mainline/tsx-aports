@@ -18,7 +18,7 @@ scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -261,7 +261,7 @@ apk-tools 3 (Alpine 3.24) refuses every upgrade while a listed repository is una
 
 GitHub Actions builds and publishes the packages. GitHub Pages serves them behind the custom domain `tsx-aports.unexceptional.net` (a `CNAME` file in the published tree). GitHub Pages has a soft limit of about 1 GB and no CDN-side pruning. `tsx-xx60-chromium` alone is over 100 MB for each build. It only repacks and does not compile, so a new build publishes within minutes of an Alpine release.
 
-`scripts/index.sh --keep 2` (the CI default) keeps the newest version and one previous version of every package. It then re-signs the pruned index.
+`scripts/index.sh --keep 2` (the CI default) keeps the newest version and one previous version of every package. A subpackage is a package of its own: tsx-xx60-board-ha does not count as a version of tsx-xx60-board. It then re-signs the pruned index. The host test is `scripts/tests/test-index-prune.sh`.
 
 Watch the size of the published tree. It has all packages, both kernel flavors, and two chromium versions while a second one exists. One version of everything is about 190 MB.
 
