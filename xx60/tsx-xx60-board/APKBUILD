@@ -30,7 +30,10 @@ makedepends="linux-headers meson samurai pkgconf wlroots0.20-dev wayland-dev
 # The board file /etc/conf.d/watchdog replaces the one of busybox-openrc (the
 # RN5T618 PMIC watchdog has its own timeout). Up to 0.1.7, tsx-ha held the
 # CSR8811 chip file and its PSR loader (bt-chip-csr8811.sh, csr_psload.py).
-replaces="busybox-openrc tsx-ha"
+# /etc/securetty replaces the one of busybox: the Alpine list plus the serial
+# console of the board. Up to 0.2.1, tsx-base held it, and a boot script added
+# the console, so every upgrade left a securetty.apk-new. No script edits it now.
+replaces="busybox busybox-openrc tsx-base tsx-ha"
 subpackages="$pkgname-kiosk:_kiosk $pkgname-ha:_ha"
 # The panel software lives in /usr/local, as in the image.
 options="!check !fhs"
@@ -57,6 +60,7 @@ etc/init.d/tsx-tfa-dsp
 etc/logrotate.d/tsx-als
 etc/logrotate.d/tsx-cpufreq
 etc/periodic/hourly/tsx-emmc-state
+etc/securetty
 etc/tsx/als.conf
 etc/tsx/audio.conf
 etc/tsx/buttons-board.conf

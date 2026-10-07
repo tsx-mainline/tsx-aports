@@ -20,7 +20,9 @@ depends="tsx-base tsx-idled tsx-splash brightnessctl cairo curl font-dejavu libi
 makedepends="cairo-dev linux-headers wayland-dev wayland-protocols wlr-protocols"
 install="$pkgname.pre-install $pkgname.post-install"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
-replaces="alpine-baselayout"
+# Up to 0.2.0, this package held /etc/motd (replaces="alpine-baselayout"), and
+# tsx-banner wrote it at each boot, so every upgrade left a motd.apk-new. No TSX
+# package ships /etc/motd now.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
 builddir="$srcdir/tsx-linux-common-$pkgver"
