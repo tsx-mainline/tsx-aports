@@ -18,8 +18,8 @@
 # Assistant layer (esphome.d/camera.py and setup.d/camera.py). Only the ha
 # profile pulls it, so only that profile gets libturbojpeg.
 pkgname=tsx-xx60-board
-pkgver=0.2.0
-pkgrel=1
+pkgver=0.2.1
+pkgrel=0
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7"
@@ -28,7 +28,7 @@ depends="alsa-utils busybox i2c-tools python3 u-boot-tools"
 makedepends="linux-headers meson samurai pkgconf wlroots0.20-dev wayland-dev
 	wayland-protocols libxkbcommon-dev libdrm-dev patch"
 # The board file /etc/conf.d/watchdog replaces the one of busybox-openrc (the
-# watchdog of the Meson SoC has its own timeout). Up to 0.1.7, tsx-ha held the
+# RN5T618 PMIC watchdog has its own timeout). Up to 0.1.7, tsx-ha held the
 # CSR8811 chip file and its PSR loader (bt-chip-csr8811.sh, csr_psload.py).
 replaces="busybox-openrc tsx-ha"
 subpackages="$pkgname-kiosk:_kiosk $pkgname-ha:_ha"
@@ -129,6 +129,6 @@ _ha() {
 }
 
 sha512sums="
-ea21c4374ab6a387b62279bdf0c0d7e5f75bfec9238ad15a3e5d5d201acdc41093c3d9de9553991aa57e0a07f0e3bf0470b79d8e8446f57bf902e2b35f600e96  tsx-xx60-linux-0.2.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx60-linux-0.2.1.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "
