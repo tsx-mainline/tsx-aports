@@ -10,6 +10,9 @@
 #   4. scripts/pin-kernel.sh, against a local server with a fixture bundle:
 #      it writes the three values, and it refuses a bundle with a wrong
 #      kernel.release, a wrong CHECKSUMS.sha256 and a missing release.
+#   5. A recipe that keeps the file modes of a tag archive (cp -a or
+#      stat -c %a) clears the group and other write bits. A kernel package
+#      gives its module tree to root.
 # A kernel sha512 of only zeros is a pending pin. The test shows a warning for
 # it and does not fail. Run scripts/pin-kernel.sh before the release.
 set -uo pipefail
@@ -77,6 +80,21 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/; do
 		case $KB in v[0-9]*) ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB'";; esac
 		case $KR in "${PV%%_*}"-[0-9]*-g[0-9a-f]*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac
 		if grep -q "^0\{128\}  " "$D/APKBUILD"; then warn "$P: the sha512 of the bundle is pending (run scripts/pin-kernel.sh $KB)"; fi;;
+	esac
+done
+
+echo "== 5. file modes =="
+# A GitHub tag archive has group-writable files. tsx-config and the plugin
+# loader of tsx-ha refuse a group-writable plugin. The bundle of a kernel
+# release has the user of the CI runner as the owner of its files.
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/; do
+	A=$D/APKBUILD; [ -f "$A" ] || continue; P=$(basename "$D")
+	if grep -qE 'cp -a "\$builddir"|stat -c %a' "$A"; then
+		grep -q 'chmod -R go-w "$pkgdir"$' "$A" && ok "$P: no group-writable files" || bad "$P: keeps the modes of the archive without chmod -R go-w"
+	fi
+	case $P in tsx-xx60-kernel-*)
+		grep -q 'chown -R 0:0 "$pkgdir"/lib$' "$A" && grep -q 'chmod -R go-w "$pkgdir"/lib$' "$A" \
+			&& ok "$P: root owns the module tree, no group-writable files" || bad "$P: the module tree keeps the owner or the modes of the bundle";;
 	esac
 done
 

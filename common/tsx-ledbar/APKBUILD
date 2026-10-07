@@ -34,6 +34,9 @@ package() {
 	cp -a "$builddir"/ledbar/. "$pkgdir"/
 	rm -rf "$pkgdir"/src
 	install -Dm755 "$builddir"/ledbar/src/tsx-ledbar "$pkgdir"/usr/local/bin/tsx-ledbar
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 sha512sums="

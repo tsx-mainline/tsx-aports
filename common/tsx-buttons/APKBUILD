@@ -7,7 +7,7 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-buttons
 pkgver=0.2.0
-pkgrel=2
+pkgrel=3
 pkgdesc="TSX front-panel button daemon with its key map"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
@@ -31,6 +31,9 @@ package() {
 	cp -a "$builddir"/buttons/. "$pkgdir"/
 	rm -rf "$pkgdir"/src
 	install -Dm755 "$builddir"/buttons/src/tsx-buttons "$pkgdir"/usr/local/sbin/tsx-buttons
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 sha512sums="

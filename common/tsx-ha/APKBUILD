@@ -37,6 +37,9 @@ package() {
 	install -d "$pkgdir"/opt/lva
 	cp -a "$builddir"/ha/voice/shim "$pkgdir"/opt/lva/shim
 	find "$pkgdir"/opt/lva -name __pycache__ -prune -exec rm -rf {} +
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 sha512sums="

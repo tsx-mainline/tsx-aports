@@ -7,7 +7,7 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-setup
 pkgver=0.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="TSX on-panel setup page and its root helper"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
@@ -22,6 +22,9 @@ builddir="$srcdir/tsx-linux-common-$pkgver"
 package() {
 	mkdir -p "$pkgdir"
 	cp -a "$builddir"/setup/. "$pkgdir"/
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 sha512sums="

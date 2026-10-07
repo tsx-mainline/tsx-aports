@@ -7,7 +7,7 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-kiosk
 pkgver=0.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
@@ -47,6 +47,9 @@ package() {
 	rm -f "$pkgdir"/etc/init.d/tsx-idled "$pkgdir"/usr/local/bin/tsx-blank "$pkgdir"/usr/local/bin/tsx-display-power
 	install -Dm755 "$builddir"/kiosk/src/tsx-overlay "$pkgdir"/usr/local/bin/tsx-overlay
 	_cursors
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 # The blank cursor theme (/usr/share/tsx/cursors). The kiosk hides the pointer

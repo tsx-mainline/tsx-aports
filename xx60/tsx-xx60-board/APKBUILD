@@ -110,6 +110,9 @@ package() {
 	install -Dm644 "$builddir"/rootfs/src/chromium-es2/sigs.json "$pkgdir"/usr/local/share/tsx/chromium-es2/sigs.json
 	mkdir -p "$pkgdir"/usr/share
 	echo "cage $_cage + argb8888-fallback.patch (built from source, sha256 $_cagesha256)" > "$pkgdir"/usr/share/tsx-cage.version
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
 }
 
 _kiosk() {

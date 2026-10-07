@@ -60,6 +60,10 @@ package() {
 	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-lts.release
 	mkdir -p "$pkgdir"/lib/modules
 	tar -xzf "$srcdir"/modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# The bundle keeps the owner and the modes of the machine that packed it
+	# (the CI runner).
+	chown -R 0:0 "$pkgdir"/lib
+	chmod -R go-w "$pkgdir"/lib
 	# The build/source links of modules_install point into the kernel build
 	# directory of the build machine. They have no meaning on a panel, and
 	# they name paths on that machine.
