@@ -6,7 +6,7 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-base
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=0
 pkgdesc="TSX panel base system: config, hostname, data, clock, banner and the hardware seam"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -30,5 +30,5 @@ package() {
 }
 
 sha512sums="
-2ba28c48e1ded3d6617a352d5c9e8be9f606c1621a63ae4c60ad791389e904c3392f386825e9a46afb9229674a5ffc22cc22c171929116d4dad00cc86fc51406  tsx-linux-common-0.2.1.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.2.2.tar.gz
 "
