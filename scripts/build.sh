@@ -11,7 +11,7 @@
 # It uses the same push, run, and pull pattern as tools/build/remote-build.sh
 # in tsx-xx60-linux. It has no default value, so this repo names no build host.
 #
-#   scripts/build.sh [--skip-existing] [--skip-unreachable] [--verify] [--arch ARCH] <PKGDIR>|--all
+#   scripts/build.sh [--skip-existing] [--skip-unreachable] [--verify] [--arch ARCH] [--extra-repo URL]... <PKGDIR>|--all
 #   PKGDIR is a package directory relative to the repo root, for example
 #   common/sendspin-cli or xx60/tsx-xx60-chromium.
 #
@@ -38,6 +38,12 @@
 #                       does not change the exit status. Any other network
 #                       failure fails the build. A source that is already in
 #                       the dist/ of the package counts as present.
+#   --extra-repo URL    add this apk repository to the build container, after
+#                       the Alpine ones. abuild -r then also finds a
+#                       dependency there, for example a published package of
+#                       this project (URL .../v3.24/common) that the build
+#                       does not make. The container trusts the committed
+#                       public keys of common/tsx-keys.
 #   --verify            do not write new sha512sums. The build fails when a
 #                       downloaded source does not match the sha512sums of the
 #                       APKBUILD. CI uses this, so a changed archive or a
@@ -243,11 +249,15 @@ pkg_arch() {
 # It needs no PKGDIR, no docker, no ssh, and no real BUILD_HOST.
 if [ "${TSX_APORTS_BUILD_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-SKIP_EXISTING=0 SKIP_UNREACHABLE=0 VERIFY=0 PASS= WANT_ARCH=
+SKIP_EXISTING=0 SKIP_UNREACHABLE=0 VERIFY=0 PASS= WANT_ARCH= EXTRA_REPOS=
 while :; do case ${1:-} in
 	--skip-existing) SKIP_EXISTING=1; PASS="$PASS $1"; shift;;
 	--skip-unreachable) SKIP_UNREACHABLE=1; PASS="$PASS $1"; shift;;
 	--verify) VERIFY=1; PASS="$PASS $1"; shift;;
+	--extra-repo)
+		case "${2:-}" in https://*|http://*) ;; *) echo "build.sh: --extra-repo needs an http(s) URL" >&2; exit 2;; esac
+		case "$2" in *[!A-Za-z0-9:/._~-]*) echo "build.sh: --extra-repo: unexpected character in the URL" >&2; exit 2;; esac
+		EXTRA_REPOS="$EXTRA_REPOS $2"; PASS="$PASS --extra-repo $2"; shift 2;;
 	--arch) WANT_ARCH=${2:?--arch needs armv7 or aarch64}; arch_platform "$WANT_ARCH" >/dev/null || exit 1; PASS="$PASS --arch $WANT_ARCH"; shift 2;;
 	*) break;;
 esac; done
@@ -408,6 +418,9 @@ while read -r PKGDIR PKGARCH; do
 			# build) and not the signing key of this container. It must
 			# still verify.
 			for k in /repo/common/tsx-keys/*.rsa.pub; do [ -f \"\$k\" ] && cp \"\$k\" /etc/apk/keys/; done
+			# --extra-repo: after the keys, so the index of the repository verifies.
+			for r in $EXTRA_REPOS; do echo \"\$r\" >> /etc/apk/repositories; done
+			[ -z '$EXTRA_REPOS' ] || apk update >/dev/null
 			mkdir -p /root/.abuild
 			echo 'PACKAGER_PRIVKEY=/keys/$KEYNAME' > /root/.abuild/abuild.conf
 			echo 'PACKAGER=\"unex <7575866+unex@users.noreply.github.com>\"' >> /root/.abuild/abuild.conf
