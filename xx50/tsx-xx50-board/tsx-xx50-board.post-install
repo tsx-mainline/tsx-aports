@@ -1,5 +1,8 @@
 #!/bin/sh
-# The touch controller service runs in the default runlevel (an image adds
-# it in rootfs/mkrootfs.sh; an apk upgrade of an older panel adds it here).
-rc-update add tsx-touch default >/dev/null 2>&1 || true
+# The touch controller service and the good-boot service of the stock U-Boot
+# run in the default runlevel. An image adds them in rootfs/mkrootfs.sh. An
+# apk upgrade of an older panel adds them here.
+for s in tsx-touch tsx-boot-ok; do
+	rc-update add $s default >/dev/null 2>&1 || true
+done
 exit 0

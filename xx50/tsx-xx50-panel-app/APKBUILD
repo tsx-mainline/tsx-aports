@@ -20,7 +20,7 @@
 # them. So the build needs the network (options net).
 # After a new release, run `abuild checksum`.
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=0
 _pio=6.1.19
 pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
@@ -48,5 +48,5 @@ package() {
 }
 
 sha512sums="
-bed5b12eecdd6ce4431c7887209778b35b15adbb8a9e30a256321cfe6ff7c75f0395b98e53db94818e53eca2ec8f8543019da71b2fac55d8b28c1dc59fe79329  tsx-xx50-panel-app-src-0.3.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-panel-app-src-0.3.1.tar.gz
 "
