@@ -23,3 +23,6 @@ xx60/tsx-xx60-kernel-lts/dist/
 abuild.conf
 APKBUILD.orig
 *~
+
+# staged sources of the xx50 recipes (abuild downloads, never committed)
+xx50/*/dist/

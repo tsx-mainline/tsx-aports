@@ -41,7 +41,7 @@ recipe_vars() {
 }
 
 echo "== 1/2/3. the recipes =="
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
 	[ -f "$D/APKBUILD" ] || continue
 	P=$(basename "$D")
 	V=$(recipe_vars "${D%/}")
@@ -80,19 +80,26 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/; do
 		case $KB in v[0-9]*) ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB'";; esac
 		case $KR in "${PV%%_*}"-[0-9]*-g[0-9a-f]*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac
 		if grep -q "^0\{128\}  " "$D/APKBUILD"; then warn "$P: the sha512 of the bundle is pending (run scripts/pin-kernel.sh $KB)"; fi;;
+	tsx-xx50-kernel-*)
+		# The xx50 kernel release has no git suffix (6.18.54-tsx-xx50).
+		case $KB in v[0-9]*) ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB'";; esac
+		case $KR in "${PV%%_*}"-*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac;;
 	esac
+	if grep -q "^0\{128\}  " "$D/APKBUILD"; then
+		case $P in tsx-xx60-kernel-*) ;; *) warn "$P: a sha512 is pending (all zeros): run abuild checksum after the tag or the release";; esac
+	fi
 done
 
 echo "== 5. file modes =="
 # A GitHub tag archive has group-writable files. tsx-config and the plugin
 # loader of tsx-ha refuse a group-writable plugin. The bundle of a kernel
 # release has the user of the CI runner as the owner of its files.
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
 	A=$D/APKBUILD; [ -f "$A" ] || continue; P=$(basename "$D")
 	if grep -qE 'cp -a "\$builddir"|stat -c %a' "$A"; then
 		grep -q 'chmod -R go-w "$pkgdir"$' "$A" && ok "$P: no group-writable files" || bad "$P: keeps the modes of the archive without chmod -R go-w"
 	fi
-	case $P in tsx-xx60-kernel-*)
+	case $P in tsx-xx60-kernel-*|tsx-xx50-kernel-*)
 		grep -q 'chown -R 0:0 "$pkgdir"/lib$' "$A" && grep -q 'chmod -R go-w "$pkgdir"/lib$' "$A" \
 			&& ok "$P: root owns the module tree, no group-writable files" || bad "$P: the module tree keeps the owner or the modes of the bundle";;
 	esac

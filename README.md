@@ -2,13 +2,14 @@
 
 tsx-aports is the apk package repository for the TSX panels. It holds signed Alpine packages. With this repository, `apk upgrade` on a panel updates the kernel, sendspin, the ES2-patched Chromium and the patched wlroots, together with the Alpine packages.
 
-The repository has two repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`).
+The repository has three repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). `xx50` holds the packages of the xx50 family (TSS-752). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`).
 
 ## Layout
 
 ```
 common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
+xx50/<pkg>/APKBUILD        i.MX53 packages (xx50: TSS-752)
 scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
 scripts/pin-kernel.sh      pin a kernel package to the bundle of a tsx-xx60-linux release
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
@@ -27,6 +28,7 @@ A panel fetches the published tree. It has one directory for each Alpine branch:
 ```
 v3.24/common/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/xx60/armv7/{*.apk, APKINDEX.tar.gz}
+v3.24/xx50/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/common/aarch64/{*.apk, APKINDEX.tar.gz}
 ```
 
@@ -38,6 +40,8 @@ https://tsx-aports.unexceptional.net/v3.24/xx60
 https://dl-cdn.alpinelinux.org/alpine/v3.24/main
 https://dl-cdn.alpinelinux.org/alpine/v3.24/community
 ```
+
+An xx50 panel lists `v3.24/xx50` in place of `v3.24/xx60`.
 
 **List the repos of this project FIRST.** See "Which chromium wins" below. When two candidates have the same version, apk picks the first one in repository order. This applies to a real pkgname and to a `provides=` match. `tsx-xx60-chromium` must win this tie, so that `apk add chromium` (and the `chromium=<ver>` pin of a rootfs) gets the ES2-patched build of this repo and not the Alpine build.
 
@@ -270,9 +274,9 @@ Watch the size of the published tree. It has all packages, both kernel flavors, 
 
 `.github/workflows/build.yml` builds and publishes the repository. It has four jobs:
 
-- **build** runs on a push to `main` that changes `common/`, `xx60/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
+- **build** runs on a push to `main` that changes `common/`, `xx60/`, `xx50/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
-  2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a kernel package with a warning when its tsx-xx60-linux release bundle does not exist. The published copy of that package stays.
+  2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a package with a warning when its tag archive or its release asset does not exist yet (a kernel bundle, the xx50 panel app source). The published copy of that package stays.
   3. `scripts/index.sh --keep 2` re-indexes and signs the merged tree.
 
   A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`.

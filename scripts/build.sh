@@ -19,8 +19,8 @@
 #                       the first architecture in the arch= of the package. It
 #                       matters for a noarch package (common/tsx-keys, armv7
 #                       by default) and for --all. With --all and no --arch,
-#                       the script builds two passes: armv7 (common/ and
-#                       xx60/) and aarch64 (common/). A package
+#                       the script builds two passes: armv7 (common/, xx60/
+#                       and xx50/) and aarch64 (common/). A package
 #                       whose arch= does not list the pass architecture is
 #                       left out of that pass.
 #
@@ -69,7 +69,7 @@
 # the script leaves this step out, and `abuild -r` checks the sums that the
 # APKBUILD has. Then `abuild -r` fetches the missing build dependencies,
 # builds, packages, signs, and indexes.
-# Output: packages/v3.24/<common|xx60>/<arch>/*.apk and APKINDEX.tar.gz.
+# Output: packages/v3.24/<common|xx60|xx50>/<arch>/*.apk and APKINDEX.tar.gz.
 # With BUILD_HOST, the script also copies the APKBUILD back, because the
 # checksum step can change it. Then the real checksum is what you commit.
 # Check the diff before you commit.
@@ -304,7 +304,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	if [ "$TARGET" != --all ]; then
 		rsync -a "$BUILD_HOST:$BUILD_DIR/$TARGET/APKBUILD" "$REPO/$TARGET/APKBUILD"
 	else
-		for CAT in common xx60; do
+		for CAT in common xx60 xx50; do
 			for d in "$REPO/$CAT"/*/; do
 				[ -f "${d}APKBUILD" ] || continue
 				p="$CAT/$(basename "$d")/APKBUILD"
@@ -324,7 +324,7 @@ KEYNAME=$(basename "$TSX_APORTS_KEY")
 JOBS=
 if [ "$TARGET" = --all ]; then
 	for A in ${WANT_ARCH:-armv7 aarch64}; do
-		case $A in armv7) CATS="common xx60";; *) CATS="common";; esac
+		case $A in armv7) CATS="common xx60 xx50";; *) CATS="common";; esac
 		LIST=
 		for D in $( (cd "$REPO" && for c in $CATS; do [ -d "$c" ] && find "$c" -mindepth 1 -maxdepth 1 -type d; done) | sort); do
 			[ -f "$REPO/$D/APKBUILD" ] || continue
