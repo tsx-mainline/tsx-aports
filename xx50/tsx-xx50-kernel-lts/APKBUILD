@@ -1,0 +1,66 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+#
+# BINARY packaging of an already-built kernel: no compiler runs in this
+# APKBUILD. source= fetches ONE release asset: the file
+# tsx-xx50-kernel-lts-bundle.tar.zst of the tsx-xx50-linux release
+# _kbundle_tag. The job "kernel" of .github/workflows/release.yml of that
+# repo builds it from kernel/KERNEL_REV. The bundle holds the uImage (zImage
+# with the board DTB appended), the uInitrd (the ramdisk with the boot
+# splash), the DTB, the modules tarball, kernel.release, kernel.commit and
+# CHECKSUMS.sha256.
+#
+# The xx50 boots from raw slots of its SD card, not from a file. The
+# post-install and post-upgrade scripts run "tsx-kernel-slots write"
+# (tsx-xx50-board 0.3.1 or later) to write /boot/uImage-lts and
+# /boot/uInitrd-lts into the normal slots, but only on a TSS-752 that runs
+# from its card. The new kernel starts at the next boot. The golden slots
+# keep the last kernel that is known to boot: U-Boot boots them after two
+# failed boots of the normal slots. After good boots of the new kernel,
+# "tsx-kernel-slots promote" copies it to the golden slots. The hooks never
+# write the golden slots.
+#
+# pkgver scheme: <upstream kernel version>_git<YYYYMMDD of the kernel commit>.
+# _kernelrelease is the name of the module folder (the kernel config sets no
+# git suffix, so it stays the same for one upstream version). After a new
+# tsx-xx50-linux release: set pkgver, _kbundle_tag and _kernelrelease, then
+# run `abuild checksum`.
+pkgname=tsx-xx50-kernel-lts
+pkgver=6.18.54_git20261010
+pkgrel=0
+_kernelrelease=6.18.54-tsx-xx50
+# The tsx-xx50-linux release tag whose kernel bundle this package pins.
+_kbundle_tag=v0.3.1
+pkgdesc="xx50 mainline kernel, longterm (LTS) line"
+url="https://github.com/tsx-mainline/tsx-xx50-linux"
+arch="armv7"
+license="GPL-2.0-only"
+# tsx-kernel-slots of tsx-xx50-board 0.3.1 writes only the normal slots.
+depends="tsx-xx50-board>=0.3.1"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+source="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/$_kbundle_tag/tsx-xx50-kernel-lts-bundle.tar.zst"
+
+package() {
+	cd "$srcdir"
+	sha256sum -c CHECKSUMS.sha256
+	[ "$(cat kernel.release)" = "$_kernelrelease" ] || { echo "kernel.release is $(cat kernel.release), not $_kernelrelease" >&2; return 1; }
+	install -Dm644 uImage "$pkgdir"/boot/uImage-lts
+	install -Dm644 uInitrd "$pkgdir"/boot/uInitrd-lts
+	install -Dm644 imx53-crestron-tss752.dtb "$pkgdir"/boot/imx53-crestron-tss752-lts.dtb
+	mkdir -p "$pkgdir"/usr/share/tsx "$pkgdir"/lib/modules
+	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-lts.release
+	cp kernel.commit "$pkgdir"/usr/share/tsx/kernel-lts.commit
+	tar -xzf modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# The bundle keeps the owner and the modes of the machine that packed it
+	# (the CI runner).
+	chown -R 0:0 "$pkgdir"/lib
+	chmod -R go-w "$pkgdir"/lib
+	# The build/source links of modules_install point into the build
+	# directory of the build machine.
+	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
+}
+
+sha512sums="
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-kernel-lts-bundle.tar.zst
+"

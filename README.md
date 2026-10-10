@@ -71,6 +71,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
   3. After all panels have upgraded, remove the package from the panels (`apk del tsx-xx60-wlroots0.20`) and remove its directory here.
 - `xx50/tsx-xx50-board` is the board layer of the xx50 panels (the files of `rootfs/overlay` of tsx-xx50-linux that the board owns), with `tsx-kernel-slots` and `tsx-boot-ok`. It has `arch=noarch`.
 - `xx50/tsx-xx50-panel-app` is the panel app program of the xx50 panels. `abuild` compiles it from the panel app source archive of a tsx-xx50-linux release: the C++ project that ESPHome writes. The build installs PlatformIO with pip in `$srcdir`, and PlatformIO downloads the libraries that the project names with exact versions. So the recipe has `options="net"`.
+- `xx50/tsx-xx50-kernel-lts` is a BINARY package of the xx50 kernel (see "Kernel packages" below). Its install hook writes the kernel into the normal raw slots of the boot card with `tsx-kernel-slots`.
 
 ## Add a package
 
@@ -203,6 +204,12 @@ In all other cases the hook only reports why it wrote nothing. This makes `apk a
 The write goes through `tsx-update-boot --emmc`. This tool keeps the previous content of the boot partition at `/data/tsxboot-emmc.prev.img`. It reads the write back to verify it. If the data does not match, it restores the previous image automatically. The hook then prints "reboot to use the new kernel". If the new kernel does not start, the `boot_retry` of U-Boot falls back to the rescue system. This does not depend on the hook.
 
 **No confirmation**: the eMMC write happens synchronously inside the install script of `apk add`. It has no confirmation prompt and no reboot countdown, so that a scripted `apk upgrade` works on many panels. The safety net is the backup, the readback verify and the restore of `tsx-update-boot`, and the `boot_retry` of U-Boot. `tsx-autoupdate` controls when `apk upgrade` runs, for example only in a maintenance window. Put a time policy there, not in the hook. The hook runs only after an upgrade.
+
+### xx50 kernel package
+
+`tsx-xx50-kernel-lts` is a binary package of the same kind. Its `source=` fetches `tsx-xx50-kernel-lts-bundle.tar.zst` of the tsx-xx50-linux release `_kbundle_tag`. The job `kernel` of `release.yml` in that repo builds the bundle. It holds the uImage, the uInitrd (the ramdisk with the boot splash), the DTB, the modules tarball, `kernel.release`, `kernel.commit` and `CHECKSUMS.sha256`. `package()` checks `CHECKSUMS.sha256` and `kernel.release`.
+
+The xx50 boots from raw slots of its SD card. The install hook runs `tsx-kernel-slots write /boot/uImage-lts /boot/uInitrd-lts` (from `tsx-xx50-board`). It does this only on a TSS-752 that runs from its card, and does nothing in a container or an image build. The command writes only the normal slots. The golden slots keep the last kernel that is known to boot, and U-Boot boots them after two failed boots. After good boots of the new kernel, `tsx-kernel-slots promote` on the panel copies it to the golden slots. `scripts/pin-kernel.sh` is for the xx60 packages only. To pin the xx50 package to a release, set `pkgver`, `_kbundle_tag` and `_kernelrelease`, then run `abuild checksum`.
 
 ## Chromium
 
