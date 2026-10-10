@@ -1,0 +1,47 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# The panel app (experimental): Home Assistant cards on the panel screen with
+# no browser (docs/panel-app.md of tsx-linux-common). This package holds the
+# parts that every family shares: the service tsx-panel-app and its start
+# script, the layout checker, the layout editor of the setup page (setup.d),
+# the tsx-config plugin of the screen keys (config.d: DIM_TIMEOUT,
+# DIM_LEVEL), the tool of the optional Home Assistant entity list, the icons
+# and the schema. The program itself is not in this package. A board family
+# that uses the app builds the program with its own display and keys and
+# ships it in its own package.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
+# GitHub archive of that tag. sha512sums holds the sum of the archive. After a
+# new tag, run `abuild checksum` (README.md, "Source of the packages").
+pkgname=tsx-panel-app
+pkgver=0.3.0
+pkgrel=0
+pkgdesc="TSX panel app: service, layout checker and layout editor (shared part)"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="noarch"
+license="GPL-2.0-or-later"
+# tsx-config apply writes the API key file (tsx-base 0.3.0 has no kiosk group
+# warning on a panel with no kiosk). The layout editor is a plugin of the
+# setup page and needs its helper command layout-save (tsx-setup 0.3.0).
+depends="tsx-base>=0.3.0 tsx-setup>=0.3.0 python3"
+# The panel software lives in /usr/local, as in the image.
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+package() {
+	mkdir -p "$pkgdir"
+	# panel-app/esphome is the source of the program (the family build uses
+	# it). It does not go on the panel.
+	local d
+	for d in etc usr; do
+		[ -d "$builddir"/panel-app/$d ] && cp -a "$builddir"/panel-app/$d "$pkgdir"/
+	done
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of the setup page refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
+}
+
+sha512sums="
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.0.tar.gz
+"
