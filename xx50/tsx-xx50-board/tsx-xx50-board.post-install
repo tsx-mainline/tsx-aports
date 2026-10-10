@@ -1,0 +1,5 @@
+#!/bin/sh
+# The touch controller service runs in the default runlevel (an image adds
+# it in rootfs/mkrootfs.sh; an apk upgrade of an older panel adds it here).
+rc-update add tsx-touch default >/dev/null 2>&1 || true
+exit 0

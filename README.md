@@ -69,6 +69,8 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
   1. Publish one more `tsx-xx60-wlroots0.20` with a higher `pkgrel`. It has no files and no `provides` or `replaces`, and it depends on `wlroots0.20>=<the fixed Alpine version>`. On the next `apk upgrade`, the panels install the Alpine package.
   2. Remove `tsx-xx60-wlroots0.20` from `rootfs/packages-tsx.txt` in tsx-xx60-linux.
   3. After all panels have upgraded, remove the package from the panels (`apk del tsx-xx60-wlroots0.20`) and remove its directory here.
+- `xx50/tsx-xx50-board` is the board layer of the xx50 panels (the files of `rootfs/overlay` of tsx-xx50-linux that the board owns), with `tsx-kernel-slots`. It has `arch=noarch`.
+- `xx50/tsx-xx50-panel-app` is the panel app program of the xx50 panels. `abuild` compiles it from the panel app source archive of a tsx-xx50-linux release: the C++ project that ESPHome writes. The build installs PlatformIO with pip in `$srcdir`, and PlatformIO downloads the libraries that the project names with exact versions. So the recipe has `options="net"`.
 
 ## Add a package
 
@@ -85,6 +87,8 @@ Every recipe builds from public sources. CI and a local build download the same 
 - The recipes of `common/` (all `tsx-*` packages that have a `tsx-linux-common-$pkgver.tar.gz` source) use the GitHub archive of the signed tag `v$pkgver` of tsx-linux-common.
 - `xx60/tsx-xx60-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx60-linux. The top directory of this archive is `tsx-xx60-linux-board-v$pkgver`.
 - `common/tsx-ledbar-fw` uses the GitHub archive of the signed tag `v$pkgver` of tsx-ledbar-fw.
+- `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
+- `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
 - The kernel packages use a release asset (see "Kernel packages").
 
 The tag fixes the content of an archive. `sha512sums` fixes the bytes. GitHub makes the archive again on each request, with its own gzip. The bytes are the same on each download, but they are not the same as the output of `git archive | gzip`. A change of the GitHub gzip program changes the sum. The build then fails and nothing is signed. To fix this, run `abuild checksum` and check that the content is the same as before.

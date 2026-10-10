@@ -1,0 +1,52 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# The panel app program of the xx50 panels (ESPHome, LVGL, the tsx_drm display
+# and the tsx_evdev input). One program for every xx50 panel: the service
+# tsx-panel-app of tsx-panel-app gives it the name, the MAC and the API key of
+# the panel at start.
+#
+# Source: the release asset tsx-xx50-panel-app-src-$pkgver.tar.gz of the tag
+# v$pkgver of tsx-xx50-linux. release.yml makes it with
+# esphome-lvgl/build.sh and esphome-lvgl/mksource.sh: ESPHome writes the C++
+# project of esphome-lvgl/panel-app.yaml and of panel-app/esphome of
+# tsx-linux-common (the tag in COMMON_REF). BUILDINFO in the archive names the
+# versions and the commits. ESPHome itself does not run here: it needs Python
+# modules with Rust and C parts that Alpine armv7 does not have as wheels.
+#
+# build() compiles the project with compile.sh of the archive: PlatformIO
+# (pip, in a venv in $srcdir) and the g++ and libdrm of Alpine. PlatformIO
+# downloads the libraries that platformio.ini names with exact versions
+# (ArduinoJson, LVGL, noise-c, libsodium) and the native platform, and checks
+# them. So the build needs the network (options net).
+# After a new release, run `abuild checksum`.
+pkgname=tsx-xx50-panel-app
+pkgver=0.3.0
+pkgrel=0
+_pio=6.1.19
+pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
+url="https://github.com/tsx-mainline/tsx-xx50-linux"
+arch="armv7"
+# The program links the C++ code of ESPHome (GPL-3.0-or-later).
+license="GPL-3.0-or-later"
+# tsx_drm draws with libdrm (no SDL, no EGL).
+depends="tsx-panel-app>=0.3.0 tsx-xx50-board>=$pkgver libdrm libstdc++"
+makedepends="build-base libdrm-dev python3 py3-pip git"
+options="net !check !fhs"
+source="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/v$pkgver/tsx-xx50-panel-app-src-$pkgver.tar.gz"
+builddir="$srcdir/tsx-xx50-panel-app-$pkgver"
+
+build() {
+	python3 -m venv "$srcdir"/pio
+	"$srcdir"/pio/bin/pip install -q --no-cache-dir platformio==$_pio
+	PATH="$srcdir/pio/bin:$PATH" PLATFORMIO_CORE_DIR="$srcdir"/pio-core HOME="$srcdir" \
+		JOBS="${JOBS:-$(nproc)}" sh "$builddir"/compile.sh "$builddir" "$builddir"/tsx-panel-app
+}
+
+package() {
+	install -Dm755 "$builddir"/tsx-panel-app "$pkgdir"/usr/local/bin/tsx-panel-app
+	install -Dm644 "$builddir"/BUILDINFO "$pkgdir"/usr/local/share/tsx/panel-app/BUILDINFO.xx50
+}
+
+sha512sums="
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-panel-app-src-0.3.0.tar.gz
+"
