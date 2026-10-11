@@ -6,7 +6,7 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-ha
-pkgver=0.3.0
+pkgver=0.3.4
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -20,7 +20,9 @@ license="GPL-2.0-or-later"
 # tensorflow-lite-c 2.17.1-r1 is the first build that is equal to the pinned
 # library of the board repository (rootfs/voice/tflite/SHA256SUMS of
 # tsx-xx60-linux). Older builds hold the path of their build folder.
-depends="tsx-base tsx-kiosk tsx-setup alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
+# The Backlight number in percent needs `brightness-pct` of tsx-panelctl
+# (tsx-base 0.3.4). The setup plugin has the field HA_URL (tsx-setup 0.3.4).
+depends="tsx-base>=0.3.4 tsx-kiosk tsx-setup>=0.3.4 alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
 	mosquitto-clients mpv-libs py3-aiohappyeyeballs py3-cryptography py3-mpv py3-numpy
 	py3-protobuf py3-tzlocal py3-zeroconf python3 sendspin-cli tensorflow-lite-c>=2.17.1-r1"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
@@ -43,5 +45,5 @@ package() {
 }
 
 sha512sums="
-3344771e00d901ffd0873444c33bc9b8838e2c70ea35b477e527b7118de5d20cdde81b7e38761dcfdbc722e5bfb9a125b875a295c05d2f86d499a426a2bfec9a  tsx-linux-common-0.3.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.4.tar.gz
 "
