@@ -69,7 +69,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
   1. Publish one more `tsx-xx60-wlroots0.20` with a higher `pkgrel`. It has no files and no `provides` or `replaces`, and it depends on `wlroots0.20>=<the fixed Alpine version>`. On the next `apk upgrade`, the panels install the Alpine package.
   2. Remove `tsx-xx60-wlroots0.20` from `rootfs/packages-tsx.txt` in tsx-xx60-linux.
   3. After all panels have upgraded, remove the package from the panels (`apk del tsx-xx60-wlroots0.20`) and remove its directory here.
-- `xx50/tsx-xx50-board` is the board layer of the xx50 panels (the files of `rootfs/overlay` of tsx-xx50-linux that the board owns), with `tsx-kernel-slots` and `tsx-boot-ok`. It has `arch=noarch`.
+- `xx50/tsx-xx50-board` is the board layer of the xx50 panels (the files of `rootfs/overlay` of tsx-xx50-linux that the board owns), with `tsx-kernel-slots` and `tsx-boot-ok`. It depends on `tsx-autoupdate`, and its install scripts add the automatic update to the default runlevel. It has `arch=noarch`.
 - `xx50/tsx-xx50-panel-app` is the panel app program of the xx50 panels. `abuild` compiles it from the panel app source archive of a tsx-xx50-linux release: the C++ project that ESPHome writes. The build installs PlatformIO with pip in `$srcdir`, and PlatformIO downloads the libraries that the project names with exact versions. So the recipe has `options="net"`.
 - `xx50/tsx-xx50-kernel-lts` is a BINARY package of the xx50 kernel (see "Kernel packages" below). Its install hook writes the kernel into the normal raw slots of the boot card with `tsx-kernel-slots`.
 
