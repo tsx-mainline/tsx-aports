@@ -7,8 +7,9 @@
 # _kbundle_tag. The job "kernel" of .github/workflows/release.yml of that
 # repo builds it from kernel/KERNEL_REV. The bundle holds the uImage (zImage
 # with the board DTB appended), the uInitrd (the ramdisk with the boot
-# splash), the DTB, the modules tarball, kernel.release, kernel.commit and
-# CHECKSUMS.sha256.
+# splash and the start of the rescue system), the rescue system
+# tsx-xx50-rescue.img (from v0.3.3 on), the DTB, the modules tarball,
+# kernel.release, kernel.commit and CHECKSUMS.sha256.
 #
 # The xx50 boots from raw slots of its SD card, not from a file. The
 # post-install and post-upgrade scripts run "tsx-kernel-slots write"
@@ -18,7 +19,10 @@
 # keep the last kernel that is known to boot: U-Boot boots them after two
 # failed boots of the normal slots. After good boots of the new kernel,
 # "tsx-kernel-slots promote" copies it to the golden slots. The hooks never
-# write the golden slots.
+# write the golden slots. They also write /boot/tsx-xx50-rescue-lts.img into
+# the rescue slot ("tsx-kernel-slots rescue", tsx-xx50-board 0.3.3 or later),
+# only when the slot content differs. After a boot of the golden slots the
+# ramdisk starts this rescue system.
 #
 # pkgver scheme: <upstream kernel version>_git<YYYYMMDD of the kernel commit>.
 # _kernelrelease is the name of the module folder (the kernel config sets no
@@ -27,16 +31,17 @@
 # run `abuild checksum`.
 pkgname=tsx-xx50-kernel-lts
 pkgver=6.18.54_git20261010
-pkgrel=0
+pkgrel=1
 _kernelrelease=6.18.54-tsx-xx50
 # The tsx-xx50-linux release tag whose kernel bundle this package pins.
-_kbundle_tag=v0.3.1
+_kbundle_tag=v0.3.3
 pkgdesc="xx50 mainline kernel, longterm (LTS) line"
 url="https://github.com/tsx-mainline/tsx-xx50-linux"
 arch="armv7"
 license="GPL-2.0-only"
-# tsx-kernel-slots of tsx-xx50-board 0.3.1 writes only the normal slots.
-depends="tsx-xx50-board>=0.3.1"
+# tsx-kernel-slots of tsx-xx50-board 0.3.3 writes only the normal slots and
+# the rescue slot.
+depends="tsx-xx50-board>=0.3.3"
 options="!check"
 install="$pkgname.post-install $pkgname.post-upgrade"
 source="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/$_kbundle_tag/tsx-xx50-kernel-lts-bundle.tar.zst"
@@ -47,6 +52,7 @@ package() {
 	[ "$(cat kernel.release)" = "$_kernelrelease" ] || { echo "kernel.release is $(cat kernel.release), not $_kernelrelease" >&2; return 1; }
 	install -Dm644 uImage "$pkgdir"/boot/uImage-lts
 	install -Dm644 uInitrd "$pkgdir"/boot/uInitrd-lts
+	install -Dm644 tsx-xx50-rescue.img "$pkgdir"/boot/tsx-xx50-rescue-lts.img
 	install -Dm644 imx53-crestron-tss752.dtb "$pkgdir"/boot/imx53-crestron-tss752-lts.dtb
 	mkdir -p "$pkgdir"/usr/share/tsx "$pkgdir"/lib/modules
 	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-lts.release
@@ -62,5 +68,5 @@ package() {
 }
 
 sha512sums="
-6544b5d3f3594956af943c02f14327a2d2b8c4571aeb1e8abaef93d84ed293974e1da8832528323ec9898b4a40e994a5caea34b1450d3160df9d79d081b06d56  tsx-xx50-kernel-lts-bundle.tar.zst
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-kernel-lts-bundle.tar.zst
 "

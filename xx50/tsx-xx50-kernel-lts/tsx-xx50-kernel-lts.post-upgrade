@@ -1,8 +1,9 @@
 #!/bin/sh
-# Write the kernel into the normal slots of the boot card, but only on a
-# TSS-752 that runs from its card (not in an image build or a chroot). The
-# golden slots keep the last good kernel ("tsx-kernel-slots promote" copies
-# the new kernel there after good boots).
+# Write the kernel into the normal slots of the boot card and the rescue
+# system into the rescue slot, but only on a TSS-752 that runs from its card
+# (not in an image build or a chroot). The golden slots keep the last good
+# kernel ("tsx-kernel-slots promote" copies the new kernel there after good
+# boots).
 tr '\0' '\n' < /proc/device-tree/compatible 2>/dev/null | grep -qx 'crestron,tss752' || exit 0
 [ -b /dev/mmcblk0 ] || exit 0
 if /usr/local/sbin/tsx-kernel-slots write /boot/uImage-lts /boot/uInitrd-lts; then
@@ -11,5 +12,9 @@ else
 	echo "tsx-xx50-kernel-lts: ERROR: the kernel slots are not written. Run" >&2
 	echo "  tsx-kernel-slots write /boot/uImage-lts /boot/uInitrd-lts" >&2
 	echo "before a reboot." >&2
+fi
+if ! /usr/local/sbin/tsx-kernel-slots rescue /boot/tsx-xx50-rescue-lts.img; then
+	echo "tsx-xx50-kernel-lts: ERROR: the rescue slot is not written. Run" >&2
+	echo "  tsx-kernel-slots rescue /boot/tsx-xx50-rescue-lts.img" >&2
 fi
 exit 0

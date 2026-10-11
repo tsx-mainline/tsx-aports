@@ -3,7 +3,8 @@
 # Board layer of the xx50 panels (TSS-752): the board file, the hardware
 # facts, the CPU governor, the touch controller mode, the watchdog settings,
 # the GPU module, the serial login, the front keys, the kernel slot writer,
-# the good-boot service of the stock U-Boot (tsx-boot-ok) and the board part
+# the good-boot service of the stock U-Boot (tsx-boot-ok), the start of the
+# rescue system (tsx-boot-rescue) and the board part
 # of the panel app (its environment and the default layout). It pulls in the
 # automatic update (tsx-autoupdate 0.3.2 or later: the idle screen and the
 # health check of the panel app) and adds its service to the default
@@ -15,15 +16,15 @@
 # sha512sums holds the sum of the archive. After a new tag, run
 # `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-xx50-board
-pkgver=0.3.2
+pkgver=0.3.3
 pkgrel=0
-pkgdesc="TSX xx50 board layer: board file, hardware facts, governor, touch mode, watchdog, keys, kernel slots, panel app board part"
+pkgdesc="TSX xx50 board layer: board file, hardware facts, governor, touch mode, watchdog, keys, kernel slots, rescue start, panel app board part"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
 license="GPL-2.0-or-later"
 # tsx-touch writes two registers of the touch controller with i2cset.
 # tsx-boot-ok writes the retry counters of the U-Boot env with fw_setenv.
-depends="busybox kmod i2c-tools u-boot-tools tsx-autoupdate>=0.3.2"
+depends="busybox kmod i2c-tools u-boot-tools tsx-autoupdate>=0.3.3"
 install="$pkgname.post-install $pkgname.post-upgrade"
 # /etc/securetty replaces the one of busybox (the Alpine list plus the serial
 # console of the board). /etc/conf.d/watchdog replaces the one of
@@ -50,6 +51,7 @@ etc/tsx/panel-board.conf
 etc/tsx/panel-layout.json
 usr/local/lib/tsx/board.sh
 usr/local/sbin/tsx-boot-ok
+usr/local/sbin/tsx-boot-rescue
 usr/local/sbin/tsx-hw
 usr/local/sbin/tsx-kernel-slots
 "
@@ -65,5 +67,5 @@ package() {
 }
 
 sha512sums="
-3880045642cff781bb922154c0883d6fd8ec80a0702ed3fc77d0a7a92cdc2f4b0e99aea768bcddab56cd68abc0ecbcd074f464e567cb1f8d039e1457734a94ca  tsx-xx50-linux-0.3.2.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-linux-0.3.3.tar.gz
 "

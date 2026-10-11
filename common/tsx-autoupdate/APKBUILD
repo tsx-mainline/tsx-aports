@@ -6,7 +6,7 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-autoupdate
-pkgver=0.3.2
+pkgver=0.3.3
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -27,5 +27,5 @@ package() {
 }
 
 sha512sums="
-3472ab95c1d2018199934cd4d2edf8670e7df2ba685acea8a6471d326811808d6d35873b0aad0ce7e9624e7bd409af331781f098ace44800e7d93288d30e2196  tsx-linux-common-0.3.2.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.3.tar.gz
 "
