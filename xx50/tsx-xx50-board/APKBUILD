@@ -18,7 +18,7 @@
 pkgname=tsx-xx50-board
 pkgver=0.3.3
 pkgrel=0
-pkgdesc="TSX xx50 board layer: board file, hardware facts, governor, touch mode, watchdog, keys, kernel slots, rescue start, panel app board part"
+pkgdesc="TSX xx50 board layer: board file, hardware facts, governor, touch, watchdog, keys, kernel slots, rescue start, panel app part"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
 license="GPL-2.0-or-later"

@@ -103,7 +103,7 @@ To release a new version of a package:
 3. Run `scripts/build.sh <PKGDIR>` (it writes the new `sha512sums`).
 4. Commit the recipe.
 
-`scripts/tests/test-sources.sh` checks each recipe. Each `source=` that has a URL needs a sum, and a `_kbundle_tag` must name a release.
+`scripts/tests/test-sources.sh` checks each recipe. Each `source=` that has a URL needs a sum, a `_kbundle_tag` must name a release, and a `pkgdesc` has at most 128 characters (abuild refuses a longer one).
 
 ## Signing key
 

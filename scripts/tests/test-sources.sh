@@ -10,6 +10,8 @@
 #   4. scripts/pin-kernel.sh, against a local server with a fixture bundle:
 #      it writes the three values, and it refuses a bundle with a wrong
 #      kernel.release, a wrong CHECKSUMS.sha256 and a missing release.
+#   0. The pkgdesc of each recipe has at most 128 characters (abuild refuses a
+#      longer one: "pkgdesc is too long").
 #   5. A recipe that keeps the file modes of a tag archive (cp -a or
 #      stat -c %a) clears the group and other write bits. A kernel package
 #      gives its module tree to root.
@@ -32,6 +34,7 @@ recipe_vars() {
 		. "$1/APKBUILD" >/dev/null 2>&1
 		echo "pkgname $pkgname"
 		echo "pkgver $pkgver"
+		echo "pkgdesclen ${#pkgdesc}"
 		echo "builddir ${builddir:-$srcdir/$pkgname-$pkgver}"
 		echo "kbundle ${_kbundle_tag:-}"
 		echo "kernelrelease ${_kernelrelease:-}"
@@ -68,7 +71,9 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
 		kbundle) KB=$a;;
 		kernelrelease) KR=$a;;
 		pkgver) PV=$a;;
+		pkgdesclen) DL=$a;;
 	esac; done <<<"$V"
+	[ "${DL:-0}" -le 128 ] && ok "$P: pkgdesc has $DL characters" || bad "$P: pkgdesc has $DL characters, abuild accepts 128"
 	[ -n "$NAMES" ] || continue
 	MISSING=; for n in $NAMES; do case " $SUMS " in *" $n "*) ;; *) MISSING="$MISSING $n";; esac; done
 	EXTRA=; for n in $SUMS; do case " $NAMES " in *" $n "*) ;; *) EXTRA="$EXTRA $n";; esac; done
