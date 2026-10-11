@@ -9,9 +9,16 @@
 # dependencies ArduinoJson, micro-flac, micro-opus, and IXWebSocket are
 # statically linked. CMake fetches them (FetchContent) at configure time, so
 # the build needs network access: options="net".
+#
+# player-volume.patch (written for upstream): the subcommands player-vol and
+# player-mute set the player volume and mute of this endpoint over the control
+# socket (the server is told through client/state), and --volume-file
+# publishes the applied volume and mute in a file (mode 0644) at each change.
+# The panel volume of tsx-panelctl and the panel app use them when the
+# Sendspin player runs (docs/sendspin.md of tsx-linux-common).
 pkgname=sendspin-cli
 pkgver=0.3.0
-pkgrel=0
+pkgrel=1
 pkgdesc="Sendspin CLI client (C++)"
 url="https://github.com/Sendspin/sendspin-cpp-cli"
 arch="armv7 aarch64"
@@ -19,7 +26,9 @@ license="MIT"
 depends="alsa-lib avahi avahi-compat-libdns_sd dbus"
 makedepends="build-base cmake samurai git linux-headers alsa-lib-dev avahi-compat-libdns_sd avahi-dev"
 options="net !check"
-source="$pkgname-$pkgver.tar.gz::https://github.com/Sendspin/sendspin-cpp-cli/archive/refs/tags/v$pkgver.tar.gz"
+source="$pkgname-$pkgver.tar.gz::https://github.com/Sendspin/sendspin-cpp-cli/archive/refs/tags/v$pkgver.tar.gz
+	player-volume.patch
+	"
 builddir="$srcdir/sendspin-cpp-cli-$pkgver"
 
 build() {
@@ -47,4 +56,5 @@ package() {
 
 sha512sums="
 d05582b720f59ea104a09c7cfe46140c46545c4634aacd8fef31a62813e8ea8f46f090707ab84e4b35a51e7eb804784243c3fa96a3c0416ad98d1e2100c08a13  sendspin-cli-0.3.0.tar.gz
+459ef684c156b589c2d3d0487224d3f451e86278461774700acd82c7ec01fa0cb7e51886e7fdfb6a1614176c297cbd46bdbe9ddd8bc16bc002b930d6d7c4fc65  player-volume.patch
 "

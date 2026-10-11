@@ -50,7 +50,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 ## Packages
 
 - `common/tsx-keys` installs the public signing key of this repo into `/etc/apk/keys`. It has `arch=noarch`.
-- `common/sendspin-cli` builds sendspin-cli from source, at a pinned tag.
+- `common/sendspin-cli` builds sendspin-cli from source, at a pinned tag, with one patch (`player-volume.patch`, written for upstream). The patch adds the subcommands `player-vol` and `player-mute` and the option `--volume-file`. With them, the player volume is the volume of the panel (tsx-linux-common `docs/sendspin.md`, "Audio and volume").
 - `common/tsx-sendspin` is the Sendspin player service of tsx-linux-common (`sendspin/`): the service, its settings and the key `SENDSPIN` of `tsx-config`. It depends on `sendspin-cli` and `tsx-base` only, so any panel with a sound card can install it. `tsx-ha` depends on it. Up to 0.3.4 `tsx-ha` held these files (`replaces="tsx-ha"`). Its install scripts make the user `tsx-sendspin`. It has `arch=noarch`.
 - `xx60/tsx-xx60-boot-tools` contains these parts:
   - `tsx-update-boot` (a copy of `installer/emmc/tsx-update-boot` in tsx-xx60-linux).

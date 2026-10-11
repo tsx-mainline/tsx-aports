@@ -1,0 +1,731 @@
+From f3a180df4bd3dce538997985bdfc4cfc493b2b8a Mon Sep 17 00:00:00 2001
+From: unex <7575866+unex@users.noreply.github.com>
+Date: Sun, 11 Oct 2026 14:02:20 -0600
+Subject: [PATCH] control: player-vol, player-mute and --volume-file
+
+The control socket could only ask the server for the *group* volume
+and mute. A device that embeds this player and has its own volume
+control (a panel slider, a knob) had no way to set this endpoint's own
+output level, and no way to show a level the server changed.
+
+Add two locally answered subcommands:
+
+  player-vol <0-100>   apply this endpoint's own volume
+  player-mute on|off   apply this endpoint's own mute
+
+Like a server's player command, they set the sink, persist the pair in
+the state store, and go out to the server in client/state through
+PlayerRole::update_volume() / update_muted(), so the server and every
+controller show the new figure. They are never refused: a disconnected
+player applies them and reports them at the next handshake. `status`
+marks such a volume "(set on this host)".
+
+Add --volume-file <path> (config key volume-file): the player writes
+its applied volume and mute there at start and on every change, from a
+server or from player-vol / player-mute, in the state file's
+`key = value` format, mode 0644, replaced atomically. A local display
+can follow the volume without access to the 0600 control socket and
+without polling `status`. The atomic write is shared with the state
+store.
+---
+ docs/wiki/Configuration.md          |  1 +
+ docs/wiki/Controlling-the-Player.md | 36 +++++++++++-
+ src/audio_sink.h                    |  1 +
+ src/cli.cpp                         | 23 +++++++-
+ src/cli.h                           |  4 ++
+ src/control.h                       | 12 +++-
+ src/control_common.cpp              | 15 ++++-
+ src/main.cpp                        | 15 ++++-
+ src/player_listener.cpp             | 51 +++++++++++++++++
+ src/player_listener.h               | 21 +++++++
+ src/state_store.cpp                 | 85 ++++++++++++++++++-----------
+ src/state_store.h                   |  5 ++
+ tests/control_test.cpp              | 50 +++++++++++++++++
+ tests/state_store_test.cpp          | 29 ++++++++++
+ 14 files changed, 305 insertions(+), 43 deletions(-)
+
+diff --git a/docs/wiki/Configuration.md b/docs/wiki/Configuration.md
+index b04c5c7..b2d5683 100644
+--- a/docs/wiki/Configuration.md
++++ b/docs/wiki/Configuration.md
+@@ -62,6 +62,7 @@ already does that.
+ | `control-socket` | `--control-socket` | the Unix socket the subcommands talk to | `$XDG_RUNTIME_DIR/sendspin-cli-<port>.sock` |
+ | `no-control` | `--no-control` | `true`/`false` — bind no control socket at all | `false` |
+ | `state-dir` | `--state-dir` | where the player keeps what it remembers | `$XDG_STATE_HOME/sendspin-cli` |
++| `volume-file` | `--volume-file` | publish the applied player volume and mute here, mode `0644`, on every change | none |
+ | `hook-start` | `--hook-start` | a shell command run when a stream starts — an amplifier relay, a light | none |
+ | `hook-stop` | `--hook-stop` | the same, when a stream stops | none |
+ | `log-level` | `-d`, `--log-level` | `none`, `error`, `warn`, `info`, `debug`, `verbose` | `info` |
+diff --git a/docs/wiki/Controlling-the-Player.md b/docs/wiki/Controlling-the-Player.md
+index 1eed59f..cd59383 100644
+--- a/docs/wiki/Controlling-the-Player.md
++++ b/docs/wiki/Controlling-the-Player.md
+@@ -47,11 +47,41 @@ is also what lets `seek-rel -5000` be an offset rather than a flag cluster.
+ | `repeat` | `off\|one\|all` | set the repeat mode |
+ | `shuffle` | `on\|off` | turn shuffle on or off |
+ | `switch` | | move this player through the groups available to it |
++| `player-vol` | `<0-100>` | this endpoint's own output volume — **answered locally**, then reported to the server |
++| `player-mute` | `on\|off` | mute or unmute this endpoint's own output — **answered locally**, then reported to the server |
+ | `delay` | `<0-5000>` | this endpoint's static delay — **answered locally** |
+ 
+-Twelve of those go out to the server as `controller@v1` commands. Two never leave the host:
+-`status`, formatted from the daemon's own view, and `delay`, which drives this endpoint's
+-own player role.
++Twelve of those go out to the server as `controller@v1` commands. Four never leave the host
++as commands: `status`, formatted from the daemon's own view, and `delay`, `player-vol` and
++`player-mute`, which drive this endpoint's own player role.
++
++## The player's own volume
++
++`vol` and `mute` ask the server to change the group. `player-vol` and `player-mute` change
++only this box, the way a volume knob on the device would: the gain is applied at once,
++remembered across restarts like a server-set volume, and the player reports it to the server
++in its `client/state`, so the server and every controller show the new figure. With no server
++connected the change still applies, and the next handshake reports it. `status` then says
++`player volume: 40 (set on this host)` until a server sets it again.
++
++```console
++$ sendspin-cli player-vol 40
++$ sendspin-cli player-mute on
++```
++
++**`--volume-file <path>`** is the other direction: the player writes its applied volume and
++mute to `<path>` at start and on every change, whoever made it — a server, an announcement
++that raises and then restores the volume, or `player-vol`. It is the state file's format, at
++mode `0644` so a local display or panel can read it without access to the control socket,
++replaced atomically, so a reader never sees half a file:
++
++```text
++# Written by sendspin-cli. Edits are overwritten.
++volume = 40
++muted = false
++```
++
++Put it on a tmpfs (`/run`), since it changes as often as the volume does.
+ 
+ ## Three that are easy to misread
+ 
+diff --git a/src/audio_sink.h b/src/audio_sink.h
+index 96f569e..25b4efb 100644
+--- a/src/audio_sink.h
++++ b/src/audio_sink.h
+@@ -55,6 +55,7 @@ enum class VolumeSource {
+     SinkDefault,  ///< nothing has set it: DEFAULT_SINK_VOLUME, unmuted
+     Restored,     ///< read back from the state store at startup
+     Server,       ///< a server sent a volume or mute command this run
++    Local,        ///< `player-vol` or `player-mute` set it on this host this run
+ };
+ 
+ /// The parameters configure() takes, as one value.
+diff --git a/src/cli.cpp b/src/cli.cpp
+index 2b9445c..b7db8b7 100644
+--- a/src/cli.cpp
++++ b/src/cli.cpp
+@@ -59,6 +59,7 @@ enum LongOnly {
+     OPT_CONTROL_SOCKET,
+     OPT_NO_CONTROL,
+     OPT_STATE_DIR,
++    OPT_VOLUME_FILE,
+     OPT_CONFIG,
+     OPT_HOOK_START,
+     OPT_HOOK_STOP,
+@@ -94,6 +95,7 @@ const std::vector<SettableOption>& settable_options() {
+         {Opt::ControlSocket, "control-socket", "--control-socket"},
+         {Opt::NoControl, "no-control", "--no-control"},
+         {Opt::StateDir, "state-dir", "--state-dir"},
++        {Opt::VolumeFile, "volume-file", "--volume-file"},
+         {Opt::HookStart, "hook-start", "--hook-start"},
+         {Opt::HookStop, "hook-stop", "--hook-stop"},
+         {Opt::ClientId, "id", "--id"},
+@@ -342,6 +344,12 @@ bool apply_option(const SettableOption& option, const std::string& value, Option
+             }
+             out.state_dir = value;
+             break;
++        case Opt::VolumeFile:
++            if (empty_value()) {
++                return false;
++            }
++            out.volume_file = value;
++            break;
+         case Opt::HookStart:
+             if (empty_value()) {
+                 return false;
+@@ -527,6 +535,7 @@ bool parse_options(int argc, char* argv[], Options& out, std::FILE* err) {
+         {"control-socket", required_argument, nullptr, OPT_CONTROL_SOCKET},
+         {"no-control", no_argument, nullptr, OPT_NO_CONTROL},
+         {"state-dir", required_argument, nullptr, OPT_STATE_DIR},
++        {"volume-file", required_argument, nullptr, OPT_VOLUME_FILE},
+         {"hook-start", required_argument, nullptr, OPT_HOOK_START},
+         {"hook-stop", required_argument, nullptr, OPT_HOOK_STOP},
+         {"id", required_argument, nullptr, OPT_ID},
+@@ -660,6 +669,9 @@ bool parse_options(int argc, char* argv[], Options& out, std::FILE* err) {
+             case OPT_STATE_DIR:
+                 apply(Opt::StateDir, optarg);
+                 break;
++            case OPT_VOLUME_FILE:
++                apply(Opt::VolumeFile, optarg);
++                break;
+             case OPT_HOOK_START:
+                 apply(Opt::HookStart, optarg);
+                 break;
+@@ -803,7 +815,7 @@ bool parse_options(int argc, char* argv[], Options& out, std::FILE* err) {
+             Opt::Device,    Opt::Name,         Opt::Server,      Opt::Daemonize,   Opt::Pidfile,
+             Opt::Logfile,   Opt::LogLevel,     Opt::BufferMs,    Opt::NoMdns,      Opt::MdnsName,
+             Opt::NoControl, Opt::StateDir,     Opt::StaticDelay, Opt::HookStart,   Opt::HookStop,
+-            Opt::ClientId,  Opt::Manufacturer, Opt::ProductName, Opt::AudioFormat,
++            Opt::ClientId,  Opt::Manufacturer, Opt::ProductName, Opt::AudioFormat, Opt::VolumeFile,
+         };
+         for (Opt opt : DAEMON_ONLY) {
+             if (out.was_given(opt)) {
+@@ -841,6 +853,9 @@ bool parse_options(int argc, char* argv[], Options& out, std::FILE* err) {
+         if (out.was_given(Opt::StateDir)) {
+             out.state_dir = absolute_path(out.state_dir);
+         }
++        if (out.was_given(Opt::VolumeFile)) {
++            out.volume_file = absolute_path(out.volume_file);
++        }
+     }
+ 
+     if (out.name.empty()) {
+@@ -1011,6 +1026,12 @@ void print_usage(std::FILE* out, const char* prog) {
+     std::fprintf(out, "                unit has neither, so pair StateDirectory= with this\n");
+     std::fprintf(out, "                flag; with none of the three the player still runs and\n");
+     std::fprintf(out, "                simply remembers nothing\n");
++    std::fprintf(out, "  --volume-file <path>\n");
++    std::fprintf(out, "                Publish this player's applied volume and mute to <path>\n");
++    std::fprintf(out, "                as 'volume = N' and 'muted = true|false' lines, mode\n");
++    std::fprintf(out, "                0644, replaced atomically at start and on every change,\n");
++    std::fprintf(out, "                whether a server or player-vol / player-mute made it.\n");
++    std::fprintf(out, "                For a local volume display; put it on a tmpfs\n");
+     std::fprintf(out, "  --manufacturer <text>\n");
+     std::fprintf(out, "  --product-name <text>\n");
+     std::fprintf(out, "                The device info client/hello carries, shown in server\n");
+diff --git a/src/cli.h b/src/cli.h
+index 9fa5584..a554fb2 100644
+--- a/src/cli.h
++++ b/src/cli.h
+@@ -73,6 +73,7 @@ enum class Opt : unsigned {
+     ControlSocket,  ///< --control-socket
+     NoControl,      ///< --no-control
+     StateDir,       ///< --state-dir
++    VolumeFile,     ///< --volume-file
+     Config,         ///< --config
+     HookStart,      ///< --hook-start
+     HookStop,       ///< --hook-stop
+@@ -129,6 +130,9 @@ struct Options {
+     /// --state-dir <dir>: where remembered state lives; empty uses state_store_path()'s search.
+     std::string state_dir;
+ 
++    /// --volume-file <path>: where to publish the applied volume and mute; empty publishes none.
++    std::string volume_file;
++
+     /// --config's value, then the config file actually read; empty when none.
+     std::string config_path;
+ 
+diff --git a/src/control.h b/src/control.h
+index bd6864f..22d96e1 100644
+--- a/src/control.h
++++ b/src/control.h
+@@ -50,7 +50,7 @@ inline constexpr int64_t CONTROL_IDLE_TIMEOUT_MS = 5000;
+ /// Spec bound for static delay; sendspin-cpp silently clamps past it, so refuse at parse time.
+ inline constexpr uint16_t MAX_STATIC_DELAY_MS = 5000;
+ 
+-/// Every request a subcommand can make: controller@v1 commands plus the locally answered two.
++/// Every request a subcommand can make: controller@v1 commands plus the locally answered ones.
+ enum class ControlCommand : uint8_t {
+     Status,  ///< answered locally from the daemon's own state
+     Play,
+@@ -66,6 +66,12 @@ enum class ControlCommand : uint8_t {
+     Shuffle,
+     Switch,
+ 
++    /// Answered locally: this endpoint's own output volume, which the server is then told.
++    PlayerVolume,
++
++    /// Answered locally: this endpoint's own mute, which the server is then told.
++    PlayerMute,
++
+     /// Answered locally: this endpoint's own static delay.
+     /// Keep last: EveryCommandInTheEnumHasARow walks the enum up to here.
+     Delay,
+@@ -105,8 +111,8 @@ std::string control_subcommand_list();
+ /// What one subcommand invocation asks for; only the field the command uses is set.
+ struct ControlRequest {
+     ControlCommand command{ControlCommand::Status};
+-    std::optional<uint8_t> volume{};                       ///< `vol`, 0-100
+-    std::optional<bool> flag{};                            ///< `mute` and `shuffle`, on|off
++    std::optional<uint8_t> volume{};                       ///< `vol` and `player-vol`, 0-100
++    std::optional<bool> flag{};                            ///< `mute`, `player-mute`, `shuffle`
+     std::optional<uint32_t> position_ms{};                 ///< `seek`
+     std::optional<int32_t> offset_ms{};                    ///< `seek-rel`
+     std::optional<sendspin::SendspinRepeatMode> repeat{};  ///< `repeat`
+diff --git a/src/control_common.cpp b/src/control_common.cpp
+index 950c0a8..ce2606d 100644
+--- a/src/control_common.cpp
++++ b/src/control_common.cpp
+@@ -172,6 +172,8 @@ const char* volume_source_note(VolumeSource source) {
+             return " (remembered from an earlier run; no server has set it)";
+         case VolumeSource::Server:
+             return "";
++        case VolumeSource::Local:
++            return " (set on this host)";
+         case VolumeSource::SinkDefault:
+             break;
+     }
+@@ -200,6 +202,13 @@ const std::vector<ControlSubcommand>& control_subcommands() {
+         {"switch", ControlCommand::Switch, 0, nullptr,
+          "Move this player through the groups available to it. Not a source selector: per the "
+          "spec's switch cycle it re-homes this client between groups"},
++        {"player-vol", ControlCommand::PlayerVolume, 1, "<0-100>",
++         "Set *this* endpoint's own output volume, as a server's player volume command would. "
++         "Answered locally, remembered across restarts, and reported to the server, which sees "
++         "it as this player's new volume"},
++        {"player-mute", ControlCommand::PlayerMute, 1, ON_OFF,
++         "Mute or unmute *this* endpoint's own output. Answered locally, remembered across "
++         "restarts, and reported to the server"},
+         {"delay", ControlCommand::Delay, 1, "<0-5000>",
+          "Tell *this* endpoint how much latency its hardware adds after the audio port -- an "
+          "amplifier, an external speaker. The player then hands audio over that much earlier, so "
+@@ -286,7 +295,8 @@ bool parse_control_request(const std::string& name, const std::vector<std::strin
+     };
+ 
+     switch (subcommand->command) {
+-        case ControlCommand::Volume: {
++        case ControlCommand::Volume:
++        case ControlCommand::PlayerVolume: {
+             uint64_t volume = 0;
+             if (!parse_unsigned(value, 100, volume)) {
+                 return reject("a volume from 0 to 100");
+@@ -305,6 +315,7 @@ bool parse_control_request(const std::string& name, const std::vector<std::strin
+             return true;
+         }
+         case ControlCommand::Mute:
++        case ControlCommand::PlayerMute:
+         case ControlCommand::Shuffle: {
+             bool flag = false;
+             if (!parse_on_off(value, flag)) {
+@@ -400,6 +411,8 @@ std::optional<SendspinControllerCommand> protocol_command(const ControlRequest&
+         case ControlCommand::Status:
+             return std::nullopt;
+         case ControlCommand::Delay:
++        case ControlCommand::PlayerVolume:
++        case ControlCommand::PlayerMute:
+             // Set on the player role, which republishes client/state itself.
+             return std::nullopt;
+         case ControlCommand::Play:
+diff --git a/src/main.cpp b/src/main.cpp
+index f864522..00eefc1 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -269,7 +269,7 @@ public:
+     /// Every reference must outlive this dispatcher, which in main() they all do.
+     ControlDispatcher(const Options& opts, sendspin::SendspinClient& client,
+                       sendspin::ControllerRole& controller, sendspin::MetadataRole& metadata,
+-                      const MetadataLogger& metadata_logger, const PlayerListener& player_listener,
++                      const MetadataLogger& metadata_logger, PlayerListener& player_listener,
+                       sendspin::PlayerRole& player, const AudioSink& sink)
+         : opts_(opts),
+           client_(client),
+@@ -314,6 +314,16 @@ public:
+             return encode_control_reply(ControlStatus::Ok, "", "");
+         }
+ 
++        // Handled locally: the listener applies, persists and reports to the server.
++        if (request.command == ControlCommand::PlayerVolume) {
++            this->player_listener_.set_local_volume(request.volume.value_or(DEFAULT_SINK_VOLUME));
++            return encode_control_reply(ControlStatus::Ok, "", "");
++        }
++        if (request.command == ControlCommand::PlayerMute) {
++            this->player_listener_.set_local_muted(request.flag.value_or(false));
++            return encode_control_reply(ControlStatus::Ok, "", "");
++        }
++
+         log_line(LogLevel::DEBUG, LOG_TAG_CONTROL, "Sending '%s'",
+                  encode_control_request(request).c_str());
+         this->controller_.send_command(to_client_command(request));
+@@ -384,7 +394,7 @@ private:
+     sendspin::ControllerRole& controller_;
+     sendspin::MetadataRole& metadata_;
+     const MetadataLogger& metadata_logger_;
+-    const PlayerListener& player_listener_;
++    PlayerListener& player_listener_;
+     /// Non-const only for `delay`.
+     sendspin::PlayerRole& player_;
+     const AudioSink& sink_;
+@@ -663,6 +673,7 @@ int main(int argc, char* argv[]) {
+     }
+     player.update_volume(volume);
+     player.update_muted(muted);
++    player_listener.set_volume_file(opts.volume_file);
+ 
+     if (!client.start()) {
+         log_fatal(LOG_TAG, "could not start the Sendspin server on port %u", opts.port);
+diff --git a/src/player_listener.cpp b/src/player_listener.cpp
+index be054e9..9fa29d7 100644
+--- a/src/player_listener.cpp
++++ b/src/player_listener.cpp
+@@ -98,6 +98,7 @@ void PlayerListener::on_volume_changed(uint8_t volume) {
+     this->applied_volume_ = volume;
+     this->volume_source_ = VolumeSource::Server;
+     this->persist_volume();
++    this->publish_volume();
+ }
+ 
+ void PlayerListener::on_mute_changed(bool muted) {
+@@ -105,6 +106,35 @@ void PlayerListener::on_mute_changed(bool muted) {
+     this->applied_muted_ = muted;
+     this->volume_source_ = VolumeSource::Server;
+     this->persist_volume();
++    this->publish_volume();
++}
++
++void PlayerListener::set_local_volume(uint8_t volume) {
++    this->sink_.set_volume(volume);
++    this->applied_volume_ = volume;
++    this->volume_source_ = VolumeSource::Local;
++    this->persist_volume();
++    this->publish_volume();
++    // Publishes client/state, so the server learns the new volume; no-op while disconnected,
++    // and the next handshake reports it then.
++    this->player_.update_volume(volume);
++    cli_log(LogLevel::INFO, "Player volume set to %u locally", static_cast<unsigned>(volume));
++}
++
++void PlayerListener::set_local_muted(bool muted) {
++    this->sink_.set_muted(muted);
++    this->applied_muted_ = muted;
++    this->volume_source_ = VolumeSource::Local;
++    this->persist_volume();
++    this->publish_volume();
++    this->player_.update_muted(muted);
++    cli_log(LogLevel::INFO, "Player %s locally", muted ? "muted" : "unmuted");
++}
++
++void PlayerListener::set_volume_file(const std::string& path) {
++    this->volume_file_ = path;
++    this->published_volume_.reset();
++    this->publish_volume();
+ }
+ 
+ void PlayerListener::on_static_delay_changed(uint16_t delay_ms) {
+@@ -117,6 +147,7 @@ void PlayerListener::restore_volume(uint8_t volume, bool muted) {
+     this->applied_volume_ = volume;
+     this->applied_muted_ = muted;
+     this->volume_source_ = VolumeSource::Restored;
++    this->publish_volume();
+ }
+ 
+ void PlayerListener::persist_volume() const {
+@@ -126,4 +157,24 @@ void PlayerListener::persist_volume() const {
+     this->store_->set_volume_and_muted(this->applied_volume_, this->applied_muted_);
+ }
+ 
++void PlayerListener::publish_volume() {
++    if (this->volume_file_.empty()) {
++        return;
++    }
++    const std::pair<uint8_t, bool> pair{this->applied_volume_, this->applied_muted_};
++    if (this->published_volume_ == pair) {
++        return;
++    }
++    if (!write_volume_file(this->volume_file_, pair.first, pair.second)) {
++        // Once per run: a volume drag would otherwise repeat it for every step.
++        if (!this->volume_file_warned_) {
++            cli_log(LogLevel::WARN, "Could not write the volume file %s",
++                    this->volume_file_.c_str());
++        }
++        this->volume_file_warned_ = true;
++        return;
++    }
++    this->published_volume_ = pair;
++}
++
+ }  // namespace sendspin_cli
+diff --git a/src/player_listener.h b/src/player_listener.h
+index fdbd861..566ec8e 100644
+--- a/src/player_listener.h
++++ b/src/player_listener.h
+@@ -26,6 +26,8 @@
+ #include <cstdint>
+ #include <functional>
+ #include <optional>
++#include <string>
++#include <utility>
+ 
+ namespace sendspin_cli {
+ 
+@@ -71,6 +73,17 @@ public:
+     /// Seeds the sink from the state store without marking it server-set. Call before connecting.
+     void restore_volume(uint8_t volume, bool muted);
+ 
++    /// Applies a volume set on this host (`player-vol`), persists it and reports it to the
++    /// server through client/state, as a hardware volume knob would. Main loop only.
++    void set_local_volume(uint8_t volume);
++
++    /// The same for mute (`player-mute`). Main loop only.
++    void set_local_muted(bool muted);
++
++    /// Where to publish the applied volume and mute on every change (--volume-file); empty
++    /// publishes nothing. Writes the current pair at once. Main loop only.
++    void set_volume_file(const std::string& path);
++
+     /// The format the sink was configured for; absent between streams and for a refused one.
+     const std::optional<StreamFormat>& stream_format() const {
+         return this->stream_format_;
+@@ -80,6 +93,9 @@ private:
+     /// Writes the applied pair to the store, if any, reporting nothing.
+     void persist_volume() const;
+ 
++    /// Writes the applied pair to the volume file, if any, when it differs from the last write.
++    void publish_volume();
++
+     sendspin::PlayerRole& player_;
+     AudioSink& sink_;
+     StateStore* store_;
+@@ -92,6 +108,11 @@ private:
+     bool applied_muted_{false};
+     VolumeSource volume_source_{VolumeSource::SinkDefault};
+ 
++    /// --volume-file, and the pair last written there.
++    std::string volume_file_;
++    std::optional<std::pair<uint8_t, bool>> published_volume_;
++    bool volume_file_warned_{false};
++
+     /// Set at stream start once the sink accepts the format, cleared at stream end.
+     std::optional<StreamFormat> stream_format_;
+ 
+diff --git a/src/state_store.cpp b/src/state_store.cpp
+index a0a92a0..77ccdf1 100644
+--- a/src/state_store.cpp
++++ b/src/state_store.cpp
+@@ -52,6 +52,48 @@ std::string parent_directory(const std::string& path) {
+     return slash == std::string::npos ? std::string() : path.substr(0, slash);
+ }
+ 
++/// Replaces `path` with `pairs` as `key = value` lines, atomically and at exactly `mode`.
++bool write_key_value_file(const std::string& path, mode_t mode,
++                          const std::vector<std::pair<std::string, std::string>>& pairs) {
++    // Pid in the name, so two players sharing a directory cannot rename each other's temp file.
++    const std::string temporary = path + ".tmp." + std::to_string(getpid());
++    // Remove a stale temp so O_EXCL creates the file with our mode.
++    std::remove(temporary.c_str());
++
++    // At `mode` from creation, so the file is never readable more widely; fchmod undoes the umask.
++    const int fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, mode);
++    if (fd < 0) {
++        return false;
++    }
++    std::FILE* file = ::fdopen(fd, "w");
++    if (file == nullptr) {
++        ::close(fd);
++        std::remove(temporary.c_str());
++        return false;
++    }
++
++    bool ok = ::fchmod(fd, mode) == 0;
++    ok = ok && std::fprintf(file, "# Written by sendspin-cli. Edits are overwritten.\n") > 0;
++    for (const auto& [key, value] : pairs) {
++        if (!ok) {
++            break;
++        }
++        ok = std::fprintf(file, "%s = %s\n", key.c_str(), value.c_str()) > 0;
++    }
++    // fsync before rename, or a power cut can leave an empty file in place.
++    if (ok) {
++        ok = std::fflush(file) == 0 && ::fsync(fd) == 0;
++    }
++    // fclose also flushes, so a full disk can surface here.
++    ok = std::fclose(file) == 0 && ok;
++
++    if (!ok || std::rename(temporary.c_str(), path.c_str()) != 0) {
++        std::remove(temporary.c_str());
++        return false;
++    }
++    return true;
++}
++
+ }  // namespace
+ 
+ std::string state_store_path(const std::string& state_dir) {
+@@ -214,42 +256,19 @@ bool StateStore::write() const {
+         return false;
+     }
+ 
+-    // Pid in the name, so two players sharing a state dir cannot rename each other's temp file.
+-    const std::string temporary = this->path_ + ".tmp." + std::to_string(getpid());
+-    // Remove a stale temp so O_EXCL creates the file with our mode.
+-    std::remove(temporary.c_str());
+-
+-    // 0600 at creation, so the file is never readable more widely.
+-    const int fd = ::open(temporary.c_str(), O_WRONLY | O_CREAT | O_EXCL, 0600);
+-    if (fd < 0) {
+-        return false;
+-    }
+-    std::FILE* file = ::fdopen(fd, "w");
+-    if (file == nullptr) {
+-        ::close(fd);
+-        std::remove(temporary.c_str());
+-        return false;
+-    }
+-
+-    bool ok = std::fprintf(file, "# Written by sendspin-cli. Edits are overwritten.\n") > 0;
+-    for (const auto& [key, value] : this->values_) {
+-        if (!ok) {
+-            break;
+-        }
+-        ok = std::fprintf(file, "%s = %s\n", key.c_str(), value.c_str()) > 0;
+-    }
+-    // fsync before rename, or a power cut can leave an empty file in place.
+-    if (ok) {
+-        ok = std::fflush(file) == 0 && ::fsync(fd) == 0;
+-    }
+-    // fclose also flushes, so a full disk can surface here.
+-    ok = std::fclose(file) == 0 && ok;
++    return write_key_value_file(this->path_, 0600,
++                                std::vector<std::pair<std::string, std::string>>(
++                                    this->values_.begin(), this->values_.end()));
++}
+ 
+-    if (!ok || std::rename(temporary.c_str(), this->path_.c_str()) != 0) {
+-        std::remove(temporary.c_str());
++bool write_volume_file(const std::string& path, uint8_t volume, bool muted) {
++    if (path.empty()) {
+         return false;
+     }
+-    return true;
++    // Readable by everyone on the host: it is for other programs, and holds nothing private.
++    return write_key_value_file(path, 0644,
++                                {{KEY_VOLUME, std::to_string(static_cast<unsigned>(volume))},
++                                 {KEY_MUTED, muted ? "true" : "false"}});
+ }
+ 
+ }  // namespace sendspin_cli
+diff --git a/src/state_store.h b/src/state_store.h
+index fbc112b..bf20498 100644
+--- a/src/state_store.h
++++ b/src/state_store.h
+@@ -89,4 +89,9 @@ private:
+     std::map<std::string, std::string> values_;
+ };
+ 
++/// Writes the applied volume and mute to `path` as `volume = N` and `muted = true|false`,
++/// atomically and at mode 0644: the --volume-file, for other programs on the host to read.
++/// @return false when `path` is empty or the write failed.
++bool write_volume_file(const std::string& path, uint8_t volume, bool muted);
++
+ }  // namespace sendspin_cli
+diff --git a/tests/control_test.cpp b/tests/control_test.cpp
+index 9aa9ee6..afa9a25 100644
+--- a/tests/control_test.cpp
++++ b/tests/control_test.cpp
+@@ -441,6 +441,10 @@ TEST(ControlRequestWire, EveryRequestSurvivesARoundTrip) {
+         {"seek-rel", {"2147483647"}},
+         {"delay", {"0"}},
+         {"delay", {"5000"}},
++        {"player-vol", {"0"}},
++        {"player-vol", {"100"}},
++        {"player-mute", {"on"}},
++        {"player-mute", {"off"}},
+     };
+ 
+     for (const auto& [name, args] : cases) {
+@@ -474,6 +478,8 @@ TEST(ControlRequestWire, ZeroValuedArgumentsSurvive) {
+     EXPECT_EQ(encode_control_request(parsed("mute", {"off"})), "mute off");
+     EXPECT_EQ(encode_control_request(parsed("repeat", {"off"})), "repeat off");
+     EXPECT_EQ(encode_control_request(parsed("delay", {"0"})), "delay 0");
++    EXPECT_EQ(encode_control_request(parsed("player-vol", {"0"})), "player-vol 0");
++    EXPECT_EQ(encode_control_request(parsed("player-mute", {"off"})), "player-mute off");
+ }
+ 
+ TEST(SplitControlLine, ReadsWordsAndRejectsAnEmptyLine) {
+@@ -565,6 +571,50 @@ TEST(ControlRefusal, StatusIsNeverRefused) {
+     EXPECT_FALSE(control_refusal(parsed("status", {}), everything_supported(), status, reason));
+ }
+ 
++TEST(ParseControlRequest, PlayerVolumeAndMuteTakeTheGroupCommandsArguments) {
++    EXPECT_EQ(parsed("player-vol", {"0"}).volume, 0);
++    EXPECT_EQ(parsed("player-vol", {"40"}).volume, 40);
++    EXPECT_EQ(parsed("player-vol", {"100"}).volume, 100);
++    EXPECT_EQ(parsed("player-mute", {"on"}).flag, true);
++    EXPECT_EQ(parsed("player-mute", {"off"}).flag, false);
++
++    for (const char* value : {"101", "-1", "", "loud"}) {
++        ControlRequest request;
++        std::string error;
++        EXPECT_FALSE(parse_control_request("player-vol", {value}, request, error))
++            << "accepted player-vol '" << value << "'";
++    }
++    ControlRequest request;
++    std::string error;
++    EXPECT_FALSE(parse_control_request("player-mute", {"yes"}, request, error));
++}
++
++TEST(ParseControlRequest, PlayerVolumeAndMuteAreNeverSentAsControllerCommands) {
++    // The player role reports them in client/state; `vol` and `mute` are the group's.
++    EXPECT_FALSE(protocol_command(parsed("player-vol", {"40"})).has_value());
++    EXPECT_FALSE(protocol_command(parsed("player-mute", {"on"})).has_value());
++}
++
++TEST(ControlRefusal, PlayerVolumeAndMuteAreNeverRefused) {
++    // A disconnected player still applies them, and reports them at the next handshake.
++    ControllerSnapshot disconnected;
++    ControlStatus status = ControlStatus::Failed;
++    std::string reason;
++    EXPECT_FALSE(control_refusal(parsed("player-vol", {"40"}), disconnected, status, reason));
++    EXPECT_FALSE(control_refusal(parsed("player-mute", {"on"}), disconnected, status, reason));
++    EXPECT_FALSE(
++        control_refusal(parsed("player-vol", {"40"}), everything_supported(), status, reason));
++}
++
++TEST(FormatStatus, ALocallySetPlayerVolumeSaysSo) {
++    StatusSnapshot snapshot;
++    snapshot.player_volume = 40;
++    snapshot.player_volume_source = VolumeSource::Local;
++    EXPECT_NE(format_status(snapshot).find("player volume: 40 (set on this host)"),
++              std::string::npos)
++        << format_status(snapshot);
++}
++
+ TEST(ControlRefusal, DelayIsNeverRefusedEither) {
+     // `delay` is exempt too, through protocol_command() rather than by name.
+     ControllerSnapshot disconnected;
+diff --git a/tests/state_store_test.cpp b/tests/state_store_test.cpp
+index a719d64..b5962ac 100644
+--- a/tests/state_store_test.cpp
++++ b/tests/state_store_test.cpp
+@@ -120,6 +120,35 @@ TEST(StateStore, RoundTripsEveryKeyAcrossAReload) {
+     EXPECT_EQ(reloaded.muted(), true);
+ }
+ 
++TEST(VolumeFile, WritesThePairInTheStateFormatReadableByEveryone) {
++    const ScratchDir scratch;
++    ASSERT_TRUE(scratch.created());
++
++    // The same format as the state file, so the same reader takes it.
++    ASSERT_TRUE(write_volume_file(scratch.file(), 40, true));
++    StateStore reread = loaded(scratch.file());
++    EXPECT_EQ(reread.volume(), 40);
++    EXPECT_EQ(reread.muted(), true);
++
++    // Rewritten in place, not appended to.
++    ASSERT_TRUE(write_volume_file(scratch.file(), 0, false));
++    reread = loaded(scratch.file());
++    EXPECT_EQ(reread.volume(), 0);
++    EXPECT_EQ(reread.muted(), false);
++
++    // 0644 whatever the umask: other programs read it, unlike the 0600 state file.
++    const mode_t previous = ::umask(077);
++    ASSERT_TRUE(write_volume_file(scratch.file(), 55, false));
++    ::umask(previous);
++    struct stat info = {};
++    ASSERT_EQ(::stat(scratch.file().c_str(), &info), 0);
++    EXPECT_EQ(info.st_mode & 0777, 0644U);
++}
++
++TEST(VolumeFile, AnEmptyPathWritesNothing) {
++    EXPECT_FALSE(write_volume_file("", 40, false));
++}
++
+ TEST(StateStore, RemembersMutedFalseRatherThanForgettingIt) {
+     const ScratchDir scratch;
+     ASSERT_TRUE(scratch.created());

@@ -15,7 +15,7 @@ license="GPL-2.0-or-later"
 # No kiosk, no browser and no Home Assistant layer: the player needs only the
 # client (sendspin-cli brings alsa-lib, avahi and dbus) and the base system
 # (tsx-config, board.sh). The board gives the "media" PCM in /etc/asound.conf.
-depends="tsx-base>=0.3.5 sendspin-cli"
+depends="tsx-base>=0.3.5 sendspin-cli>=0.3.0-r1"
 # Up to 0.3.4, tsx-ha held the service, its settings and its logrotate file.
 replaces="tsx-ha"
 install="$pkgname.pre-install $pkgname.pre-upgrade"
