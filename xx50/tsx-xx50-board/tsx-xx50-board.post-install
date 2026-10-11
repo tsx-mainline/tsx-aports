@@ -1,9 +1,10 @@
 #!/bin/sh
-# The touch controller service, the good-boot service of the stock U-Boot and
-# the automatic update run in the default runlevel. An image adds them in
-# rootfs/mkrootfs.sh. An apk upgrade of an older panel adds them here. The
-# automatic update starts at the next boot.
-for s in tsx-touch tsx-boot-ok tsx-autoupdate; do
+# The touch controller service, the good-boot service of the stock U-Boot,
+# the automatic update, the audio setup and the root helper of the panel app
+# (tsx-panelctl) run in the default runlevel. An image adds them in
+# rootfs/mkrootfs.sh. An apk upgrade of an older panel adds them here. They
+# start at the next boot.
+for s in tsx-touch tsx-boot-ok tsx-autoupdate tsx-audio tsx-panelctl; do
 	rc-update add $s default >/dev/null 2>&1 || true
 done
 exit 0

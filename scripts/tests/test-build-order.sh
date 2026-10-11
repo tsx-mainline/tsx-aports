@@ -67,7 +67,7 @@ for A in armv7 aarch64; do
 	pos() { echo "$ORDERED" | grep -nx "$1" | cut -d: -f1; }
 	before() { [ -n "$(pos "$1")" ] && [ -n "$(pos "$2")" ] && [ "$(pos "$1")" -lt "$(pos "$2")" ]; }
 	for pair in "common/tsx-base common/tsx-autoupdate" "common/tsx-kiosk common/tsx-ha" "common/tsx-setup common/tsx-ha" "common/tsx-idled common/tsx-kiosk" "common/tsx-splash common/tsx-kiosk" \
-		"common/tensorflow-lite-c common/tsx-ha" "common/sendspin-cli common/tsx-ha" "common/tsx-base common/tsx-buttons"; do
+		"common/tensorflow-lite-c common/tsx-ha" "common/sendspin-cli common/tsx-ha" "common/sendspin-cli common/tsx-sendspin" "common/tsx-sendspin common/tsx-ha" "common/tsx-base common/tsx-buttons"; do
 		set -- $pair; before "$1" "$2" && ok "$A: $1 before $2" || bad "$A: $1 is not before $2"
 	done
 	if [ $A = armv7 ]; then

@@ -1,0 +1,7 @@
+#!/bin/sh
+# The player runs as its own user in the group audio (docs/security.md of
+# tsx-linux-common). Up to 0.3.4 it ran as the user kiosk.
+if ! getent passwd tsx-sendspin >/dev/null; then
+	adduser -S -D -H -h /dev/null -s /sbin/nologin -G audio -g "Sendspin player" tsx-sendspin
+fi
+exit 0

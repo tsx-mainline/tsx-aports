@@ -1,0 +1,14 @@
+#!/bin/sh
+# The program of the panel app runs as its own user (docs/security.md of
+# tsx-linux-common): the display (video), the touch and the keys (input),
+# the sound (audio) and the pairing code of the setup page
+# (tsx-setup-screen, which tsx-setup makes). The service gives it its folders
+# and its sysfs files before each start.
+getent group tsx-panel-app >/dev/null || addgroup -S tsx-panel-app
+if ! getent passwd tsx-panel-app >/dev/null; then
+	adduser -S -D -H -h /dev/null -s /sbin/nologin -G tsx-panel-app -g "panel app" tsx-panel-app
+fi
+for g in video input audio tsx-setup-screen; do
+	addgroup tsx-panel-app $g 2>/dev/null || true
+done
+exit 0

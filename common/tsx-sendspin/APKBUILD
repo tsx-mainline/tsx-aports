@@ -1,0 +1,37 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Sendspin player for Music Assistant, on any panel with a sound card.
+#
+# Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
+# GitHub archive of that tag. sha512sums holds the sum of the archive. After a
+# new tag, run `abuild checksum` (README.md, "Source of the packages").
+pkgname=tsx-sendspin
+pkgver=0.3.5
+pkgrel=0
+pkgdesc="TSX Sendspin player: the service of sendspin-cli, its settings and the key SENDSPIN"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="noarch"
+license="GPL-2.0-or-later"
+# No kiosk, no browser and no Home Assistant layer: the player needs only the
+# client (sendspin-cli brings alsa-lib, avahi and dbus) and the base system
+# (tsx-config, board.sh). The board gives the "media" PCM in /etc/asound.conf.
+depends="tsx-base>=0.3.5 sendspin-cli"
+# Up to 0.3.4, tsx-ha held the service, its settings and its logrotate file.
+replaces="tsx-ha"
+install="$pkgname.pre-install $pkgname.pre-upgrade"
+# The panel software lives in /usr/local, as in the image.
+options="!check !fhs"
+source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
+builddir="$srcdir/tsx-linux-common-$pkgver"
+
+package() {
+	mkdir -p "$pkgdir"
+	cp -a "$builddir"/sendspin/. "$pkgdir"/
+	# The GitHub archive of a tag has group-writable files. tsx-config refuses
+	# a group-writable plugin.
+	chmod -R go-w "$pkgdir"
+}
+
+sha512sums="
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.5.tar.gz
+"

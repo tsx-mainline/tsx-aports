@@ -51,6 +51,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 
 - `common/tsx-keys` installs the public signing key of this repo into `/etc/apk/keys`. It has `arch=noarch`.
 - `common/sendspin-cli` builds sendspin-cli from source, at a pinned tag.
+- `common/tsx-sendspin` is the Sendspin player service of tsx-linux-common (`sendspin/`): the service, its settings and the key `SENDSPIN` of `tsx-config`. It depends on `sendspin-cli` and `tsx-base` only, so any panel with a sound card can install it. `tsx-ha` depends on it. Up to 0.3.4 `tsx-ha` held these files (`replaces="tsx-ha"`). Its install scripts make the user `tsx-sendspin`. It has `arch=noarch`.
 - `xx60/tsx-xx60-boot-tools` contains these parts:
   - `tsx-update-boot` (a copy of `installer/emmc/tsx-update-boot` in tsx-xx60-linux).
   - `tsx-kernel-flavor` (shows or switches the booted flavor, and is also the install hook of the kernel packages).
@@ -61,7 +62,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
   The boot image of the kernel packages has both board DTBs in the vendor multi-DTB container. `stage-kernel.sh` packs the container with `mkimage.sh --board-dtbs`. `scripts/check-bootimg-dtbs.py` checks it. The host test is `scripts/tests/test-board-dtbs.sh`.
 - `xx60/tsx-xx60-kernel-stable` and `xx60/tsx-xx60-kernel-lts` are BINARY packages of an already-built kernel (see "Kernel packages" below). They install side by side. The rootfs of a panel has both.
 - `common/tensorflow-lite-c` is the TFLite C library for the wakeword models of the voice satellite.
-- `common/tsx-panel-app` is the shared part of the panel app of tsx-linux-common (experimental): the service, the layout checker and the layout editor of the setup page. It has `arch=noarch`. The program itself comes from a family package. The xx60 family uses the browser kiosk and has no such package.
+- `common/tsx-panel-app` is the shared part of the panel app of tsx-linux-common (experimental): the service, the layout checker and the layout editor of the setup page. Its install scripts make the user `tsx-panel-app`, which runs the program. It has `arch=noarch`. The program itself comes from a family package. The xx60 family uses the browser kiosk and has no such package.
 - `xx60/tsx-xx60-chromium` is the armv7 `chromium` .apk from Alpine, repacked with the 2-byte ES3->ES2 EGL fallback patch. The build applies the patch (see "Chromium" below). The package has `provides=chromium=<same version>`.
 - `xx60/tsx-xx60-wlroots0.20` is the Alpine `wlroots0.20` recipe with one patch. The Meson CRTC has no gamma LUT. Without the patch, the first `output * power on` of sway after `output * power off` fails, and the screen stays off. The package has `provides=wlroots0.20=<same version>` and works like `tsx-xx60-chromium` (see "Which chromium wins"). Its `pkgver` and `pkgrel` must be equal to the Alpine package. The job `wlroots-watch` opens an issue when Alpine publishes another `wlroots0.20` build.
 

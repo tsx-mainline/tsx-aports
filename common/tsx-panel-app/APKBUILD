@@ -14,7 +14,7 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-panel-app
-pkgver=0.3.4
+pkgver=0.3.5
 pkgrel=0
 pkgdesc="TSX panel app: service, layout checker and layout editor (shared part)"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -25,7 +25,11 @@ license="GPL-2.0-or-later"
 # setup page and needs its helper command layout-save (tsx-setup 0.3.0).
 # 0.3.4: the panel app takes the screen commands of tsx-panelctl (tsx-base
 # 0.3.4), and the editor sends the CSRF token that tsx-setup 0.3.4 needs.
-depends="tsx-base>=0.3.4 tsx-setup>=0.3.4 python3"
+# 0.3.5: the program runs as the user tsx-panel-app (the install scripts
+# make it). tsx-panelctl of tsx-base 0.3.5 takes its root actions, and
+# tsx-setup 0.3.5 lets it read the pairing code.
+depends="tsx-base>=0.3.5 tsx-setup>=0.3.5 python3"
+install="$pkgname.pre-install $pkgname.pre-upgrade"
 # The panel software lives in /usr/local, as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
@@ -45,5 +49,5 @@ package() {
 }
 
 sha512sums="
-c2f3fd4b612247e405f27d01135ca994c6b563ed895b815c46743e39bc49284aec5e61e3639b84ada92aab356e5d6f4a6be373361cf29e842129b95df2d4fdca  tsx-linux-common-0.3.4.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.5.tar.gz
 "
