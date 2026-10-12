@@ -20,7 +20,7 @@
 # them. So the build needs the network (options net).
 # After a new release, run `abuild checksum`.
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.5
+pkgver=0.3.6
 pkgrel=0
 _pio=6.1.19
 pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
@@ -29,7 +29,7 @@ arch="armv7"
 # The program links the C++ code of ESPHome (GPL-3.0-or-later).
 license="GPL-3.0-or-later"
 # tsx_drm draws with libdrm (no SDL, no EGL).
-depends="tsx-panel-app>=0.3.5 tsx-xx50-board>=$pkgver libdrm libstdc++"
+depends="tsx-panel-app>=0.3.6 tsx-xx50-board>=$pkgver libdrm libstdc++"
 makedepends="build-base libdrm-dev python3 py3-pip git"
 options="net !check !fhs"
 source="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/v$pkgver/tsx-xx50-panel-app-src-$pkgver.tar.gz"
@@ -48,5 +48,5 @@ package() {
 }
 
 sha512sums="
-f02a1dbf0bff9ecb8d2345a75c0764567c6af3d002fefaca1d62011b3fded2ee719313834efe9de470338526c2223a8b4d2ccff2b77dc5f7c8a0e0f7b22a2bf4  tsx-xx50-panel-app-src-0.3.5.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-panel-app-src-0.3.6.tar.gz
 "

@@ -17,8 +17,11 @@
 # The subpackage tsx-xx60-board-ha holds the camera plugins of the Home
 # Assistant layer (esphome.d/camera.py and setup.d/camera.py). Only the ha
 # profile pulls it, so only that profile gets libturbojpeg.
+# 0.3.6: the files are the same as in 0.2.2. The version follows the release
+# number of the project, because tsx-autoupdate shows the version of this
+# package in Home Assistant as the version of the panel software.
 pkgname=tsx-xx60-board
-pkgver=0.2.2
+pkgver=0.3.6
 pkgrel=0
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -136,6 +139,6 @@ _ha() {
 }
 
 sha512sums="
-aa48d4929922c40cdead6d1274904466394ca30b89f059c6e1d644ea0385cdc09a263fea154bce93b979aa68967512f2c2054d889d50cc4d24ab4ec2a219076b  tsx-xx60-linux-0.2.2.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx60-linux-0.3.6.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "

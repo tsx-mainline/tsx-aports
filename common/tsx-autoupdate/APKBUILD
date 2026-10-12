@@ -5,14 +5,18 @@
 # Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
+# 0.3.6: the modes auto and manual, the setting AUTO_RESTART, the state
+# "restart required" and release numbers as versions (the version of the board
+# package tsx-<family>-board, else tsx-base). Depends on the settings and the
+# override of tsx-base 0.3.6.
 pkgname=tsx-autoupdate
-pkgver=0.3.3
+pkgver=0.3.6
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
 license="GPL-2.0-or-later"
-depends="tsx-base apk-tools curl python3"
+depends="tsx-base>=0.3.6 apk-tools curl python3"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
@@ -27,5 +31,5 @@ package() {
 }
 
 sha512sums="
-7782b407c575a5ec61f18e5c21fe673fbd59fb8f4c26022b2dc0a46c55a9633dab3f801e63ce2c64eae1de4981bcfbaa43d2f45e33ea383b20dc2d76b38a498c  tsx-linux-common-0.3.3.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.6.tar.gz
 "

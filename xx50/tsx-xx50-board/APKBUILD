@@ -16,7 +16,7 @@
 # sha512sums holds the sum of the archive. After a new tag, run
 # `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-xx50-board
-pkgver=0.3.5
+pkgver=0.3.6
 pkgrel=0
 pkgdesc="TSX xx50 board layer: board file, hardware facts, services, audio, keys, kernel slots, rescue start, panel app board part"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -25,7 +25,7 @@ license="GPL-2.0-or-later"
 # tsx-touch writes two registers of the touch controller with i2cset.
 # tsx-boot-ok writes the retry counters of the U-Boot env with fw_setenv.
 # tsx-audio sets the codec and the volume controls with alsa-utils.
-depends="alsa-utils busybox kmod i2c-tools u-boot-tools tsx-autoupdate>=0.3.3"
+depends="alsa-utils busybox kmod i2c-tools u-boot-tools tsx-autoupdate>=0.3.6"
 install="$pkgname.post-install $pkgname.post-upgrade"
 # /etc/securetty replaces the one of busybox (the Alpine list plus the serial
 # console of the board). /etc/conf.d/watchdog replaces the one of
@@ -72,5 +72,5 @@ package() {
 }
 
 sha512sums="
-ed5281470a10abfc82224de94fdf318d344a7e191ee10e4f201098d57efee49b9c165259b7bc7ffbb5999d309a7dc2a7f37bdae660033139938d08d4d91e95d4  tsx-xx50-linux-0.3.5.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-linux-0.3.6.tar.gz
 "
