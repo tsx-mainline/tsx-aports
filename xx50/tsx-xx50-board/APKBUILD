@@ -3,12 +3,12 @@
 # Board layer of the xx50 panels (TSS-752): the board file, the hardware
 # facts, the CPU governor, the touch controller mode, the watchdog settings,
 # the GPU module, the serial login, the front keys, the kernel slot writer,
-# the good-boot service of the stock U-Boot (tsx-boot-ok), the start of the
-# rescue system (tsx-boot-rescue) and the board part
-# of the panel app (its environment and the default layout). It pulls in the
-# automatic update (tsx-autoupdate 0.3.2 or later: the idle screen and the
-# health check of the panel app) and adds its service to the default
-# runlevel.
+# the good-boot service of the stock U-Boot (tsx-boot-ok), the module order
+# of the audio drivers, the start of the rescue system (tsx-boot-rescue) and
+# the board part of the panel app (its environment and the default layout).
+# It pulls in the automatic update (tsx-autoupdate 0.3.2 or later: the idle
+# screen and the health check of the panel app) and adds its service to the
+# default runlevel.
 #
 # Source: the signed tag board-v$pkgver of tsx-xx50-linux. The build downloads
 # the GitHub archive of that tag. Its top directory is
@@ -45,6 +45,7 @@ etc/init.d/tsx-audio
 etc/init.d/tsx-boot-ok
 etc/init.d/tsx-cpufreq
 etc/init.d/tsx-touch
+etc/modprobe.d/tsx-xx50-audio.conf
 etc/modules-load.d/tsx-xx50.conf
 etc/securetty
 etc/tsx/audio.conf

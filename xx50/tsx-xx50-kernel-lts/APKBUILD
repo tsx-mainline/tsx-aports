@@ -30,11 +30,11 @@
 # tsx-xx50-linux release: set pkgver, _kbundle_tag and _kernelrelease, then
 # run `abuild checksum`.
 pkgname=tsx-xx50-kernel-lts
-pkgver=6.18.54_git20261010
-pkgrel=1
+pkgver=6.18.54_git20261012
+pkgrel=0
 _kernelrelease=6.18.54-tsx-xx50
 # The tsx-xx50-linux release tag whose kernel bundle this package pins.
-_kbundle_tag=v0.3.3
+_kbundle_tag=v0.3.8
 pkgdesc="xx50 mainline kernel, longterm (LTS) line"
 url="https://github.com/tsx-mainline/tsx-xx50-linux"
 arch="armv7"
@@ -68,5 +68,5 @@ package() {
 }
 
 sha512sums="
-97ac3171b3c02e6995099747f8f6cb7bdd25af4e998f795d55982ff291ad624fcd3ab8872f4502bf014a576753895d4d7f94f5e08df55144493af06d36857f1e  tsx-xx50-kernel-lts-bundle.tar.zst
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-kernel-lts-bundle.tar.zst
 "
