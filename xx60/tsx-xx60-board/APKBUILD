@@ -21,7 +21,7 @@
 # number of the project, because tsx-autoupdate shows the version of this
 # package in Home Assistant as the version of the panel software.
 pkgname=tsx-xx60-board
-pkgver=0.3.6
+pkgver=0.3.7
 pkgrel=0
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -139,6 +139,6 @@ _ha() {
 }
 
 sha512sums="
-6667304acb895188ccc563db87b4fc750f1da81c968213145bdafce2100db5ebb055f01e9f432b3132923399ca09bc6467bced462d102f4d9e9f70703747f54d  tsx-xx60-linux-0.3.6.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx60-linux-0.3.7.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "

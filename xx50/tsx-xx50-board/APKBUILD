@@ -16,7 +16,7 @@
 # sha512sums holds the sum of the archive. After a new tag, run
 # `abuild checksum` (README.md, "Source of the packages").
 pkgname=tsx-xx50-board
-pkgver=0.3.6
+pkgver=0.3.7
 pkgrel=0
 pkgdesc="TSX xx50 board layer: board file, hardware facts, services, audio, keys, kernel slots, rescue start, panel app board part"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -72,5 +72,5 @@ package() {
 }
 
 sha512sums="
-9ad1c08b69f164fbfbf41dddc8cb7470e1c9511e34b80cf02db28744880e73bb693fd1eb6c2b33e8c7e95212568110377de04df8ecfb58930dd5a56d8b649fa7  tsx-xx50-linux-0.3.6.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-linux-0.3.7.tar.gz
 "

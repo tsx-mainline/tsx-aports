@@ -9,8 +9,10 @@
 # "restart required" and release numbers as versions (the version of the board
 # package tsx-<family>-board, else tsx-base). Depends on the settings and the
 # override of tsx-base 0.3.6.
+# 0.3.7: the release notes are a Markdown list, and the title and the latest
+# version say "restart required" after an install that waits for a restart.
 pkgname=tsx-autoupdate
-pkgver=0.3.6
+pkgver=0.3.7
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -31,5 +33,5 @@ package() {
 }
 
 sha512sums="
-3185536be5e9bdbb9f804381610c7988e1aa2ef402f78e400221614c785b4c41e95b1e43804dd0e2400f7f8413d6b7a9a22bc2a602c8ed83e90fd55a8bd7dfa8  tsx-linux-common-0.3.6.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.7.tar.gz
 "

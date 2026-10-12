@@ -19,8 +19,10 @@
 # (ArduinoJson, LVGL, noise-c, libsodium) and the native platform, and checks
 # them. So the build needs the network (options net).
 # After a new release, run `abuild checksum`.
+# 0.3.7: the program reads the release notes of tsx-autoupdate 0.3.7 (a newline
+# is the two characters \n in update.state).
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.6
+pkgver=0.3.7
 pkgrel=0
 _pio=6.1.19
 pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
@@ -48,5 +50,5 @@ package() {
 }
 
 sha512sums="
-011e4e93f57dacfa89080c489995ebdf6dd9d2d39884afb65b448f0eb0983dac12c151fed6b5856b038f3b3d237c2b2be0851f5b550597791102fa8e5ad75829  tsx-xx50-panel-app-src-0.3.6.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-panel-app-src-0.3.7.tar.gz
 "
