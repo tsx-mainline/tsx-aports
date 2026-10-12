@@ -10,9 +10,11 @@
 # profile runs them (the console profile too). So they are a package of their
 # own, and tsx-kiosk does not install them. The console, kiosk and ha meta
 # packages of each family pull this package.
+# 0.3.8: tsx-display-power starts fewer processes for the repeated off. It is the
+# only file that differs from 0.2.0.
 pkgname=tsx-idled
-pkgver=0.2.0
-pkgrel=1
+pkgver=0.3.8
+pkgrel=0
 pkgdesc="TSX idle daemon: backlight timeout, blank and wake, and the tsx-blank and tsx-display-power tools"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
@@ -38,5 +40,5 @@ package() {
 }
 
 sha512sums="
-97123b7ac4fa1b72deb20291a562b3d0159ec1577efbf8ae1eead721de43b355f9a66cdf46db1a00742866fda83926a9448e39f7443cb688a0e0a64957c28d3e  tsx-linux-common-0.2.0.tar.gz
+49e4d33852d9454a72bb53440f0a372e66e609f8f1d742ba0025be32c8a8fe2e41e27f460768f9cc0d41aa047b033f641cf834fad048c59b72cef826bc378118  tsx-linux-common-0.3.8.tar.gz
 "
