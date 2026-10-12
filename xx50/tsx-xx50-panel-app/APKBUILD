@@ -21,8 +21,9 @@
 # After a new release, run `abuild checksum`.
 # 0.3.7: the program reads the release notes of tsx-autoupdate 0.3.7 (a newline
 # is the two characters \n in update.state).
+# 0.3.8: no touch poll, and the entities send a change only.
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.7
+pkgver=0.3.8
 pkgrel=0
 _pio=6.1.19
 pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
@@ -50,5 +51,5 @@ package() {
 }
 
 sha512sums="
-239867f3534efcf4069485b199b19832197ea92f673c6436ce5e5dff5f9b2760503d90aa73d515b9db528728946c78c7d2f2c9995306131550367daee3b2911d  tsx-xx50-panel-app-src-0.3.7.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx50-panel-app-src-0.3.8.tar.gz
 "
