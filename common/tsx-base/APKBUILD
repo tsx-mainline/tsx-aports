@@ -6,7 +6,8 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.7: tsx-panelctl starts "tsx-autoupdate now" detached, so no zombie stays.
-# 0.3.8: tsx-banner waits for inotify events (no check every 3 s).
+# 0.3.8: tsx-banner waits for inotify events (no check every 3 s). A client call
+# of tsx-panelctl starts no date process.
 pkgname=tsx-base
 pkgver=0.3.8
 pkgrel=0

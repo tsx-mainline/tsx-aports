@@ -5,8 +5,9 @@
 # Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
+# 0.3.8: tsx-display-power starts fewer processes.
 pkgname=tsx-kiosk
-pkgver=0.2.2
+pkgver=0.3.8
 pkgrel=0
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -77,5 +78,5 @@ _cursors() {
 }
 
 sha512sums="
-58c647e83f20c56d4f9657b20aaa2a4449ce3713854b3881e004c9d2ae95d55c3c6562cc63bc692aa8ac0269927a28855fff98b89656040006b31075bb39466d  tsx-linux-common-0.2.2.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.8.tar.gz
 "

@@ -20,6 +20,7 @@
 # 0.3.6: the files are the same as in 0.2.2. The version follows the release
 # number of the project, because tsx-autoupdate shows the version of this
 # package in Home Assistant as the version of the panel software.
+# 0.3.8: tsx-als and tsx-cpufreqd start no process in their loops.
 pkgname=tsx-xx60-board
 pkgver=0.3.8
 pkgrel=0
