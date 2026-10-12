@@ -16,9 +16,15 @@
 # publishes the applied volume and mute in a file (mode 0644) at each change.
 # The panel volume of tsx-panelctl and the panel app use them when the
 # Sendspin player runs (docs/sendspin.md of tsx-linux-common).
+#
+# idle-loop.patch (written for upstream): the main loop ticks every 10 ms only
+# while sendspin-cpp asks for high performance (a stream plays, a time-sync
+# burst runs) and every 100 ms while the player is idle. A control request
+# ends the wait at once. An idle player woke the CPU 100 times a second
+# before: about 3.5 % of the CPU of an xx50 panel at 167 MHz.
 pkgname=sendspin-cli
 pkgver=0.3.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Sendspin CLI client (C++)"
 url="https://github.com/Sendspin/sendspin-cpp-cli"
 arch="armv7 aarch64"
@@ -28,6 +34,7 @@ makedepends="build-base cmake samurai git linux-headers alsa-lib-dev avahi-compa
 options="net !check"
 source="$pkgname-$pkgver.tar.gz::https://github.com/Sendspin/sendspin-cpp-cli/archive/refs/tags/v$pkgver.tar.gz
 	player-volume.patch
+	idle-loop.patch
 	"
 builddir="$srcdir/sendspin-cpp-cli-$pkgver"
 
@@ -57,4 +64,5 @@ package() {
 sha512sums="
 d05582b720f59ea104a09c7cfe46140c46545c4634aacd8fef31a62813e8ea8f46f090707ab84e4b35a51e7eb804784243c3fa96a3c0416ad98d1e2100c08a13  sendspin-cli-0.3.0.tar.gz
 459ef684c156b589c2d3d0487224d3f451e86278461774700acd82c7ec01fa0cb7e51886e7fdfb6a1614176c297cbd46bdbe9ddd8bc16bc002b930d6d7c4fc65  player-volume.patch
+6f816cee65e4806ec6d16c05d6f5c3d9a9cbafa45fff20ed47e36cc6f9923be97f2a07e9f048eedcb5c80b57a551ca33735cfe1a0af5afc9f9a03fe955e0378e  idle-loop.patch
 "
