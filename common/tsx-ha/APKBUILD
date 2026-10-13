@@ -7,8 +7,9 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.7: tsx-mqtt sends the new update texts (title, latest version, notes).
 # 0.3.8: the poll of the ESPHome device starts no process.
+# 0.3.9: the MQTT Backlight number is a percent (1 to 100), as the ESPHome entity.
 pkgname=tsx-ha
-pkgver=0.3.8
+pkgver=0.3.9
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -49,5 +50,5 @@ package() {
 }
 
 sha512sums="
-49e4d33852d9454a72bb53440f0a372e66e609f8f1d742ba0025be32c8a8fe2e41e27f460768f9cc0d41aa047b033f641cf834fad048c59b72cef826bc378118  tsx-linux-common-0.3.8.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.9.tar.gz
 "

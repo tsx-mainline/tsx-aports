@@ -11,8 +11,10 @@
 # override of tsx-base 0.3.6.
 # 0.3.7: the release notes are a Markdown list, and the title and the latest
 # version say "restart required" after an install that waits for a restart.
+# 0.3.9: the 15-minute tick starts about 25 processes, not 280, and runs
+# apk info -v once (the same output files).
 pkgname=tsx-autoupdate
-pkgver=0.3.7
+pkgver=0.3.9
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -33,5 +35,5 @@ package() {
 }
 
 sha512sums="
-951472b677622047fae1509fd3d431b6ff716815e88f1cca7564a06060d256ef49b19fd864942d6f22c5c79199c9367356359dad7447865160c288ca0d4aa8a4  tsx-linux-common-0.3.7.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.9.tar.gz
 "

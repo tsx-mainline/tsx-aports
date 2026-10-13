@@ -21,8 +21,9 @@
 # number of the project, because tsx-autoupdate shows the version of this
 # package in Home Assistant as the version of the panel software.
 # 0.3.8: tsx-als and tsx-cpufreqd start no process in their loops.
+# 0.3.9: the files are the same as in 0.3.8. The version follows the release.
 pkgname=tsx-xx60-board
-pkgver=0.3.8
+pkgver=0.3.9
 pkgrel=0
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -140,6 +141,6 @@ _ha() {
 }
 
 sha512sums="
-66b21493db6915bcb9d80887f44e46006fba56c714352e062ccab339ded41d4070ee482a34ce2af739ffa8c4e653caaa44d9f47a2ff16489a6dc195afdf5ae8b  tsx-xx60-linux-0.3.8.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-xx60-linux-0.3.9.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "
