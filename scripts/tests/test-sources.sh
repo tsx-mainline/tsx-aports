@@ -8,8 +8,9 @@
 #   3. A kernel package names a release (_kbundle_tag), and its
 #      _kernelrelease starts with the version of pkgver.
 #   4. scripts/pin-kernel.sh, against a local server with a fixture bundle:
-#      it writes the three values, and it refuses a bundle with a wrong
-#      kernel.release, a wrong CHECKSUMS.sha256 and a missing release.
+#      it writes the three values and keep/ (keep-pins.sh), and it refuses
+#      a bundle with a wrong kernel.release, a wrong CHECKSUMS.sha256 and a
+#      missing release.
 #   0. The pkgdesc of each recipe has at most 128 characters (abuild refuses a
 #      longer one: "pkgdesc is too long").
 #   5. A recipe that keeps the file modes of a tag archive (cp -a or
@@ -115,7 +116,7 @@ if ! command -v zstd >/dev/null; then echo "  no zstd: section skipped"; fin; fi
 W=$(mktemp -d); SRV=
 trap '[ -n "$SRV" ] && kill $SRV 2>/dev/null; rm -rf "$W"' EXIT
 R=$W/repo; mkdir -p "$R/scripts"
-cp "$HERE/pin-kernel.sh" "$R/scripts/"
+cp "$HERE/pin-kernel.sh" "$HERE/keep-pins.sh" "$R/scripts/"
 mkrepo() {   # FLAVOR
 	local d=$R/xx60/tsx-xx60-kernel-$1; mkdir -p "$d"
 	cat > "$d/APKBUILD" <<APKBUILD
@@ -141,7 +142,14 @@ mkbundle() {
 mkdir -p "$W/rel"
 python3 -u -m http.server 0 --bind 127.0.0.1 -d "$W/rel" >"$W/srv.log" 2>&1 & SRV=$!
 for _ in $(seq 50); do PORT=$(grep -oE 'port [0-9]+' "$W/srv.log" | head -1 | cut -d' ' -f2); [ -n "$PORT" ] && break; sleep 0.1; done
-PIN() { (cd "$R" && PIN_BASE_URL="http://127.0.0.1:$PORT" scripts/pin-kernel.sh "$@" 2>&1); }
+PIN() { (cd "$R" && PIN_BASE_URL="http://127.0.0.1:$PORT" PIN_RAW_URL="http://127.0.0.1:$PORT/raw" \
+	PIN_TREE_URL="http://127.0.0.1:$PORT/tree" scripts/pin-kernel.sh "$@" 2>&1); }
+# the packages.pin of the tag and a published tree with the pinned package (keep-pins.sh)
+mkdir -p "$W/rel/raw/v1.0.0/rootfs/initramfs" "$W/rel/tree/common/armv7" "$W/rel/tree/xx60/armv7"
+echo "tsx-splash=0.2.0-r1" > "$W/rel/raw/v1.0.0/rootfs/initramfs/packages.pin"
+echo splash > "$W/rel/tree/common/armv7/tsx-splash-0.2.0-r1.apk"
+printf 'P:tsx-splash\nV:0.2.0-r1\n\n' > "$W/APKINDEX"; tar -czf "$W/rel/tree/common/armv7/APKINDEX.tar.gz" -C "$W" APKINDEX
+: > "$W/APKINDEX"; tar -czf "$W/rel/tree/xx60/armv7/APKINDEX.tar.gz" -C "$W" APKINDEX
 
 mkrepo lts; mkrepo stable
 mkbundle v1.0.0 lts 9.9.9-00005-gbbbbbbbbbbbb; mkbundle v1.0.0 stable 9.9.9-00006-gcccccccccccc
@@ -154,6 +162,8 @@ if OUT=$(PIN v1.0.0); then
 	grep -qx 'pkgrel=1' "$A" && ok "pkgrel untouched" || bad "pkgrel changed"
 	cmp -s "$R/xx60/tsx-xx60-kernel-lts/dist/tsx-xx60-kernel-lts-bundle.tar.zst" "$W/rel/v1.0.0/tsx-xx60-kernel-lts-bundle.tar.zst" && ok "bundle copied to dist/" || bad "no dist copy"
 	grep -qx '_kernelrelease=9.9.9-00006-gcccccccccccc' "$R/xx60/tsx-xx60-kernel-stable/APKBUILD" && ok "stable pinned too" || bad "stable not pinned"
+	grep -q '^common/armv7/tsx-splash-0.2.0-r1.apk ' "$R/keep/keep.txt" 2>/dev/null && [ -s "$R/keep/v3.24/common/armv7/tsx-splash-0.2.0-r1.apk" ] \
+		&& ok "keep/ follows the packages.pin of the tag (keep-pins.sh)" || bad "keep/ not written: $OUT"
 else bad "pin v1.0.0: $OUT"; fi
 
 mkrepo lts

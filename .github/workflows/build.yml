@@ -6,8 +6,10 @@
 #                   It restores the published tree (scripts/carry-forward.py).
 #                   It builds only the new versions (scripts/build.sh
 #                   --skip-existing). It then re-indexes and signs the tree
-#                   (scripts/index.sh --keep 2). A pull request builds with a
-#                   throwaway key and publishes nothing.
+#                   (scripts/index.sh --keep 2). The kept packages of
+#                   keep/keep.txt are never pruned, and index.sh puts them
+#                   back from keep/v3.24/ if the tree lost them. A pull
+#                   request builds with a throwaway key and publishes nothing.
 #   deploy          publishes the tree that `build` assembled.
 #   chromium-watch  runs on a schedule. It checks Alpine v3.24 armv7 for a
 #                   newer chromium and opens a pull request that changes
@@ -50,9 +52,9 @@ name: build
 on:
   push:
     branches: [main]
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   pull_request:
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   schedule:
     # chromium-watch and wlroots-watch use this schedule. The time is UTC, once a day.
     - cron: '17 6 * * *'

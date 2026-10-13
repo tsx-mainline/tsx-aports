@@ -15,6 +15,9 @@
 #   4. It writes _kbundle_tag, _kernelrelease and the sha512 of the bundle
 #      into the APKBUILD. It does not change pkgver or pkgrel. Set them first.
 #      An apk version must rise, or `apk upgrade` does not take the package.
+#   5. It runs scripts/keep-pins.sh TAG: keep/keep.txt then lists the package
+#      versions of rootfs/initramfs/packages.pin of TAG, the files that the
+#      initramfs in the boot images of these kernel packages comes from.
 # The script stops at the first failed check and then changes no APKBUILD of
 # the flavor that failed.
 #
@@ -56,3 +59,4 @@ for F in "$@"; do
 	echo "   kernel.commit  $COMMIT"
 	echo "   pinned: _kbundle_tag=$TAG, sha512 ${SUM%"${SUM#????????????}"}..."
 done
+"$HERE/keep-pins.sh" "$TAG"

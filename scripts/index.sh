@@ -14,6 +14,11 @@
 # --keep N   keep the newest N versions of each package (sorted by
 #            pkgver/pkgrel), delete the others, then re-index. The default
 #            is 2: the latest version and one previous version.
+#            The files that keep/keep.txt lists are not pruned and do not
+#            count as versions. If the tree lacks one, the script copies it
+#            from keep/v3.24/ (sha256 checked). These are the packages that
+#            the rescue initramfs of tsx-xx60-linux pins (see README.md
+#            "Kept packages").
 # --out DIR  the directory for the published tree (default: repo/,
 #            gitignored). CI publishes it (see .github/workflows/build.yml).
 #
@@ -38,8 +43,43 @@ apk_names() {
 	(cd "$1" && ls -- *.apk 2>/dev/null) | sed -E 's/^(.*)-([0-9][^-]*-r[0-9]+)\.apk$/\1\t\1-\2.apk/'
 }
 
+KEEPDIR=${TSX_APORTS_KEEP_DIR:-$REPO/keep}
+
+# kept_list: one line "<category>/<arch>/<file> <sha256>" for each file that
+# keep/keep.txt lists.
+kept_list() {
+	[ -f "$KEEPDIR/keep.txt" ] || return 0
+	sed -e 's/#.*//' "$KEEPDIR/keep.txt" | awk 'NF >= 2 { print $1, $2 }'
+}
+
+# restore_kept TREE: TREE is packages/v3.24. Copy each kept file that TREE
+# lacks from keep/v3.24/. A kept file in TREE must have the sha256 of the
+# list. Return 1 on a mismatch or a file that is nowhere.
+restore_kept() {
+	local tree=${1%/} rel sum t k
+	while read -r rel sum; do
+		t=$tree/$rel
+		if [ -e "$t" ]; then
+			[ "$(sha256sum < "$t" | cut -d' ' -f1)" = "$sum" ] \
+				|| { echo "index.sh: $rel in the tree is not the kept file (sha256 $sum)" >&2; return 1; }
+			continue
+		fi
+		k=$KEEPDIR/v3.24/$rel
+		[ -f "$k" ] || { echo "index.sh: $rel is kept, but neither the tree nor $KEEPDIR/v3.24 has it" >&2; return 1; }
+		[ "$(sha256sum < "$k" | cut -d' ' -f1)" = "$sum" ] \
+			|| { echo "index.sh: $k does not have the sha256 of keep.txt ($sum)" >&2; return 1; }
+		mkdir -p "$(dirname "$t")"
+		cp "$k" "$t"
+		echo "index.sh: restored $rel from keep/v3.24"
+	done < <(kept_list)
+	return 0
+}
+
 prune_dir() {  # ARCH_DIR
-	local d="$1" pruned=0 pkgname files n old f
+	local d="${1%/}" pruned=0 pkgname files n old f catarch kept
+	# The kept files of this <category>/<arch> stay, and they do not count.
+	catarch=$(basename "$(dirname "$d")")/$(basename "$d")
+	kept=$(kept_list | awk -v p="$catarch/" 'index($1, p) == 1 { print substr($1, length(p) + 1) }')
 	# Group the files by the whole pkgname, and keep the KEEP newest files
 	# of each group. Do not use a glob such as "<pkgname>-*.apk": it also
 	# matches the subpackages (tsx-xx60-board-ha, tsx-ledbar-fw), and then
@@ -47,7 +87,10 @@ prune_dir() {  # ARCH_DIR
 	# plain version sort. This is close enough for a prune, and the prune
 	# alone does nothing that affects security.
 	for pkgname in $(apk_names "$d" | cut -f1 | sort -u); do
-		files=$(apk_names "$d" | awk -F'\t' -v p="$pkgname" '$1 == p { print $2 }' | sort -V)
+		files=$(apk_names "$d" | awk -F'\t' -v p="$pkgname" -v k="$kept" '
+			BEGIN { n = split(k, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") K[a[i]] = 1 }
+			$1 == p && !($2 in K) { print $2 }' | sort -V)
+		[ -n "$files" ] || continue
 		n=$(printf '%s\n' "$files" | wc -l)
 		if [ "$n" -gt "$KEEP" ]; then
 			old=$(printf '%s\n' "$files" | head -n $((n - KEEP)))
@@ -66,6 +109,8 @@ if [ "${TSX_APORTS_INDEX_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null ||
 
 SRC="$REPO/packages/v3.24"
 [ -d "$SRC" ] || { echo "index.sh: no $SRC -- run scripts/build.sh first" >&2; exit 1; }
+
+restore_kept "$SRC"
 
 READY=   # the architectures whose image is pulled and checked in this run
 for cat_dir in "$SRC"/*/; do

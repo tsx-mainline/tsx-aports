@@ -19,7 +19,9 @@ scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune)
+scripts/keep-pins.sh       keep/keep.txt for the initramfs pins of a tsx-xx60-linux tag (pin-kernel.sh runs it)
+keep/                      the kept packages: never pruned, restored by index.sh (see "Kept packages")
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune, kept packages)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -282,6 +284,18 @@ GitHub Actions builds and publishes the packages. GitHub Pages serves them behin
 
 Watch the size of the published tree. It has all packages, both kernel flavors, and two chromium versions while a second one exists. One version of everything is about 190 MB.
 
+### Kept packages
+
+The rescue initramfs of tsx-xx60-linux takes a few files from exact package versions: `rootfs/initramfs/packages.pin` of that repo (for example `tsx-xx60-board=0.2.0-r1`). The boot image in each kernel package carries such an initramfs, and its stamp covers `packages.pin`. So the pins move only together with new kernel packages. The release build of tsx-xx60-linux (`release.yml`) and its image build (`rootfs.yml`) take these versions from the published tree. If the prune deletes one, both builds fail.
+
+`keep/keep.txt` lists these files with their sha256. `keep/v3.24/` holds a copy of each file, the published bytes signed with the project key. `scripts/index.sh` does these steps:
+
+- It does not prune a kept file, and a kept file does not count as one of the `--keep N` versions.
+- If the tree lacks a kept file, it copies the file from `keep/v3.24/` and checks the sha256.
+- If the tree has a kept file with another sha256, it stops.
+
+`scripts/pin-kernel.sh TAG` runs `scripts/keep-pins.sh TAG`. That script reads `packages.pin` of TAG and writes `keep/keep.txt` and `keep/v3.24/` again: a pin that the list has keeps its file, a new pin comes from the published tree, and a file that no pin names goes. Commit the changes of `keep/` with the kernel recipes. The host tests are `scripts/tests/test-index-prune.sh` and `scripts/tests/test-keep-pins.sh`.
+
 ## CI
 
 `.github/workflows/build.yml` builds and publishes the repository. It has four jobs:
@@ -289,7 +303,7 @@ Watch the size of the published tree. It has all packages, both kernel flavors, 
 - **build** runs on a push to `main` that changes `common/`, `xx60/`, `xx50/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
   2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a package with a warning when its tag archive or its release asset does not exist yet (a kernel bundle, the xx50 panel app source). The published copy of that package stays.
-  3. `scripts/index.sh --keep 2` re-indexes and signs the merged tree.
+  3. `scripts/index.sh --keep 2` puts back a kept package that the tree lacks (see "Kept packages"), prunes, and re-indexes and signs the merged tree.
 
   A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`.
 - **deploy** publishes that tree with `actions/deploy-pages`.

@@ -8,6 +8,9 @@
 #      also when pkgrel has two digits.
 #   3. A package name with a dot and a digit (tsx-xx60-wlroots0.20) groups
 #      correctly.
+#   4. The files of keep/keep.txt are not pruned and do not count. A kept
+#      file that the tree lacks comes back from keep/v3.24/. The files in
+#      keep/v3.24/ of this repo have the sha256 of the list.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
@@ -59,5 +62,38 @@ n=$(printf '%s\n' "$out" | grep -c 'pruning')
 echo "== prune_dir again =="
 prune_dir "$D" >/dev/null; rc=$?
 [ $rc = 0 ] && ok "nothing more to prune" || bad "second prune returned $rc"
+
+echo "== kept files (keep/keep.txt): not pruned, not counted, restored =="
+K=$W/keep; T=$W/tree/v3.24; mkdir -p "$K/v3.24/xx60/armv7" "$T/xx60/armv7" "$T/common/armv7"
+echo "board 0.2.0-r1" > "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk"
+SUM=$(sha256sum < "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" | cut -d' ' -f1)
+printf '# comment\nxx60/armv7/tsx-xx60-board-0.2.0-r1.apk %s\n' "$SUM" > "$K/keep.txt"
+TSX_APORTS_KEEP_DIR=$K
+KEEPDIR=$K
+for f in tsx-xx60-board-0.3.6-r0 tsx-xx60-board-0.3.7-r0 tsx-xx60-board-0.3.8-r0; do : > "$T/xx60/armv7/$f.apk"; done
+out=$(restore_kept "$T"); rc=$?
+[ $rc = 0 ] && cmp -s "$T/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" \
+	&& ok "a kept file that the tree lacks is restored from keep/v3.24" || bad "restore: rc $rc, $out"
+out=$(restore_kept "$T"); rc=$?
+[ $rc = 0 ] && [ -z "$out" ] && ok "a second restore does nothing" || bad "second restore: rc $rc, $out"
+prune_dir "$T/xx60/armv7/" >/dev/null
+has2() { [ -e "$T/xx60/armv7/$1.apk" ]; }
+has2 tsx-xx60-board-0.2.0-r1 && ok "the kept 0.2.0-r1 is not pruned" || bad "the kept 0.2.0-r1 was pruned"
+has2 tsx-xx60-board-0.3.8-r0 && has2 tsx-xx60-board-0.3.7-r0 && ok "the 2 newest stay (the kept file does not count)" || bad "a newest version was pruned"
+has2 tsx-xx60-board-0.3.6-r0 && bad "0.3.6-r0 was kept" || ok "0.3.6-r0 is pruned"
+: > "$T/common/armv7/tsx-xx60-board-0.2.0-r1.apk"; : > "$T/common/armv7/tsx-xx60-board-0.3.7-r0.apk"; : > "$T/common/armv7/tsx-xx60-board-0.3.8-r0.apk"
+prune_dir "$T/common/armv7" >/dev/null
+[ ! -e "$T/common/armv7/tsx-xx60-board-0.2.0-r1.apk" ] && ok "the keep list names a category and arch: the same file name elsewhere is pruned" || bad "kept in another category"
+echo "changed" > "$T/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk"
+out=$(restore_kept "$T" 2>&1); rc=$?
+[ $rc = 1 ] && echo "$out" | grep -q "is not the kept file" && ok "a kept file with another sha256 in the tree: an error" || bad "mismatch: rc $rc, $out"
+rm -f "$T/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk"
+out=$(restore_kept "$T" 2>&1); rc=$?
+[ $rc = 1 ] && echo "$out" | grep -q "neither the tree nor" && ok "a kept file that is nowhere: an error" || bad "missing: rc $rc, $out"
+echo "== the kept files of this repo =="
+KEEPDIR=$HERE/../keep
+while read -r rel sum; do
+	[ "$(sha256sum < "$KEEPDIR/v3.24/$rel" | cut -d' ' -f1)" = "$sum" ] && ok "keep/v3.24/$rel has its sha256" || bad "keep/v3.24/$rel: sha256 differs or the file is missing"
+done < <(kept_list)
 
 fin

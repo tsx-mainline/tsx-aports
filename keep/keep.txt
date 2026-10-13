@@ -1,0 +1,13 @@
+# Kept packages: scripts/index.sh never prunes these files, and it copies a
+# file from keep/v3.24/ when the published tree lacks it (sha256 checked).
+# They are the exact versions that the rescue initramfs of tsx-xx60-linux takes
+# its files from (rootfs/initramfs/packages.pin of the release tag that the
+# kernel packages pin, _kbundle_tag in xx60/tsx-xx60-kernel-lts). The release
+# build of tsx-xx60-linux needs these versions in the published tree.
+# scripts/pin-kernel.sh writes this list and keep/v3.24/ for its TAG.
+# The files are the published ones, signed with the key of common/tsx-keys.
+# <category>/<arch>/<file>  <sha256>
+common/armv7/tsx-rescue-ui-0.2.0-r1.apk b87b69948b1c5b04cdcb5e41fa49baaec6a856b80b5a7e2f5d88d7947fb39d8a
+common/armv7/tsx-splash-0.2.0-r1.apk 38e497d55c2798431dfee6229b538729b7d8c84c0314e7cf56940ea3136c559d
+xx60/armv7/tsx-xx60-board-0.2.0-r1.apk dc062fff4f81630dae46fc8bae3770ff49206842dc598f6e8e4aa31c9784b18b
+common/armv7/tsx-kiosk-0.2.0-r1.apk 74b8f53eec694d30430d59a91ab917ee81f8f06b389ad8079cf67cca1e8a8bf4
