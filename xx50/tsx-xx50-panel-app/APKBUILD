@@ -22,8 +22,9 @@
 # 0.3.7: the program reads the release notes of tsx-autoupdate 0.3.7 (a newline
 # is the two characters \n in update.state).
 # 0.3.8: no touch poll, and the entities send a change only.
+# 0.3.10: the sensor "Last boot".
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.8
+pkgver=0.3.10
 pkgrel=0
 _pio=6.1.19
 pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
@@ -51,5 +52,5 @@ package() {
 }
 
 sha512sums="
-2180adce348f044b925b77955c52e7e273129a6a05a76e246c8c14d1a45c5dc38506b18d1a17290b8215c80d5ceaa2dda8627548d55d6ab99ea51282fd6cf579  tsx-xx50-panel-app-src-0.3.8.tar.gz
+038dcb96edd5daea5398fa51327d1fe7a4102282bc2436f9de42567eaec5d2ae7cb6e3c44d34c30c6d9751efbddc868f3d647e859156413a7a899165c3145edb  tsx-xx50-panel-app-src-0.3.10.tar.gz
 "
