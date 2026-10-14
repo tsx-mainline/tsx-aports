@@ -13,8 +13,10 @@
 # version say "restart required" after an install that waits for a restart.
 # 0.3.9: the 15-minute tick starts about 25 processes, not 280, and runs
 # apk info -v once (the same output files).
+# 0.3.11: "tsx-autoupdate status" shows the line "LED bar image" while a newer
+# image waits for tsx-ledbar-fw-install.
 pkgname=tsx-autoupdate
-pkgver=0.3.9
+pkgver=0.3.11
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -35,5 +37,5 @@ package() {
 }
 
 sha512sums="
-b05691a9b3f9c4b08acde4763bd4796a985cb4f80c9547b8a64002c93a38a892e8d3967b6448d24394203c0f40a6e5b9bb5d74dfd8a48d863cb3ee64232139b1  tsx-linux-common-0.3.9.tar.gz
+20a5294e79947903b827b67edff89a7cc3920439cbc52e0215bc3cca98d11e2ce9b1561747cc8485063ebbc085f46943b21513621f686e0c5512c15f59ef11ac  tsx-linux-common-0.3.11.tar.gz
 "

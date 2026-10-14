@@ -6,8 +6,9 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.10: the setup page has the Dark mode setting.
+# 0.3.11: the setup page shows ORIENTATION_HW of hw.conf as the default orientation.
 pkgname=tsx-setup
-pkgver=0.3.10
+pkgver=0.3.11
 pkgrel=0
 pkgdesc="TSX on-panel setup page and its root helper"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -32,5 +33,5 @@ package() {
 }
 
 sha512sums="
-b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
+20a5294e79947903b827b67edff89a7cc3920439cbc52e0215bc3cca98d11e2ce9b1561747cc8485063ebbc085f46943b21513621f686e0c5512c15f59ef11ac  tsx-linux-common-0.3.11.tar.gz
 "

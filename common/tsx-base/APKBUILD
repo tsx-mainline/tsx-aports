@@ -10,8 +10,10 @@
 # of tsx-panelctl starts no date process.
 # 0.3.10: the kiosk dark mode setting (KIOSK_DARK) in tsx-config and tsx-panelctl,
 # and the init script tsx-setup reads the time zone file of the card tool.
+# 0.3.11: tsx-config apply and the setup page use ORIENTATION_HW of hw.conf as the
+# default of ORIENTATION, for a board that reports a hardware orientation.
 pkgname=tsx-base
-pkgver=0.3.10
+pkgver=0.3.11
 pkgrel=0
 pkgdesc="TSX panel base system: config, hostname, data, clock, banner and the hardware seam"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -35,5 +37,5 @@ package() {
 }
 
 sha512sums="
-b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
+20a5294e79947903b827b67edff89a7cc3920439cbc52e0215bc3cca98d11e2ce9b1561747cc8485063ebbc085f46943b21513621f686e0c5512c15f59ef11ac  tsx-linux-common-0.3.11.tar.gz
 "
