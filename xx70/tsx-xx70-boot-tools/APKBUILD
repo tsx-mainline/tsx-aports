@@ -1,0 +1,31 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Boot image tools of the xx70 platform: tsx-update-boot and tsx-bootrec
+# (vendored from tsx-xx70-linux rootfs/overlay/usr/local/sbin, keep them in
+# step), tsx-kernel-flavor (show or switch the booted kernel flavor, also the
+# hook of the tsx-xx70-kernel-* packages) and the tsx_is_installed_panel()
+# helper. One package, so both kernel flavors share one copy.
+pkgname=tsx-xx70-boot-tools
+pkgver=1
+pkgrel=2
+pkgdesc="xx70 boot_b image update tools"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="aarch64"
+license="GPL-2.0-or-later"
+depends="busybox"
+options="!check"
+source="tsx-update-boot tsx-bootrec tsx-is-panel.sh tsx-kernel-flavor"
+
+package() {
+	install -Dm755 "$srcdir"/tsx-update-boot "$pkgdir"/usr/sbin/tsx-update-boot
+	install -Dm755 "$srcdir"/tsx-bootrec "$pkgdir"/usr/sbin/tsx-bootrec
+	install -Dm644 "$srcdir"/tsx-is-panel.sh "$pkgdir"/usr/lib/tsx/tsx-is-panel.sh
+	install -Dm755 "$srcdir"/tsx-kernel-flavor "$pkgdir"/usr/sbin/tsx-kernel-flavor
+}
+
+sha512sums="
+9c43157102368d803cb114d535006a05ce3c45009479eb4d7cb3837585eb52b685becd473fe914be90a6cd57e8a2de797242f0c6c1b2518516bfb36e8c9212d1  tsx-update-boot
+d44ecf7d2e0ad15cf661ce8c2b396a9f035836ea0d93bf91cdf8db5f18f7f2ee7cd4b706b8f00c29334e4370fcd9697c32df87bf7227d137062915af06aa1dc1  tsx-bootrec
+9bde1b2d231d9ab3aef722952124e016cb18fb87c18720b6b93b031401f7fc12da6641cbd6ef21658abe2fc2a0764c53980587a020095eb46c9ab511d2dabd31  tsx-is-panel.sh
+afcd4cb533e30d21ad6018765043777eaf27d01ed8ed57c5a56116136361af578f8b48c8ae00c0b0c4a0eb1a915014634f7728e7aecd9dfc854e1733241a7645  tsx-kernel-flavor
+"

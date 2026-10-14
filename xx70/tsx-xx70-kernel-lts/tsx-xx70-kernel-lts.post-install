@@ -1,0 +1,10 @@
+#!/bin/sh
+# Writes boot_b only on an installed xx70 panel where the selected flavor is
+# lts (tsx-kernel-flavor, tsx-xx70-boot-tools). In a chroot, a container or
+# with the other flavor selected, it only says why nothing was written.
+if [ -x /usr/sbin/tsx-kernel-flavor ]; then
+	/usr/sbin/tsx-kernel-flavor --hook lts
+else
+	echo "tsx-xx70-kernel-lts: tsx-kernel-flavor is missing (tsx-xx70-boot-tools too old?). Nothing written."
+fi
+exit 0

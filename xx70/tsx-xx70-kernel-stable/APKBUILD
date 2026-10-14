@@ -1,0 +1,61 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+#
+# BINARY packaging of an already-built kernel: no compiler runs in this
+# APKBUILD. source= is ONE release asset of this repository (tsx-aports),
+# tsx-xx70-kernel-stable-bundle.tar.zst of the release _kbundle_tag. The
+# source repository of the xx70 boot image, tsx-xx70-linux, is not public, so
+# the bundle that ../../scripts/stage-kernel-xx70.sh makes on the build host
+# is attached to a tsx-aports release (README.md, "xx70 kernel packages").
+# abuild unpacks the bundle (a plain .tar.zst) into Image.gz, the board DTBs,
+# the modules tree tarball, the boot_b image (lk2nd + Android boot image from
+# kernel/mkimage.sh), kernel.release and kernel.commit (the last two are
+# build provenance only). CI downloads the asset and checks it against
+# sha512sums. A local build uses the staged file in dist/: SRCDEST below
+# makes abuild use that file (checked by sha512sums) and not the network.
+# The script fills in pkgver, pkgrel, _kernelrelease and sha512sums below: do
+# not edit them by hand. Set _kbundle_tag to the release that holds the
+# staged bundle, and attach that exact file.
+SRCDEST="$startdir/dist"
+#
+# pkgver: <upstream kernel version>_git<YYYYMMDD>, for example
+# 7.2.8_git20260930. apk does not allow '-' in pkgver, so the staging date
+# replaces the "-NNNNN-gHASH" part of `make kernelrelease`. _kernelrelease
+# records the exact build (provenance only, nothing on the panel reads it).
+#
+# "stable" is the newest upstream stable series (7.2.y at this time). The
+# default flavor of a panel is tsx-xx70-kernel-lts.
+# Both flavors install side by side: each one has its own /lib/modules/<release>/
+# and its own /boot/tsx-xx70-<flavor>.img. The hooks write boot_b only for the
+# selected flavor (tsx-kernel-flavor, tsx-xx70-boot-tools).
+pkgname=tsx-xx70-kernel-stable
+pkgver=7.2.8_git20261014
+pkgrel=2
+_kernelrelease=7.2.8-00102-g7d4b8131cbb9
+# The tsx-aports release that holds the bundle (xx70-kernel-<YYYYMMDD>).
+_kbundle_tag=xx70-kernel-20261014
+pkgdesc="xx70 mainline kernel, stable line"
+url="https://github.com/tsx-mainline/linux"
+arch="aarch64"
+license="GPL-2.0-only"
+depends="tsx-xx70-boot-tools>=1-r0"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+source="https://github.com/tsx-mainline/tsx-aports/releases/download/$_kbundle_tag/tsx-xx70-kernel-stable-bundle.tar.zst"
+
+package() {
+	install -Dm644 "$srcdir"/tsx-xx70-boot.img "$pkgdir"/boot/tsx-xx70-stable.img
+	mkdir -p "$pkgdir"/usr/share/tsx
+	echo "$_kernelrelease" > "$pkgdir"/usr/share/tsx/kernel-stable.release
+	tar -xzf "$srcdir"/modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# The bundle keeps the owner and the modes of the machine that packed it.
+	chown -R 0:0 "$pkgdir"/lib
+	chmod -R go-w "$pkgdir"/lib
+	# modules_install's build and source links point into the kernel build
+	# directory of the build machine. They mean nothing on a panel.
+	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
+}
+
+sha512sums="
+242bf0ba8cff36a35ba5fa7d5716dc4aaa5a66782d69fd76afcda84d6cd49757c5935d528b8908b3522c4b5ae29cf27119000fe2074968668d6c57897bc2fde1  tsx-xx70-kernel-stable-bundle.tar.zst
+"

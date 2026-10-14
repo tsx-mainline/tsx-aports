@@ -2,7 +2,7 @@
 
 tsx-aports is the apk package repository for the TSX panels. It holds signed Alpine packages. With this repository, `apk upgrade` on a panel updates the kernel, sendspin, the ES2-patched Chromium and the patched wlroots, together with the Alpine packages.
 
-The repository has three repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). `xx50` holds the packages of the xx50 family (TSS-752). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`).
+The repository has four repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). `xx50` holds the packages of the xx50 family (TSS-752). `xx70` holds the kernel packages of the xx70 family (TSW-570, TSW-770 and TSW-1070). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`).
 
 ## Layout
 
@@ -10,6 +10,7 @@ The repository has three repos. `common` holds the hardware-independent packages
 common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
 xx50/<pkg>/APKBUILD        i.MX53 packages (xx50: TSS-752)
+xx70/<pkg>/APKBUILD        APQ8053 kernel packages (xx70: TSW-570, TSW-770 and TSW-1070)
 scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
 scripts/pin-kernel.sh      pin a kernel package to the bundle of a tsx-xx60-linux release
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
@@ -17,11 +18,12 @@ scripts/arch-image.sh      the container image of each architecture (used by bui
 scripts/apk-split.py       split an apk into its sig/control/data members (used by resign.sh)
 scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
+scripts/stage-kernel-xx70.sh   stage the bundle of an xx70 kernel package on a build host
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
 scripts/keep-pins.sh       keep/keep.txt for the initramfs pins of a tsx-xx60-linux tag (pin-kernel.sh runs it)
 keep/                      the kept packages: never pruned, restored by index.sh (see "Kept packages")
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune, kept packages)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -32,6 +34,7 @@ v3.24/common/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/xx60/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/xx50/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/common/aarch64/{*.apk, APKINDEX.tar.gz}
+v3.24/xx70/aarch64/{*.apk, APKINDEX.tar.gz}
 ```
 
 ## A panel's /etc/apk/repositories
@@ -43,7 +46,7 @@ https://dl-cdn.alpinelinux.org/alpine/v3.24/main
 https://dl-cdn.alpinelinux.org/alpine/v3.24/community
 ```
 
-An xx50 panel lists `v3.24/xx50` in place of `v3.24/xx60`.
+An xx50 panel lists `v3.24/xx50` in place of `v3.24/xx60`. An xx70 panel lists `v3.24/xx70`.
 
 **List the repos of this project FIRST.** See "Which chromium wins" below. When two candidates have the same version, apk picks the first one in repository order. This applies to a real pkgname and to a `provides=` match. `tsx-xx60-chromium` must win this tie, so that `apk add chromium` (and the `chromium=<ver>` pin of a rootfs) gets the ES2-patched build of this repo and not the Alpine build.
 
@@ -75,6 +78,8 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 - `xx50/tsx-xx50-board` is the board layer of the xx50 panels (the files of `rootfs/overlay` of tsx-xx50-linux that the board owns), with `tsx-kernel-slots`, `tsx-boot-ok` and `tsx-boot-rescue`. It depends on `tsx-autoupdate`, and its install scripts add the automatic update to the default runlevel. It has `arch=noarch`.
 - `xx50/tsx-xx50-panel-app` is the panel app program of the xx50 panels. `abuild` compiles it from the panel app source archive of a tsx-xx50-linux release: the C++ project that ESPHome writes. The build installs PlatformIO with pip in `$srcdir`, and PlatformIO downloads the libraries that the project names with exact versions. So the recipe has `options="net"`.
 - `xx50/tsx-xx50-kernel-lts` is a BINARY package of the xx50 kernel (see "Kernel packages" below). Its install hook writes the kernel into the normal raw slots of the boot card, and the rescue system into the rescue slot, with `tsx-kernel-slots`.
+- `xx70/tsx-xx70-boot-tools` contains `tsx-update-boot` and `tsx-bootrec` (copies of `rootfs/overlay/usr/local/sbin` in tsx-xx70-linux), `tsx-kernel-flavor` (shows or switches the booted flavor, and is also the install hook of the kernel packages) and the `tsx_is_installed_panel()` detection helper. `tsx-update-boot` writes only the `boot_b` partition. Before it writes, it checks the image for a `crestron,tswxx70` DTB. The host test is `scripts/tests/test-xx70-flavor.sh`.
+- `xx70/tsx-xx70-kernel-stable` and `xx70/tsx-xx70-kernel-lts` are BINARY packages of an already-built kernel (see "xx70 kernel packages" below). They install side by side.
 
 ## Add a package
 
@@ -93,7 +98,7 @@ Every recipe builds from public sources. CI and a local build download the same 
 - `common/tsx-ledbar-fw` uses the GitHub archive of the signed tag `v$pkgver` of tsx-ledbar-fw (panel tools, hooks, tests) and the release asset `tsx-ledbar-$pkgver.upg` of the same tag (the image). It does not compile the firmware, because the Alpine cross compiler makes a different image than the tested one.
 - `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
 - `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
-- The kernel packages use a release asset (see "Kernel packages").
+- The kernel packages use a release asset (see "Kernel packages"). The xx70 kernel packages use an asset of a tsx-aports release (see "xx70 kernel packages").
 
 The tag fixes the content of an archive. `sha512sums` fixes the bytes. GitHub makes the archive again on each request, with its own gzip. The bytes are the same on each download, but they are not the same as the output of `git archive | gzip`. A change of the GitHub gzip program changes the sum. The build then fails and nothing is signed. To fix this, run `abuild checksum` and check that the content is the same as before.
 
@@ -213,6 +218,22 @@ The write goes through `tsx-update-boot --emmc`. This tool keeps the previous co
 `tsx-xx50-kernel-lts` is a binary package of the same kind. Its `source=` fetches `tsx-xx50-kernel-lts-bundle.tar.zst` of the tsx-xx50-linux release `_kbundle_tag`. The job `kernel` of `release.yml` in that repo builds the bundle. It holds the uImage, the uInitrd (the ramdisk with the boot splash), the rescue system `tsx-xx50-rescue.img` (from v0.3.3 on), the DTB, the modules tarball, `kernel.release`, `kernel.commit` and `CHECKSUMS.sha256`. `package()` checks `CHECKSUMS.sha256` and `kernel.release`.
 
 The xx50 boots from raw slots of its SD card. The install hook runs `tsx-kernel-slots write /boot/uImage-lts /boot/uInitrd-lts` (from `tsx-xx50-board`). It does this only on a TSS-752 that runs from its card, and does nothing in a container or an image build. The command writes only the normal slots. The golden slots keep the last kernel that is known to boot, and U-Boot boots them after two failed boots. After good boots of the new kernel, `tsx-kernel-slots promote` on the panel copies it to the golden slots. `scripts/pin-kernel.sh` is for the xx60 packages only. To pin the xx50 package to a release, set `pkgver`, `_kbundle_tag` and `_kernelrelease`, then run `abuild checksum`.
+
+### xx70 kernel packages
+
+`tsx-xx70-kernel-lts` and `tsx-xx70-kernel-stable` are binary packages of the same kind. The source repository of the xx70 boot image, tsx-xx70-linux, is not public. So the bundle is an asset of a release of this repository: `tsx-xx70-kernel-<flavor>-bundle.tar.zst` of the release `_kbundle_tag` (`xx70-kernel-<YYYYMMDD>`, the date of `pkgver`). The bundle holds `Image.gz`, the eight board DTBs, the modules tarball, the `boot_b` image `tsx-xx70-boot.img` (lk2nd, the kernel, the eight DTBs and the boot initramfs, from `kernel/mkimage.sh` of tsx-xx70-linux), `kernel.release`, `kernel.commit` and `CHECKSUMS.sha256`. The kernel source is the public fork https://github.com/tsx-mainline/linux, branches `tsx-xx70-lts` and `tsx-xx70-stable`.
+
+To make a new bundle:
+
+1. Build the kernel at the pin of `kernel/KERNEL_REV.<flavor>` of tsx-xx70-linux, with `ci/build-kernel.sh` of that repository, on the build host.
+2. Build lk2nd at `bootloader/LK2ND_REV` and the boot initramfs of the same tsx-xx70-linux commit (`rootfs/build-rootfs.sh qbootctl`, then `rootfs/build-rootfs.sh initramfs`). A published bundle must use an initramfs without `AUTHORIZED_KEYS` and without `TSX_DEV_RESCUE_HASH`.
+3. Run `scripts/stage-kernel-xx70.sh <flavor>` with the build host variables of its header. The script packs the bundle on the build host and writes `pkgver`, `pkgrel`, `_kernelrelease` and `sha512sums` into the APKBUILD.
+4. Set `_kbundle_tag` to `xx70-kernel-<date of pkgver>`.
+5. Build and test the packages from the staged bundle (`scripts/build.sh`, as for a local build).
+6. Make the release `xx70-kernel-<date>` on a published commit of this repository, and attach the two staged bundles without a change. Their sha512 must be the sums of the APKBUILDs.
+7. Push the recipes to `main`. CI downloads the assets, checks them against `sha512sums` and builds the packages for aarch64.
+
+The install hook is the same as for xx60: `post-install` and `post-upgrade` run `tsx-kernel-flavor --hook <flavor>` of `tsx-xx70-boot-tools`. The hook writes only when `tsx_is_installed_panel()` finds that `/` is the `system_b` partition, the flavor of the package is the selected flavor, and `boot_b` does not already hold the image. The selected flavor is `KERNEL_FLAVOR` of `tsx-config`. If that is not set, it is the installed flavor with the series of the running kernel. The hook writes `boot_b` through `tsx-update-boot`, which keeps the previous content in `/data/tsx/boot_b.prev.img` and reads the write back. It never writes `boot_a`, the GPT or the boot record. To switch the flavor, run `tsx-kernel-flavor lts|stable` and reboot.
 
 ## Chromium
 

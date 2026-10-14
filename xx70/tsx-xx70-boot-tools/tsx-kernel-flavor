@@ -1,0 +1,127 @@
+#!/bin/sh
+# tsx-kernel-flavor: show or switch the kernel flavor an installed xx70 panel
+# boots (tsx-xx70-kernel-lts or tsx-xx70-kernel-stable).
+#
+#   tsx-kernel-flavor                 show the selected flavor, the running
+#                                     kernel and the packaged boot images
+#   tsx-kernel-flavor lts|stable      select FLAVOR (panel.conf KERNEL_FLAVOR)
+#                                     and write /boot/tsx-xx70-FLAVOR.img into
+#                                     boot_b with tsx-update-boot (backup and
+#                                     read-back check). Reboot to use it.
+#   tsx-kernel-flavor --hook FLAVOR   package install and upgrade scripts:
+#                                     write the image of FLAVOR only when
+#                                     FLAVOR is the selected one and boot_b
+#                                     does not hold the image already.
+#
+# Both kernel packages can be installed at the same time. Each one has its
+# own /lib/modules/<release>/ tree and its own /boot/tsx-xx70-<flavor>.img,
+# so a switch writes only boot_b. The selected flavor is, in order:
+# KERNEL_FLAVOR in the panel configuration (tsx-config), else the installed
+# flavor with the release series of the running kernel. When neither gives
+# one, no flavor is selected and the package hooks write nothing: a panel
+# that runs stable must not change to lts because only lts is installed.
+# Nothing is written anywhere but on an installed xx70 panel
+# (tsx_is_installed_panel). The previous boot_b image stays in
+# /data/tsx/boot_b.prev.img (tsx-update-boot).
+# Test hooks: TSX_LIBDIR, TSX_BOOTDIR, TSX_SHAREDIR, TSX_UPDATE_BOOT,
+# TSX_SYSBLOCK, TSX_DEVDIR, TSX_UNAME_R (the running release).
+set -u
+LIBDIR=${TSX_LIBDIR:-/usr/lib/tsx}
+BOOTDIR=${TSX_BOOTDIR:-/boot}
+SHAREDIR=${TSX_SHAREDIR:-/usr/share/tsx}
+UPDATE=${TSX_UPDATE_BOOT:-/usr/sbin/tsx-update-boot}
+. "$LIBDIR/tsx-is-panel.sh"
+
+say() { echo "tsx-kernel-flavor: $*"; }
+
+tsx_config() {
+	for c in /usr/local/sbin/tsx-config /usr/sbin/tsx-config; do
+		[ -x "$c" ] && { "$c" "$@"; return; }
+	done
+	return 127
+}
+
+image_of() { echo "$BOOTDIR/tsx-xx70-$1.img"; }
+release_of() { cat "$SHAREDIR/kernel-$1.release" 2>/dev/null; }
+series() { echo "$1" | cut -d. -f1-2; }
+
+selected_flavor() {
+	f=$(tsx_config get KERNEL_FLAVOR 2>/dev/null) || f=
+	case $f in lts|stable) echo "$f"; return;; esac
+	run=${TSX_UNAME_R:-$(uname -r)}
+	for f in lts stable; do
+		r=$(release_of $f)
+		[ -n "$r" ] && [ "$(series "$r")" = "$(series "$run")" ] && { echo "$f"; return; }
+	done
+	echo none
+}
+
+# sha256 of the first LEN bytes of boot_b
+part_sha() {
+	p=$(tsx_part_name boot_b) || return 1
+	dd if="${TSX_DEVDIR:-/dev}/$p" bs=1M count=$(( ($1 + 1048575) / 1048576 )) 2>/dev/null | head -c "$1" | sha256sum | cut -d' ' -f1
+}
+
+write_image() {  # write_image FLAVOR
+	img=$(image_of "$1")
+	[ -r "$img" ] || { say "no $img (is tsx-xx70-kernel-$1 installed?)"; return 1; }
+	# tsx-update-boot checks the image again before it writes
+	if chk=$("$UPDATE" --check "$img" 2>&1); then say "$chk"; else
+		say "$chk"
+		say "the $1 image does not boot this panel. Nothing written."
+		return 1
+	fi
+	sha=$(sha256sum < "$img" | cut -d' ' -f1)
+	if [ "$(part_sha "$(stat -c %s "$img")")" = "$sha" ]; then
+		say "boot_b already holds the $1 image ($(release_of "$1")). Nothing written."
+		return 0
+	fi
+	say "writing the $1 boot image ($(release_of "$1")) into boot_b"
+	if "$UPDATE" "$img" "$sha"; then
+		say "the previous boot_b image is in /data/tsx/boot_b.prev.img"
+		say "reboot to use the $1 kernel"
+		return 0
+	fi
+	say "tsx-update-boot failed. The panel still boots the previous kernel."
+	return 1
+}
+
+case "${1:-}" in
+-h|--help) sed -n '2,24p' "$0"; exit 0;;
+'')
+	sel=$(selected_flavor)
+	[ "$sel" = none ] && sel="none (KERNEL_FLAVOR is unset and no installed flavor has the series of the running kernel: tsx-kernel-flavor lts|stable)"
+	printf '%-10s%s\n' selected: "$sel" running: "${TSX_UNAME_R:-$(uname -r)}"
+	for f in lts stable; do
+		if [ -r "$(image_of $f)" ]; then
+			ok=$("$UPDATE" --check "$(image_of $f)" >/dev/null 2>&1 && echo "boots this panel" || echo "NOT for this panel")
+			printf '%-10s%s\n' "$f:" "$(release_of $f) ($(image_of $f), $ok)"
+		else
+			printf '%-10s%s\n' "$f:" "not installed (apk add tsx-xx70-kernel-$f)"
+		fi
+	done
+	exit 0;;
+--hook)
+	f=${2:?--hook FLAVOR}
+	tsx_is_installed_panel || { say "not on an installed xx70 panel (or in a chroot or container). Nothing written."; exit 0; }
+	sel=$(selected_flavor)
+	if [ "$sel" = none ]; then
+		say "tsx-xx70-kernel-$f installed. KERNEL_FLAVOR is unset and the running kernel (${TSX_UNAME_R:-$(uname -r)}) is not $f, so nothing written. To switch: tsx-kernel-flavor $f"
+	elif [ "$sel" != "$f" ]; then
+		say "tsx-xx70-kernel-$f installed. The panel boots $sel, so nothing written. To switch: tsx-kernel-flavor $f"
+	else
+		write_image "$f" || say "boot_b was not changed. Run tsx-kernel-flavor $f to try again."
+	fi
+	exit 0;;
+lts|stable)
+	f=$1
+	[ "$(id -u)" = 0 ] || { say "must run as root"; exit 1; }
+	tsx_is_installed_panel || { say "not on an installed xx70 panel. Nothing written."; exit 1; }
+	[ -r "$(image_of $f)" ] || { say "tsx-xx70-kernel-$f is not installed (apk add tsx-xx70-kernel-$f)"; exit 1; }
+	old=$(tsx_config get KERNEL_FLAVOR 2>/dev/null) || old=
+	write_image "$f" || exit 1
+	if tsx_config set KERNEL_FLAVOR "$f" >/dev/null 2>&1; then say "KERNEL_FLAVOR=$f (was ${old:-unset})"
+	else say "WARNING: could not record KERNEL_FLAVOR=$f (tsx-config missing?)"; fi
+	exit 0;;
+*) sed -n '2,24p' "$0" >&2; exit 2;;
+esac

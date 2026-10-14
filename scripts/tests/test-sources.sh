@@ -6,7 +6,8 @@
 #   2. The builddir of a recipe that downloads a GitHub tag archive is the
 #      top directory of that archive (<repo>-<tag without a leading v>).
 #   3. A kernel package names a release (_kbundle_tag), and its
-#      _kernelrelease starts with the version of pkgver.
+#      _kernelrelease starts with the version of pkgver. An xx70 kernel
+#      package names the tsx-aports release xx70-kernel-<date of pkgver>.
 #   4. scripts/pin-kernel.sh, against a local server with a fixture bundle:
 #      it writes the three values and keep/ (keep-pins.sh), and it refuses
 #      a bundle with a wrong kernel.release, a wrong CHECKSUMS.sha256 and a
@@ -45,7 +46,7 @@ recipe_vars() {
 }
 
 echo "== 1/2/3. the recipes =="
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 	[ -f "$D/APKBUILD" ] || continue
 	P=$(basename "$D")
 	V=$(recipe_vars "${D%/}")
@@ -90,6 +91,11 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
 		# The xx50 kernel release has no git suffix (6.18.54-tsx-xx50).
 		case $KB in v[0-9]*) ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB'";; esac
 		case $KR in "${PV%%_*}"-*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac;;
+	tsx-xx70-kernel-*)
+		# The bundle is an asset of a tsx-aports release xx70-kernel-<YYYYMMDD>
+		# with the date of pkgver.
+		case $KB in "xx70-kernel-${PV##*_git}") ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB', expected xx70-kernel-${PV##*_git}";; esac
+		case $KR in "${PV%%_*}"-[0-9]*-g[0-9a-f]*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac;;
 	esac
 	if grep -q "^0\{128\}  " "$D/APKBUILD"; then
 		case $P in tsx-xx60-kernel-*) ;; *) warn "$P: a sha512 is pending (all zeros): run abuild checksum after the tag or the release";; esac
@@ -100,12 +106,12 @@ echo "== 5. file modes =="
 # A GitHub tag archive has group-writable files. tsx-config and the plugin
 # loader of tsx-ha refuse a group-writable plugin. The bundle of a kernel
 # release has the user of the CI runner as the owner of its files.
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 	A=$D/APKBUILD; [ -f "$A" ] || continue; P=$(basename "$D")
 	if grep -qE 'cp -a "\$builddir"|stat -c %a' "$A"; then
 		grep -q 'chmod -R go-w "$pkgdir"$' "$A" && ok "$P: no group-writable files" || bad "$P: keeps the modes of the archive without chmod -R go-w"
 	fi
-	case $P in tsx-xx60-kernel-*|tsx-xx50-kernel-*)
+	case $P in tsx-xx60-kernel-*|tsx-xx50-kernel-*|tsx-xx70-kernel-*)
 		grep -q 'chown -R 0:0 "$pkgdir"/lib$' "$A" && grep -q 'chmod -R go-w "$pkgdir"/lib$' "$A" \
 			&& ok "$P: root owns the module tree, no group-writable files" || bad "$P: the module tree keeps the owner or the modes of the bundle";;
 	esac

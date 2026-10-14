@@ -32,7 +32,8 @@
 # Sources. Every recipe downloads public files: the GitHub archive of a signed
 # tag (tsx-linux-common, tsx-xx60-linux, tsx-xx50-linux, tsx-ledbar-fw),
 # upstream archives, the kernel bundles of a tsx-xx60-linux or tsx-xx50-linux
-# release, and the panel app source archive of a tsx-xx50-linux release.
+# release, the xx70 kernel bundles of a tsx-aports release, and the panel app
+# source archive of a tsx-xx50-linux release.
 # tsx-xx50-panel-app also downloads PlatformIO and its pinned libraries in
 # build(). The build runs with --verify,
 # so it checks each download against the sha512sums of the APKBUILD and stops
@@ -52,9 +53,9 @@ name: build
 on:
   push:
     branches: [main]
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   pull_request:
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   schedule:
     # chromium-watch and wlroots-watch use this schedule. The time is UTC, once a day.
     - cron: '17 6 * * *'
@@ -165,7 +166,8 @@ jobs:
       # --skip-unreachable: the build skips a kernel package whose release
       # bundle does not exist yet, with a warning. Its carried-forward copy
       # stays.
-      # --all builds two passes: armv7 (common, xx60, xx50) and aarch64 (common).
+      # --all builds two passes: armv7 (common, xx60, xx50) and aarch64
+      # (common, xx70).
       # A package builds in a pass only when its arch= lists that
       # architecture. tensorflow-lite-c and sendspin-cli list both.
       - name: Build the new versions

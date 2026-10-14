@@ -1,0 +1,109 @@
+#!/bin/sh
+# ON THE PANEL (running kiosk system): replace the mainline boot image.
+#   tsx-update-boot IMG SHA256   write IMG (kernel/mkimage.sh output: lk2nd +
+#                                Android boot image, at most 64 MiB) into the
+#                                boot_b partition. The previous partition
+#                                content is saved first to
+#                                /data/tsx/boot_b.prev.img (+ .sha256), the
+#                                write is read back, and a bad readback
+#                                restores the old image. Roll back:
+#                                tsx-update-boot /data/tsx/boot_b.prev.img \
+#                                  $(cat /data/tsx/boot_b.prev.img.sha256)
+#   tsx-update-boot --check IMG  only check IMG (layout and board, below)
+#   tsx-update-boot --help
+# Checks before anything is written: the sha256; "ANDROID!" at 0 (lk2nd) and
+# at 512 KiB (the kernel's boot image); a DTB for this board family after
+# 512 KiB (compatible "crestron,tswxx70"). --any-board (first option) skips
+# the board test. Slot a, the GPT and the boot-side record are never
+# touched: a new kernel that does not come up is counted by the vendor LK,
+# which returns to stock Android after 11 boots (docs/recovery.md).
+# Test hooks: TSX_SYSBLOCK (/sys/class/block), TSX_DEVDIR (/dev),
+# TSX_DATA (/data), TSX_NO_MOUNTCHECK=1, TSX_RESCUE_MARK (/run/rescue-reason).
+# In a rescue with no /data the backup goes to /tmp (RAM).
+set -eu
+case "${1:-}" in -h|--help|"") sed -n '2,22p' "$0"; exit 0;; esac
+ANYBOARD=0; [ "${1:-}" = --any-board ] && { ANYBOARD=1; shift; }
+SYSB=${TSX_SYSBLOCK:-/sys/class/block}
+DEVD=${TSX_DEVDIR:-/dev}
+DATA=${TSX_DATA:-/data}
+PART_START=1052672 PART_SECTORS=131072   # boot_b on every known unit (docs/boot.md)
+LK2ND_MAX=524288
+
+# boot_b's device node: by partition name (sysfs PARTNAME), on the eMMC
+boot_dev() {
+	for u in "$SYSB"/mmcblk*p*/uevent; do
+		[ -r "$u" ] || continue
+		grep -qx 'PARTNAME=boot_b' "$u" || continue
+		d=${u%/uevent}; echo "${d##*/}"; return 0
+	done
+	return 1
+}
+
+image_check() {
+	img=$1
+	[ "$(head -c 8 "$img")" = "ANDROID!" ] || { echo "check: $img does not start with an Android boot image (lk2nd)"; return 1; }
+	[ "$(dd if="$img" bs=1 skip=$LK2ND_MAX count=8 2>/dev/null)" = "ANDROID!" ] ||
+		{ echo "check: no Android boot image at 512 KiB of $img (not a kernel/mkimage.sh image)"; return 1; }
+	sz=$(wc -c < "$img" | tr -d ' ')
+	[ "$sz" -le $((PART_SECTORS * 512)) ] || { echo "check: $img ($sz bytes) is larger than boot_b (64 MiB)"; return 1; }
+	if [ "$ANYBOARD" = 1 ]; then echo "check: board test skipped (--any-board)"; return 0; fi
+	if tail -c +$((LK2ND_MAX + 1)) "$img" | grep -a -q 'crestron,tswxx70'; then
+		echo "check: OK, the kernel image carries a crestron,tswxx70 DTB"; return 0
+	fi
+	echo "check: no crestron,tswxx70 DTB in the kernel part of $img: it would not boot this panel"
+	return 1
+}
+
+if [ "${1:-}" = --check ]; then if image_check "${2:?IMG}"; then exit 0; else exit 1; fi; fi
+IMG=${1:?IMG}; SHA=${2:?SHA256}
+[ "$(sha256sum < "$IMG" | cut -d' ' -f1)" = "$SHA" ] || { echo "image sha256 mismatch"; exit 1; }
+image_check "$IMG" || { echo "nothing written"; exit 1; }
+
+p=$(boot_dev) || { echo "no boot_b partition found (sysfs PARTNAME)"; exit 1; }
+BOOT=$DEVD/$p
+st=$(cat "$SYSB/$p/start") psz=$(cat "$SYSB/$p/size")
+[ "$st" = $PART_START ] && [ "$psz" = $PART_SECTORS ] ||
+	{ echo "$p (boot_b) is at $st/$psz sectors, expected $PART_START/$PART_SECTORS: refusing"; exit 1; }
+[ -b "$BOOT" ] || [ -f "$BOOT" ] || { echo "$BOOT is not a block device"; exit 1; }
+if [ "${TSX_NO_MOUNTCHECK:-0}" != 1 ] && ! grep -q " $DATA " /proc/mounts; then
+	# A rescue system (the golden rescue, or the rescue of boot_b) has no
+	# /data. The backup then stays in RAM, for this rescue session only.
+	if [ -e "${TSX_RESCUE_MARK:-/run/rescue-reason}" ]; then
+		DATA=/tmp/tsx-rescue-data
+		echo "this is a rescue system with no /data: the backup of boot_b stays in RAM ($DATA), until the next reboot"
+	else
+		echo "$DATA is not mounted (needed for the backup)"; exit 1
+	fi
+fi
+sz=$(wc -c < "$IMG" | tr -d ' ')
+PREV=$DATA/tsx/boot_b.prev.img
+mkdir -p "$DATA/tsx"
+# read back LEN bytes of the partition, sha256
+part_sha() { dd if="$BOOT" bs=1M count=$(( ($1 + 1048575) / 1048576 )) 2>/dev/null | head -c "$1" | sha256sum | cut -d' ' -f1; }
+drop_caches() { sync; { echo 3 > /proc/sys/vm/drop_caches; } 2>/dev/null || true; }
+# a roll back (IMG is the backup itself): keep a copy, the backup below replaces it
+if [ "$IMG" -ef "$PREV" ]; then cp "$IMG" "$DATA/tsx/boot_b.rollback.img"; IMG=$DATA/tsx/boot_b.rollback.img; fi
+echo "--- saving the current boot_b ($BOOT, 64 MiB) to $PREV"
+dd if="$BOOT" of="$PREV.new" bs=1M count=$((PART_SECTORS / 2048)) conv=fsync 2>&1 | tail -1
+psha=$(sha256sum < "$PREV.new" | cut -d' ' -f1)
+drop_caches
+[ "$(part_sha $((PART_SECTORS * 512)))" = "$psha" ] || { rm -f "$PREV.new"; echo "backup readback mismatch: nothing written"; exit 1; }
+mv "$PREV.new" "$PREV"; echo "$psha" > "$PREV.sha256"; sync
+echo "previous boot_b sha256 (64 MiB): $psha"
+echo "--- writing $IMG ($sz bytes) into $BOOT"
+dd if="$IMG" of="$BOOT" bs=1M conv=fsync,notrunc 2>&1 | tail -1
+drop_caches
+got=$(part_sha "$sz")
+if [ "$got" = "$SHA" ]; then
+	echo "boot_b verified ($got)"
+	rm -f "$DATA/tsx/boot_b.rollback.img"
+	echo "done: reboot to start the new kernel"
+	echo "roll back with: tsx-update-boot $PREV $psha"
+	exit 0
+fi
+echo "BOOT_B READBACK MISMATCH ($got): restoring the previous image"
+dd if="$PREV" of="$BOOT" bs=1M conv=fsync,notrunc 2>&1 | tail -1
+drop_caches
+if [ "$(part_sha $((PART_SECTORS * 512)))" = "$psha" ]; then echo "previous image restored and verified"
+else echo "WARNING: restore readback mismatch too; do NOT reboot (the vendor LK falls back to stock Android after 11 failed boots)"; fi
+exit 1
