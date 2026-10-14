@@ -1,6 +1,7 @@
 #!/bin/sh
-# Runs after a package upgrade. The hook of the package updates the bar only
-# when the user installed the tsx-ledbar firmware (marker in /data/tsx).
+# Runs after a package upgrade. The hook of the package never loads the bar.
+# When the user installed the tsx-ledbar firmware (marker in /data/tsx), it
+# records a newer image in /data/tsx/ledbar-fw.pending.
 # apk gives scripts a short PATH, so add the directories of the panel tools.
 PATH=/usr/local/sbin:/usr/local/bin:$PATH
 export PATH

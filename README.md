@@ -90,7 +90,7 @@ Every recipe builds from public sources. CI and a local build download the same 
 
 - The recipes of `common/` (all `tsx-*` packages that have a `tsx-linux-common-$pkgver.tar.gz` source) use the GitHub archive of the signed tag `v$pkgver` of tsx-linux-common.
 - `xx60/tsx-xx60-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx60-linux. The top directory of this archive is `tsx-xx60-linux-board-v$pkgver`.
-- `common/tsx-ledbar-fw` uses the GitHub archive of the signed tag `v$pkgver` of tsx-ledbar-fw.
+- `common/tsx-ledbar-fw` uses the GitHub archive of the signed tag `v$pkgver` of tsx-ledbar-fw (panel tools, hooks, tests) and the release asset `tsx-ledbar-$pkgver.upg` of the same tag (the image). It does not compile the firmware, because the Alpine cross compiler makes a different image than the tested one.
 - `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
 - `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
 - The kernel packages use a release asset (see "Kernel packages").
