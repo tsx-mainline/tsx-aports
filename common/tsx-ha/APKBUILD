@@ -8,8 +8,10 @@
 # 0.3.7: tsx-mqtt sends the new update texts (title, latest version, notes).
 # 0.3.8: the poll of the ESPHome device starts no process.
 # 0.3.9: the MQTT Backlight number is a percent (1 to 100), as the ESPHome entity.
+# 0.3.10: the Dark mode switch, a rate limit for the CPU temperature, the light and
+# the distance sensors, and "Last boot" in place of "Uptime".
 pkgname=tsx-ha
-pkgver=0.3.9
+pkgver=0.3.10
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -50,5 +52,5 @@ package() {
 }
 
 sha512sums="
-b05691a9b3f9c4b08acde4763bd4796a985cb4f80c9547b8a64002c93a38a892e8d3967b6448d24394203c0f40a6e5b9bb5d74dfd8a48d863cb3ee64232139b1  tsx-linux-common-0.3.9.tar.gz
+b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
 "

@@ -6,8 +6,9 @@
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.8: tsx-display-power starts fewer processes.
+# 0.3.10: the KIOSK_DARK setting adds the dark mode flags of the browser.
 pkgname=tsx-kiosk
-pkgver=0.3.8
+pkgver=0.3.10
 pkgrel=0
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -78,5 +79,5 @@ _cursors() {
 }
 
 sha512sums="
-49e4d33852d9454a72bb53440f0a372e66e609f8f1d742ba0025be32c8a8fe2e41e27f460768f9cc0d41aa047b033f641cf834fad048c59b72cef826bc378118  tsx-linux-common-0.3.8.tar.gz
+b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
 "
