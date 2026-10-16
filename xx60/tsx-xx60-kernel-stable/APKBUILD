@@ -39,12 +39,12 @@ SRCDEST="$startdir/dist"
 # into the eMMC boot partition (tsx-kernel-flavor, tsx-xx60-boot-tools).
 pkgname=tsx-xx60-kernel-stable
 pkgver=7.2.8_git20261006
-pkgrel=0
+pkgrel=1
 _kernelrelease=7.2.8-00119-geddf71e798ef
 # The tsx-xx60-linux release tag whose "kbundle" CI asset this package pins.
 # release.yml of that repo builds the asset when the tag is pushed. The tag
 # builds the kernel of its kernel/KERNEL_REV.stable.
-_kbundle_tag=v0.2.1
+_kbundle_tag=v0.3.12
 pkgdesc="xx60 mainline kernel, latest stable line"
 url="https://github.com/tsx-mainline/tsx-xx60-linux"
 arch="armv7"
@@ -71,5 +71,5 @@ package() {
 }
 
 sha512sums="
-6023f48183655a466a6a9fe01640937c2d5bd9bb7101480601dce6ef7aad6ccb814315c363b40dc0ee28b72ab39ab17716897cf3fb903bb8812cee4f395572e7  tsx-xx60-kernel-stable-bundle.tar.zst
+571d6724e7aaa78d2cdbb0257b468770a08158ab506fd5104b49bfaa39ba95afb10f0fc68c8478faa953abd23ba62b404970b3c3f797280ef7ab667fb3725ac0  tsx-xx60-kernel-stable-bundle.tar.zst
 "
