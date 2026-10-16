@@ -23,8 +23,9 @@
 # 0.3.8: tsx-als and tsx-cpufreqd start no process in their loops.
 # 0.3.9: the files are the same as in 0.3.8. The version follows the release.
 # 0.3.12: the files are the same as in 0.3.9. The version follows the release.
+# 0.3.13: the files are the same as in 0.3.9. The version follows the release.
 pkgname=tsx-xx60-board
-pkgver=0.3.12
+pkgver=0.3.13
 pkgrel=0
 pkgdesc="TSX xx60 board layer: board file, hardware tools, services, keys, Bluetooth chip, TFA9890 and audio"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -142,6 +143,6 @@ _ha() {
 }
 
 sha512sums="
-24320401875d5ba2e39bb77901a840ed87c3165831ec520ca63e68b0e273e8b5ed9e3e8efef6ffbcc60cfa9590433d88773c9111fd23851fc6cf4e9f5479286a  tsx-xx60-linux-0.3.12.tar.gz
+73cb1d92c71aab2aa247684af4e1d76fe4b1bb8c1f032859911c492e9b949c707f3ae5c6ab98017cb2f02c771e980620194bba69188ac02bd2759f4a05cdbf3d  tsx-xx60-linux-0.3.13.tar.gz
 b220767df979e4315233643d8285c9a26925684f95ef1d0c3ad87e05042598c33e630ba960a5569e3ee971a2e86ff0f44ac7361f03dcc5dee78995faa8fa1189  cage-0.3.1.tar.gz
 "
