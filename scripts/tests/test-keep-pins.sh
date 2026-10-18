@@ -30,6 +30,11 @@ echo rescue20 > "$K/v3.24/common/armv7/tsx-rescue-ui-0.2.0-r1.apk"
 { echo "# header line 1"; echo "# header line 2"
   echo "xx60/armv7/tsx-xx60-board-0.2.0-r1.apk $(sha256sum < "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" | cut -d' ' -f1)"
   echo "common/armv7/tsx-rescue-ui-0.2.0-r1.apk $(sha256sum < "$K/v3.24/common/armv7/tsx-rescue-ui-0.2.0-r1.apk" | cut -d' ' -f1)"; } > "$K/keep.txt"
+# keep/keep-alpine.txt and keep/alpine/ (Alpine files) belong to no pin: keep-pins.sh must leave them
+mkdir -p "$K/alpine/v3.24/xx60/armv7"
+echo alpinefile > "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk"
+echo "xx60/armv7/chromium-common-152.0.7977.82-r0.apk $(sha256sum < "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk" | cut -d' ' -f1)" > "$K/keep-alpine.txt"
+alpine_before=$(cat "$K/keep-alpine.txt")
 pin() {  # pin TAG LINES...: packages.pin of TAG
 	local t=$1; shift; mkdir -p "$W/raw/$t/rootfs/initramfs"
 	{ echo "# a comment"; printf '%s\n' "$@"; } > "$W/raw/$t/rootfs/initramfs/packages.pin"
@@ -51,6 +56,8 @@ while read -r rel sum; do
 done < <(grep -v '^#' "$K/keep.txt")
 ok "every kept file has the sha256 of its line"
 [ "$(head -n 2 "$K/keep.txt")" = "$(printf '# header line 1\n# header line 2')" ] && ok "the header stays" || bad "header: $(head -n 2 "$K/keep.txt")"
+[ "$(cat "$K/keep-alpine.txt")" = "$alpine_before" ] && [ "$(cat "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk")" = alpinefile ] \
+	&& ok "keep-alpine.txt and keep/alpine/ stay" || bad "keep-pins.sh changed the kept Alpine files"
 echo "== 2. the same tag again"
 before=$(cat "$K/keep.txt")
 out=$(run v9.0.0 2>&1); rc=$?

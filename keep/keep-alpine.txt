@@ -1,0 +1,17 @@
+# Kept Alpine packages: scripts/index.sh never prunes these files, and it
+# copies a file from keep/alpine/v3.24/ when the published tree lacks it
+# (sha256 checked). scripts/pin-kernel.sh and keep-pins.sh do not touch this
+# list or this folder.
+# They are the armv7 packages of Alpine v3.24 community that
+# xx60/tsx-xx60-chromium depends on (chromium-common=152.0.7977.82-r0, and
+# chromium-angle=152.0.7977.82-r0 through chromium-common). Alpine removed
+# chromium from armv7 on 2026-10-15 (aports commit 7e8aa9ca, "disable on
+# armv7": the link step ran out of memory on the builders), so its index
+# lists no armv7 chromium package any more.
+# The files are the original Alpine files, signed with the Alpine key
+# alpine-devel@lists.alpinelinux.org-616adfeb (checked with apk verify), from
+# https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/. We do not sign
+# them again. A panel trusts the Alpine keys already.
+# <category>/<arch>/<file>  <sha256>
+xx60/armv7/chromium-common-152.0.7977.82-r0.apk c7f699d5d65ec89687f159f862e5e4bcd7fc028dbab69b6fcfa49c4deb842b51
+xx60/armv7/chromium-angle-152.0.7977.82-r0.apk 4b8ed589f407093f983e7533498c230eb25ca328563b335510c42e685967f33d

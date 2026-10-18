@@ -41,6 +41,13 @@
 # package() so that the shipped binaries change, derive the list again from
 # the .PKGINFO of the new .apk (`tar -xzf chromium-*.apk .PKGINFO && cat
 # .PKGINFO`). Do not edit it by hand.
+# Alpine switched off the armv7 build of chromium on 2026-10-15 (aports commit
+# 7e8aa9ca). Its index lists no armv7 chromium package any more, so the
+# depends= below on chromium-common (and chromium-angle through it) resolves
+# only through keep/keep-alpine.txt: scripts/index.sh keeps the two original
+# Alpine files of this version in the xx60 index. The source= file below is
+# still on the CDN. Keep this pkgver until Alpine builds armv7 again or a
+# decision for another browser or a build of our own is made.
 pkgname=tsx-xx60-chromium
 pkgver=152.0.7977.82
 pkgrel=0

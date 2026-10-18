@@ -14,11 +14,13 @@
 # --keep N   keep the newest N versions of each package (sorted by
 #            pkgver/pkgrel), delete the others, then re-index. The default
 #            is 2: the latest version and one previous version.
-#            The files that keep/keep.txt lists are not pruned and do not
-#            count as versions. If the tree lacks one, the script copies it
-#            from keep/v3.24/ (sha256 checked). These are the packages that
-#            the rescue initramfs of tsx-xx60-linux pins (see README.md
-#            "Kept packages").
+#            The files that keep/keep.txt and keep/keep-alpine.txt list are
+#            not pruned and do not count as versions. If the tree lacks one,
+#            the script copies it from keep/v3.24/ (keep.txt) or from
+#            keep/alpine/v3.24/ (keep-alpine.txt), sha256 checked. keep.txt
+#            has the packages that the rescue initramfs of tsx-xx60-linux
+#            pins. keep-alpine.txt has Alpine packages that Alpine removed
+#            and that our packages depend on (see README.md "Kept packages").
 # --out DIR  the directory for the published tree (default: repo/,
 #            gitignored). CI publishes it (see .github/workflows/build.yml).
 #
@@ -33,7 +35,7 @@ OUT="$REPO/repo"
 while [ $# -gt 0 ]; do case $1 in
 	--keep) KEEP=$2; shift;;
 	--out) OUT=$2; shift;;
-	-h|--help) sed -n '2,21p' "$0"; exit 0;;
+	-h|--help) sed -n '2,25p' "$0"; exit 0;;
 	*) echo "unknown arg $1" >&2; exit 1;;
 esac; shift; done
 
@@ -46,10 +48,23 @@ apk_names() {
 KEEPDIR=${TSX_APORTS_KEEP_DIR:-$REPO/keep}
 
 # kept_list: one line "<category>/<arch>/<file> <sha256>" for each file that
-# keep/keep.txt lists.
+# keep/keep.txt or keep/keep-alpine.txt lists.
 kept_list() {
-	[ -f "$KEEPDIR/keep.txt" ] || return 0
-	sed -e 's/#.*//' "$KEEPDIR/keep.txt" | awk 'NF >= 2 { print $1, $2 }'
+	local l
+	for l in keep.txt keep-alpine.txt; do
+		[ -f "$KEEPDIR/$l" ] || continue
+		sed -e 's/#.*//' "$KEEPDIR/$l" | awk 'NF >= 2 { print $1, $2 }'
+	done
+}
+
+# kept_source REL: the path of the copy of a kept file, in keep/v3.24/ or in
+# keep/alpine/v3.24/. Print the first path, even if no file is there.
+kept_source() {
+	if [ -f "$KEEPDIR/v3.24/$1" ] || [ ! -f "$KEEPDIR/alpine/v3.24/$1" ]; then
+		echo "$KEEPDIR/v3.24/$1"
+	else
+		echo "$KEEPDIR/alpine/v3.24/$1"
+	fi
 }
 
 # restore_kept TREE: TREE is packages/v3.24. Copy each kept file that TREE
@@ -64,8 +79,8 @@ restore_kept() {
 				|| { echo "index.sh: $rel in the tree is not the kept file (sha256 $sum)" >&2; return 1; }
 			continue
 		fi
-		k=$KEEPDIR/v3.24/$rel
-		[ -f "$k" ] || { echo "index.sh: $rel is kept, but neither the tree nor $KEEPDIR/v3.24 has it" >&2; return 1; }
+		k=$(kept_source "$rel")
+		[ -f "$k" ] || { echo "index.sh: $rel is kept, but neither the tree nor $KEEPDIR/v3.24 or $KEEPDIR/alpine/v3.24 has it" >&2; return 1; }
 		[ "$(sha256sum < "$k" | cut -d' ' -f1)" = "$sum" ] \
 			|| { echo "index.sh: $k does not have the sha256 of keep.txt ($sum)" >&2; return 1; }
 		mkdir -p "$(dirname "$t")"

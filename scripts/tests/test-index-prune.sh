@@ -11,6 +11,9 @@
 #   4. The files of keep/keep.txt are not pruned and do not count. A kept
 #      file that the tree lacks comes back from keep/v3.24/. The files in
 #      keep/v3.24/ of this repo have the sha256 of the list.
+#   5. The same holds for keep/keep-alpine.txt and keep/alpine/v3.24/ (the
+#      Alpine packages that Alpine removed). keep-pins.sh does not touch
+#      them, so they have their own list and folder.
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
@@ -90,10 +93,31 @@ out=$(restore_kept "$T" 2>&1); rc=$?
 rm -f "$T/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk" "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk"
 out=$(restore_kept "$T" 2>&1); rc=$?
 [ $rc = 1 ] && echo "$out" | grep -q "neither the tree nor" && ok "a kept file that is nowhere: an error" || bad "missing: rc $rc, $out"
+echo "== kept Alpine files (keep/keep-alpine.txt) =="
+K=$W/keep2; T=$W/tree2/v3.24; mkdir -p "$K/alpine/v3.24/xx60/armv7" "$T/xx60/armv7"
+echo "alpine chromium-common" > "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk"
+SUM=$(sha256sum < "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk" | cut -d' ' -f1)
+printf '# comment\nxx60/armv7/chromium-common-152.0.7977.82-r0.apk %s\n' "$SUM" > "$K/keep-alpine.txt"
+KEEPDIR=$K
+[ "$(kept_list)" = "xx60/armv7/chromium-common-152.0.7977.82-r0.apk $SUM" ] && ok "kept_list reads keep-alpine.txt when keep.txt is absent" || bad "kept_list: $(kept_list)"
+out=$(restore_kept "$T"); rc=$?
+[ $rc = 0 ] && cmp -s "$T/xx60/armv7/chromium-common-152.0.7977.82-r0.apk" "$K/alpine/v3.24/xx60/armv7/chromium-common-152.0.7977.82-r0.apk" \
+	&& ok "an Alpine file that the tree lacks is restored from keep/alpine/v3.24" || bad "restore alpine: rc $rc, $out"
+: > "$T/xx60/armv7/chromium-common-152.0.7977.83-r0.apk"; : > "$T/xx60/armv7/chromium-common-152.0.7977.84-r0.apk"; : > "$T/xx60/armv7/chromium-common-152.0.7977.85-r0.apk"
+prune_dir "$T/xx60/armv7/" >/dev/null
+[ -e "$T/xx60/armv7/chromium-common-152.0.7977.82-r0.apk" ] && [ ! -e "$T/xx60/armv7/chromium-common-152.0.7977.83-r0.apk" ] \
+	&& ok "the kept Alpine file is not pruned and does not count" || bad "prune of the kept Alpine file"
+printf 'xx60/armv7/tsx-xx60-board-0.2.0-r1.apk %s\n' "$SUM" > "$K/keep.txt"
+[ "$(kept_list | wc -l)" = 2 ] && ok "kept_list joins keep.txt and keep-alpine.txt" || bad "kept_list join"
+rm -f "$K/keep.txt"
+echo "changed" > "$T/xx60/armv7/chromium-common-152.0.7977.82-r0.apk"
+out=$(restore_kept "$T" 2>&1); rc=$?
+[ $rc = 1 ] && echo "$out" | grep -q "is not the kept file" && ok "an Alpine file with another sha256 in the tree: an error" || bad "alpine mismatch: rc $rc, $out"
 echo "== the kept files of this repo =="
 KEEPDIR=$HERE/../keep
 while read -r rel sum; do
-	[ "$(sha256sum < "$KEEPDIR/v3.24/$rel" | cut -d' ' -f1)" = "$sum" ] && ok "keep/v3.24/$rel has its sha256" || bad "keep/v3.24/$rel: sha256 differs or the file is missing"
+	f=$(kept_source "$rel")
+	[ -f "$f" ] && [ "$(sha256sum < "$f" | cut -d' ' -f1)" = "$sum" ] && ok "$rel has its sha256" || bad "$rel: sha256 differs or the file is missing"
 done < <(kept_list)
 
 fin

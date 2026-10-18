@@ -254,7 +254,14 @@ jobs:
           LATEST=$(curl -fsSL https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/APKINDEX.tar.gz \
             | tar -xzO APKINDEX | awk '/^P:chromium$/{p=1} p&&/^V:/{print substr($0,3); exit}')
           echo "current=$CURRENT latest=$LATEST"
-          if [ -z "$LATEST" ]; then echo "::error::no chromium in the Alpine index"; exit 1; fi
+          if [ -z "$LATEST" ]; then
+            # Alpine switched off the armv7 build of chromium on 2026-10-15
+            # (aports 7e8aa9ca). The kept files of keep/keep-alpine.txt cover
+            # the dependencies of the current tsx-xx60-chromium.
+            echo "::warning::no chromium in the Alpine armv7 index (Alpine disabled the armv7 build)"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$CURRENT" = "$LATEST" ]; then
             echo "new=false" >> "$GITHUB_OUTPUT"
           else

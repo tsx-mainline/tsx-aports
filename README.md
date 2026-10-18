@@ -22,6 +22,7 @@ scripts/stage-kernel-xx70.sh   stage the bundle of an xx70 kernel package on a b
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
 scripts/keep-pins.sh       keep/keep.txt for the initramfs pins of a tsx-xx60-linux tag (pin-kernel.sh runs it)
+scripts/keep-alpine.sh     keep an Alpine package that Alpine removed (keep/keep-alpine.txt)
 keep/                      the kept packages: never pruned, restored by index.sh (see "Kept packages")
 scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
@@ -316,6 +317,14 @@ The rescue initramfs of tsx-xx60-linux takes a few files from exact package vers
 - If the tree has a kept file with another sha256, it stops.
 
 `scripts/pin-kernel.sh TAG` runs `scripts/keep-pins.sh TAG`. That script reads `packages.pin` of TAG and writes `keep/keep.txt` and `keep/v3.24/` again: a pin that the list has keeps its file, a new pin comes from the published tree, and a file that no pin names goes. Commit the changes of `keep/` with the kernel recipes. The host tests are `scripts/tests/test-index-prune.sh` and `scripts/tests/test-keep-pins.sh`.
+
+#### Kept Alpine packages
+
+`tsx-xx60-chromium` depends on `chromium-common=152.0.7977.82-r0`, and that package depends on `chromium-angle=152.0.7977.82-r0`. On 2026-10-15 Alpine switched off the armv7 build of `chromium` (aports commit 7e8aa9ca: the link step runs out of memory on the builders). The v3.24 armv7 index of Alpine lists no `chromium`, `chromium-common` or `chromium-angle` since then. The old files are still on the CDN, but no index lists them, so `apk add` fails with "chromium-common (no such package)".
+
+`keep/keep-alpine.txt` lists the two armv7 files with their sha256. `keep/alpine/v3.24/` holds the original Alpine files. They keep the signature of Alpine (`alpine-devel@lists.alpinelinux.org-616adfeb`). We do not sign them again, and a panel already trusts that key. `scripts/index.sh` handles these files like the other kept files (no prune, no count, copy back with sha256 check) and lists them in the index of `xx60/armv7`. `scripts/keep-pins.sh` does not touch them. The packages carry `license=BSD-3-Clause` in their metadata and no license file.
+
+To add or change a kept Alpine file, run `scripts/keep-alpine.sh CATEGORY URL`. It downloads the file, runs `apk verify` in the armv7 container, copies the file to `keep/alpine/v3.24/` and adds its line to `keep/keep-alpine.txt`.
 
 ## CI
 
