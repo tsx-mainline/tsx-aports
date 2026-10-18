@@ -46,8 +46,12 @@
 # depends= below on chromium-common (and chromium-angle through it) resolves
 # only through keep/keep-alpine.txt: scripts/index.sh keeps the two original
 # Alpine files of this version in the xx60 index. The source= file below is
-# still on the CDN. Keep this pkgver until Alpine builds armv7 again or a
-# decision for another browser or a build of our own is made.
+# still on the CDN of Alpine. fetch() takes it from there first. If the CDN
+# does not have it any more, fetch() takes the same file from the release
+# asset of this repo (_relurl below). The sha512sums check is the same for
+# both. Keep this pkgver until Alpine builds armv7 again or a decision for
+# another browser or a build of our own is made. See plan/CHROMIUM-ARMV7.md
+# of the workspace, or the README section "Chromium".
 pkgname=tsx-xx60-chromium
 pkgver=152.0.7977.82
 pkgrel=0
@@ -140,6 +144,23 @@ options="net suid !tracedeps"
 source="chromium-$pkgver-r$pkgrel.apk::https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/chromium-$pkgver-r$pkgrel.apk
 	patch-chromium.py
 	sigs.json"
+
+# The release asset of this repo: the original Alpine file, not changed.
+_relurl=https://github.com/tsx-mainline/tsx-aports/releases/download/alpine-armv7-chromium-$pkgver-r$pkgrel
+# TSX_CHROMIUM_CDN_FAIL=1 makes the Alpine CDN download fail (a test of the
+# fallback).
+fetch() {
+	local f=chromium-$pkgver-r$pkgrel.apk
+	mkdir -p "$SRCDEST"
+	if [ ! -s "$SRCDEST/$f" ]; then
+		if [ -n "$TSX_CHROMIUM_CDN_FAIL" ] || ! uri_fetch "https://dl-cdn.alpinelinux.org/alpine/v3.24/community/armv7/$f"; then
+			warning "the Alpine CDN does not give $f, taking the release asset of this repo"
+			rm -f "$SRCDEST/$f"
+			uri_fetch "$_relurl/$f" || die "neither the Alpine CDN nor $_relurl has $f"
+		fi
+	fi
+	default_fetch
+}
 
 build() {
 	rm -rf extract

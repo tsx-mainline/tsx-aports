@@ -248,6 +248,8 @@ The build does not compile Chromium from source, because a from-source build tak
 
 `depends=` is a verbatim copy of the `.PKGINFO` of the upstream package. It includes plain dependencies and `so:` soname dependencies. It is not the result of the automatic ELF scan of abuild (`options=!tracedeps`). The package holds the same binaries as the Alpine package, so the Alpine list describes them. The scan would also need about 60 shared libraries in the build container, only to resolve names to versions.
 
+Alpine switched off the armv7 build of `chromium` on 2026-10-15 (see "Kept Alpine packages"). The recipe stays at 152.0.7977.82-r0. Its `fetch()` takes the Alpine `.apk` from the Alpine CDN first. If the CDN does not have the file, it takes the same file from the release `alpine-armv7-chromium-152.0.7977.82-r0` of this repo. That asset is the original Alpine file, not changed, and the `sha512sums` check is the same for both sources. To test the fallback, set `TSX_CHROMIUM_CDN_FAIL=1` for `abuild fetch`.
+
 ### Which chromium wins
 
 `tsx-xx60-chromium` sets `provides="chromium=<same version>"` and `replaces="chromium"`. With this repo listed, `apk add chromium` (or a pin in the `packages.txt` of a rootfs) resolves to it. A consumer does not need to know the package name of this repo.
