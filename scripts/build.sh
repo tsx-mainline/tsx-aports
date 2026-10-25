@@ -411,6 +411,7 @@ while read -r PKGDIR PKGARCH; do
 	*) ensure_image "$PKGARCH"; check_image_arch "$PKGARCH"; READY="$READY $PKGARCH";;
 	esac
 	echo "=== building $PKGDIR ($PKGARCH) ==="
+	read -r PKGNAME PKGVER PKGREL <<<"$(apkbuild_info "$PKGDIR" | head -n 1)"
 	# A family package (xx60/...) depends on common packages (tsx-base,
 	# tsx-ledbar and more). abuild -r resolves a dependency only from the
 	# repository of the package itself, so the build adds the common packages
@@ -448,6 +449,11 @@ while read -r PKGDIR PKGARCH; do
 			cd /repo/$PKGDIR
 			$CHECKSUM_CMD
 			abuild -F -r -P /repo/packages/v3.24
+			# A recipe with _pins (uc-pxx-boot-tools): the final .apk must hold
+			# the reviewed bytes. The script removes a package that does not.
+			if grep -q '^_pins=' APKBUILD; then
+				sh /repo/scripts/check-apk-pins.sh APKBUILD /repo/packages/v3.24/${PKGDIR%%/*}/$PKGARCH/$PKGNAME-$PKGVER-r$PKGREL.apk
+			fi
 		"
 done <<EOF
 $JOBS

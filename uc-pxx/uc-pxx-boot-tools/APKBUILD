@@ -47,6 +47,11 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 # sha256, the file in the sources (bundle: the tools bundle, tag: the tag
 # archive), the path in the package. The values are the reviewed files of the
 # uc-pxx boot control (rule 9 exception of the UC-P10 safety rules).
+# TODO: uc-pxx-update-boot is a new caller of the two wrappers. Add its sha256
+# here (local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot) only after its
+# review says GO, together with its entry in the rule 9 list. Until then the
+# package must not go to a panel that runs "uc-pxx-update-boot write".
+# scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
 b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
@@ -63,7 +68,9 @@ _check_pins() {
 		case $1:$src in
 		source:bundle:*) f=$srcdir/${src#bundle:};;
 		source:tag:*) f=$builddir/${src#tag:};;
+		source:local:*) f=$srcdir/${src#local:};;
 		package:*) f=$pkgdir/$dst;;
+		*) error "bad pin line: $sum $src $dst"; return 1;;
 		esac
 		got=$(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)
 		if [ "$got" = "$sum" ]; then
@@ -107,5 +114,5 @@ package() {
 sha512sums="
 9f03fdd1310a408251976af938a01beef09a06668ae4a5d22cce35788faebffbcb0c41bc50966d26c75b627c60746c6d5ed7a3c24830c45614798efef85245c5  uc-pxx-linux-0.1.0.tar.gz
 71f5755b83a30f995a91bb7dba21cb6cb2f6419a077f76a6cbe8e002b95c584fc61309451a1469090d5daa10edf691f23808b124005932d1fdff2eecb6f2c25a  uc-pxx-tools-bundle.tar.zst
-eb94a555afe588f2f73cb9c5fd48660fb2290f64d8ac0846a18ac7e3c68bc50bf8780d16786352a930131f7248fc358745b7e1e542cc82e84a7a917d4113be25  uc-pxx-update-boot
+409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "

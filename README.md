@@ -23,6 +23,7 @@ scripts/stage-kernel-xx70.sh   stage the bundle of an xx70 kernel package on a b
 scripts/stage-kernel-uc-pxx.sh stage the bundle of the uc-pxx kernel package on a build host
 scripts/stage-uc-pxx-tools.sh  stage the tools bundle of the uc-pxx recipes on a build host
 scripts/uc-pxx-source.sh   the local source archive of uc-pxx-linux (a tag or a snapshot)
+scripts/check-apk-pins.sh  check the pinned files of a built .apk (_pins of the recipe)
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/channels.py        the tree logic of the testing channel: assemble, promote, compare, sort (see "Testing channel")
 scripts/manifest.py        the manifest of a deploy: make, wait, verify (see "Manifest of a deploy")
@@ -272,7 +273,7 @@ All recipes have `arch="aarch64"`, also the ones without a program. A noarch rec
 
 ### Pinned files
 
-`uc-pxx-bootctl`, `uc-pxx-mark-boot.sh`, `uc-pxx-boot-ok`, `uc-pxx-flash-boot` and `uc-pxx-arm-slot` may write the A/B metadata of a panel (misc LBA 49156). A review approved their exact bytes. `_pins` in `uc-pxx/uc-pxx-boot-tools/APKBUILD` holds their sha256 values. `check()` refuses the build when a source file has another sha256, and `package()` checks the installed copies again. `options="!strip"` keeps the bytes of the binary. The package also installs the list as `/usr/share/uc-pxx/boot-control.sha256` (`sha256sum -c` on the panel). Never change a value in `_pins` without a new review of that exact file. `scripts/stage-uc-pxx-tools.sh` refuses a `uc-pxx-bootctl` with another sha256, and `scripts/stage-kernel-uc-pxx.sh` refuses a `kernel/mkimage.sh` with another sha256.
+`uc-pxx-bootctl`, `uc-pxx-mark-boot.sh`, `uc-pxx-boot-ok`, `uc-pxx-flash-boot` and `uc-pxx-arm-slot` may write the A/B metadata of a panel (misc LBA 49156). A review approved their exact bytes. `_pins` in `uc-pxx/uc-pxx-boot-tools/APKBUILD` holds their sha256 values. `check()` refuses the build when a source file has another sha256, and `package()` checks the installed copies again. `options="!strip"` keeps the bytes of the binary. After abuild, `scripts/build.sh` runs `scripts/check-apk-pins.sh` on the final `.apk`: a package with another copy of a pinned file is removed and the build fails. `uc-pxx-update-boot` gets its pin after its review says GO (a TODO in the recipe). The package also installs the list as `/usr/share/uc-pxx/boot-control.sha256` (`sha256sum -c` on the panel). Never change a value in `_pins` without a new review of that exact file. `scripts/stage-uc-pxx-tools.sh` refuses a `uc-pxx-bootctl` with another sha256, and `scripts/stage-kernel-uc-pxx.sh` refuses a `kernel/mkimage.sh` with another sha256.
 
 ### The boot image and the resource
 
@@ -281,9 +282,12 @@ The Android boot image of the UC-P10 has a Rockchip resource for U-Boot in its "
 `uc-pxx-update-boot` (package `uc-pxx-boot-tools`) makes the complete image on the panel:
 
 1. It checks the package image: header version 0, page size 2048, no second part, a build token, the id field, the model of its device tree and the kernel release.
-2. It reads the boot image header of `boot_b` (read only) and takes its second part. The resource must start with `RSCE` and have an `rk-kernel.dtb` entry.
-3. It puts the resource into a copy of the package image, in `/run/uc-pxx/boot-assembled.img`. The result has the same bytes as `kernel/mkimage.sh --resource` with that resource (tested with the v4 image of the UC-P10).
-4. `uc-pxx-update-boot write` shows these checks and the A/B state. Then it runs `uc-pxx-arm-slot` and `uc-pxx-flash-boot IMAGE SHA256`. The tool itself opens every block device read only. The flash wrapper is the only writer of `boot_a`.
+   It also checks that `uc-pxx.id=` on the command line of the embedded device tree is the header token.
+2. It reads the boot image header of `boot_b` (read only) and takes its second part. The resource must have the RSCE layout with an `rk-kernel.dtb` entry, and its sha256 must be on the list of approved resources of the model (`RESOURCES` in the tool). The UC-P10 has one: the stock resource `290ef405...`. The UC-P8 has none yet, so the tool refuses a UC-P8. The tool has no option to skip this check.
+3. It puts the resource into a copy of the package image and checks the result again from its own bytes. The result has the same bytes as `kernel/mkimage.sh --resource` with that resource (tested with the v4 image of the UC-P10). It writes the image to a new file with a unique name in `/run/uc-pxx`. That folder must be a real folder of root with mode 0700, and a lock in it allows one run at a time.
+4. `uc-pxx-update-boot write` shows these checks and the A/B state. Then it runs `uc-pxx-arm-slot` and `uc-pxx-flash-boot IMAGE SHA256`, each in its own session. From the arm step until the flash ends, the tool ignores SIGINT, SIGHUP, SIGTERM and SIGQUIT, and it never stops a wrapper. The tool itself opens every block device read only. The flash wrapper is the only writer of `boot_a`. The exit status tells what happened (0 done, 1 nothing armed or written, 1N the arm step failed, 2N the flash step failed, 30 a wrapper ended by a signal), see the header of the tool.
+
+As root the tool uses only its fixed paths: the `UC_PXX_*` variables of the host test have no effect. `assemble` and `extract` write only a new file (not an existing path, not a link, not in `/dev`).
 
 The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. To start a new kernel, run `uc-pxx-update-boot write` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
 

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3 -I
 # SPDX-License-Identifier: GPL-2.0-or-later
 """uc-pxx-update-boot: put the boot image of the kernel package into boot_a.
 
@@ -9,6 +9,10 @@ stock boot image in boot_b of this unit, puts it into a copy of the package
 image, and writes the copy into boot_a only through the reviewed wrappers:
 first uc-pxx-arm-slot, then uc-pxx-flash-boot IMAGE SHA256. The tool itself
 opens every block device read only.
+
+The resource must be one that has booted on that model. RESOURCES lists their
+sha256 values. The tool refuses every other resource, and it has no option to
+skip this check: a new resource needs a new review and a new entry.
 
   uc-pxx-update-boot [status]       show the package image, boot_a and boot_b.
                                     Read only.
@@ -24,41 +28,67 @@ opens every block device read only.
   uc-pxx-update-boot assemble TEMPLATE RESOURCE OUT
                                     no device access: put RESOURCE into the
                                     package image TEMPLATE (for an installer
-                                    on a host, and for tests).
+                                    on a host). OUT must not exist.
   uc-pxx-update-boot extract BOOTIMG OUT
                                     no device access: write the second part
                                     (the resource) of the boot image file
-                                    BOOTIMG to OUT.
+                                    BOOTIMG to OUT. OUT must not exist.
   uc-pxx-update-boot inspect IMAGE  no device access: check a package image
                                     (no resource) and show its token, model
                                     and kernel release.
 
-Exit status: 0 done or nothing to do, 1 refused (nothing written), 2 usage,
-or the exit status of uc-pxx-arm-slot or uc-pxx-flash-boot (3 and 4 mean that
-the A/B state needs a person: do not reboot, read their message).
+Exit status:
+   0  done, or nothing to do
+   1  refused before uc-pxx-arm-slot ran: nothing was armed or written
+   2  usage
+  1N  uc-pxx-arm-slot exited with N (11: refused or failed, 13: the A/B state
+      is unknown). boot_a was not written. Slot A may be armed (trying).
+  2N  uc-pxx-flash-boot exited with N. Slot A was armed (trying). boot_a may
+      hold a partial or an old image (21), or the A/B state needs a person
+      (23, 24). Read the message of the wrapper before a reboot. 29: the
+      wrapper could not start, boot_a was not written.
+  30  a wrapper was ended by a signal. Slot A may be trying and boot_a may be
+      partial. Do not reboot before uc-pxx-bootctl status is checked.
 
-Test hooks (environment): UC_PXX_SYSBLOCK, UC_PXX_DEVDIR, UC_PXX_ROOT,
-UC_PXX_DT_COMPATIBLE, UC_PXX_RUNDIR, UC_PXX_BOOT_IMAGE, UC_PXX_RELEASE_FILE,
-UC_PXX_ARM_SLOT, UC_PXX_FLASH_BOOT, UC_PXX_BOOTCTL, UC_PXX_TEST_NONROOT.
+Test hooks (environment, ignored when the tool runs as root): UC_PXX_SYSBLOCK,
+UC_PXX_DEVDIR, UC_PXX_ROOT, UC_PXX_DT_COMPATIBLE, UC_PXX_RUNDIR,
+UC_PXX_BOOT_IMAGE, UC_PXX_RELEASE_FILE, UC_PXX_ARM_SLOT, UC_PXX_FLASH_BOOT,
+UC_PXX_BOOTCTL, UC_PXX_TEST_NONROOT.
 """
+import errno
+import fcntl
 import hashlib
 import os
 import re
+import signal
+import stat
 import struct
 import subprocess
 import sys
+import tempfile
 
-ENV = os.environ.get
-SYSBLOCK = ENV("UC_PXX_SYSBLOCK", "/sys/class/block")
-DEVDIR = ENV("UC_PXX_DEVDIR", "/dev")
-ROOT = ENV("UC_PXX_ROOT", "/")
-DT_COMPATIBLE = ENV("UC_PXX_DT_COMPATIBLE", "/proc/device-tree/compatible")
-RUNDIR = ENV("UC_PXX_RUNDIR", "/run/uc-pxx")
-BOOT_IMAGE = ENV("UC_PXX_BOOT_IMAGE", "/boot/uc-pxx-lts.img")
-RELEASE_FILE = ENV("UC_PXX_RELEASE_FILE", "/usr/share/uc-pxx/kernel-lts.release")
-ARM_SLOT = ENV("UC_PXX_ARM_SLOT", "/usr/sbin/uc-pxx-arm-slot")
-FLASH_BOOT = ENV("UC_PXX_FLASH_BOOT", "/usr/sbin/uc-pxx-flash-boot")
-BOOTCTL = ENV("UC_PXX_BOOTCTL", "/usr/sbin/uc-pxx-bootctl")
+IS_ROOT = os.geteuid() == 0
+
+
+def setting(name, default):
+    """A path of the panel. Root always gets the fixed path: no environment
+    variable can change what root reads, writes or runs."""
+    if IS_ROOT:
+        return default
+    return os.environ.get(name, default)
+
+
+SYSBLOCK = setting("UC_PXX_SYSBLOCK", "/sys/class/block")
+DEVDIR = setting("UC_PXX_DEVDIR", "/dev")
+ROOT = setting("UC_PXX_ROOT", "/")
+DT_COMPATIBLE = setting("UC_PXX_DT_COMPATIBLE", "/proc/device-tree/compatible")
+RUNDIR = setting("UC_PXX_RUNDIR", "/run/uc-pxx")
+BOOT_IMAGE = setting("UC_PXX_BOOT_IMAGE", "/boot/uc-pxx-lts.img")
+RELEASE_FILE = setting("UC_PXX_RELEASE_FILE", "/usr/share/uc-pxx/kernel-lts.release")
+ARM_SLOT = setting("UC_PXX_ARM_SLOT", "/usr/sbin/uc-pxx-arm-slot")
+FLASH_BOOT = setting("UC_PXX_FLASH_BOOT", "/usr/sbin/uc-pxx-flash-boot")
+BOOTCTL = setting("UC_PXX_BOOTCTL", "/usr/sbin/uc-pxx-bootctl")
+TEST_NONROOT = (not IS_ROOT) and bool(os.environ.get("UC_PXX_TEST_NONROOT"))
 
 MAGIC = b"ANDROID!"
 # uc-pxx-flash-boot and kernel/mkimage.sh of uc-pxx-linux refuse a larger image
@@ -70,16 +100,41 @@ MAX_RESOURCE = 16 * 1024 * 1024
 PAGE = 2048
 SHIM_DTB = 0x10000
 SHIM_LINUX = 0x200000
-MODELS = (b"crestron,uc-p10", b"crestron,uc-p8")
-TOKEN_RE = re.compile(rb"^[A-Za-z0-9._-]{1,15}$")
+MODELS = ("crestron,uc-p10", "crestron,uc-p8")
+TOKEN_RE = re.compile(r"^[A-Za-z0-9._-]{1,15}$")
+# The resources (sha256 of the whole second part) that booted on each model
+# with its vendor U-Boot. UC-P10: the stock resource of boot_b, in boot_a of
+# the v4 image (UC-P10 safety rules, rule 9). UC-P8: none yet, so a UC-P8 is
+# refused. Never add a value without a review and a boot test on that model.
+RESOURCES = {
+    "crestron,uc-p10": ("290ef40577d434d702c3544076dbebd6ddd17e16087eff0e84c92549d67bb363",),
+    "crestron,uc-p8": (),
+}
+SIGNALS = (signal.SIGINT, signal.SIGHUP, signal.SIGTERM, signal.SIGQUIT)
 
 
 class Refuse(Exception):
-    """A check failed. Nothing was written."""
+    """A check failed. Nothing was armed or written."""
+
+
+_quiet = False
 
 
 def say(msg):
-    print("uc-pxx-update-boot: " + msg, flush=True)
+    """Print a line. A closed stdout (a pipe to head, a lost terminal) does not
+    stop the tool: the output goes away and the work goes on."""
+    global _quiet
+    if _quiet:
+        return
+    try:
+        sys.stdout.write("uc-pxx-update-boot: " + msg + "\n")
+        sys.stdout.flush()
+    except OSError:
+        _quiet = True
+        try:
+            sys.stdout = open(os.devnull, "w")
+        except OSError:
+            pass
 
 
 # --- the Android boot image header (versions 0 to 2) -------------------------
@@ -90,7 +145,7 @@ def pages(n, page):
 
 def parse_header(head):
     """Return a dict of the header fields of an Android boot image."""
-    if len(head) < 1632 or head[:8] != MAGIC:
+    if len(head) < 1660 or head[:8] != MAGIC:
         raise Refuse("no Android boot image (no ANDROID! magic)")
     f = struct.unpack_from("<8s10I16s512s32s", head, 0)
     h = dict(kernel_size=f[1], ramdisk_size=f[3], second_size=f[5], page=f[8],
@@ -128,7 +183,7 @@ def image_id(h, read):
 
 
 def check_resource(res):
-    """Check a Rockchip resource (RSCE) and return the names of its entries."""
+    """Check the layout of a Rockchip resource (RSCE). Return its entry names."""
     if len(res) < 1024 or res[:4] != b"RSCE":
         raise Refuse("the resource does not start with RSCE")
     # struct resource_img_hdr of the Rockchip U-Boot: magic, two u16 versions,
@@ -153,6 +208,89 @@ def check_resource(res):
     return names
 
 
+def check_allowed(res, model):
+    """The resource must be one that booted on MODEL (RESOURCES). No override."""
+    sha = hashlib.sha256(res).hexdigest()
+    allowed = RESOURCES.get(model, ())
+    if sha not in allowed:
+        if not allowed:
+            raise Refuse("no resource is approved for %s yet (this resource: sha256 %s)" % (model, sha))
+        raise Refuse("the resource (sha256 %s) is not the approved resource of %s (%s)"
+                     % (sha, model, " ".join(allowed)))
+    return sha
+
+
+# --- the device tree in the shim ----------------------------------------------
+
+def fdt_props(dtb, path):
+    """The properties of the node PATH ("/" or "/chosen") of a flat device tree."""
+    if len(dtb) < 40 or dtb[:4] != b"\xd0\x0d\xfe\xed":
+        raise Refuse("no device tree")
+    total, off_struct, off_strings = struct.unpack_from(">III", dtb, 4)
+    size_strings, size_struct = struct.unpack_from(">II", dtb, 32)
+    if total > len(dtb) or off_struct + size_struct > total or off_strings + size_strings > total:
+        raise Refuse("the device tree header is not plausible")
+    want = [p for p in path.split("/") if p]
+    stack, props, i, end = [], {}, off_struct, off_struct + size_struct
+    while i + 4 <= end:
+        tok = struct.unpack_from(">I", dtb, i)[0]
+        i += 4
+        if tok == 1:                                   # FDT_BEGIN_NODE
+            j = dtb.index(b"\0", i)
+            name = dtb[i:j].decode("ascii", "replace")
+            stack.append(name)
+            i = (j + 4) & ~3
+        elif tok == 2:                                 # FDT_END_NODE
+            if not stack:
+                break
+            stack.pop()
+        elif tok == 3:                                 # FDT_PROP
+            ln, nameoff = struct.unpack_from(">II", dtb, i)
+            i += 8
+            if [s for s in stack[1:]] == want:
+                k = off_strings + nameoff
+                pname = dtb[k:dtb.index(b"\0", k)].decode("ascii", "replace")
+                props[pname] = dtb[i:i + ln]
+            i = (i + ln + 3) & ~3
+        elif tok == 4:                                 # FDT_NOP
+            continue
+        elif tok == 9:                                 # FDT_END
+            break
+        else:
+            raise Refuse("the device tree has a bad token")
+    return props
+
+
+def shim_dtb(data, h):
+    k = h["kernel_off"]
+    dtb = data[k + SHIM_DTB:k + SHIM_LINUX]
+    if dtb[:4] != b"\xd0\x0d\xfe\xed":
+        raise Refuse("no device tree at 64 KiB in the kernel part of the package image")
+    return dtb[:struct.unpack_from(">I", dtb, 4)[0]]
+
+
+def dtb_model(data, h):
+    """The crestron model of the device tree in the shim (64 KiB into the kernel part)."""
+    comp = fdt_props(shim_dtb(data, h), "/").get("compatible", b"").split(b"\0")
+    for m in MODELS:
+        if m.encode() in comp:
+            return m
+    raise Refuse("the device tree of the package image names no UC-P model")
+
+
+def dtb_token(data, h):
+    """The token of the word uc-pxx.id= in /chosen/bootargs of the shim device tree."""
+    args = fdt_props(shim_dtb(data, h), "/chosen").get("bootargs", b"").rstrip(b"\0").decode("ascii", "replace")
+    ids = [w[len("uc-pxx.id="):] for w in args.split() if w.startswith("uc-pxx.id=")]
+    return ids[0] if len(ids) == 1 else ""
+
+
+def linux_release(data, h):
+    k = h["kernel_off"] + SHIM_LINUX
+    m = re.search(rb"Linux version (\S+)", data[k:k + h["kernel_size"] - SHIM_LINUX])
+    return m.group(1).decode() if m else ""
+
+
 # --- the package image (kernel/mkimage.sh with an empty resource) ------------
 
 def check_template(data):
@@ -162,7 +300,8 @@ def check_template(data):
         raise Refuse("the package image is not a header version 0 image with page size %d" % PAGE)
     if h["second_size"] != 0:
         raise Refuse("the package image already has a second part (%d bytes)" % h["second_size"])
-    if not TOKEN_RE.match(h["name"]):
+    token = h["name"].decode("ascii", "replace")
+    if not TOKEN_RE.match(token):
         raise Refuse("the package image has no build token in its header name field")
     if len(data) != h["end"]:
         raise Refuse("the package image has %d bytes, its header says %d" % (len(data), h["end"]))
@@ -170,27 +309,12 @@ def check_template(data):
         raise Refuse("the id field of the package image does not match its content")
     if h["kernel_size"] <= SHIM_LINUX:
         raise Refuse("the kernel part of the package image is too small for the shim")
+    mkbootimg_base(data)
+    got = dtb_token(data, h)
+    if got != token:
+        raise Refuse("the kernel command line of the package image has uc-pxx.id=%s, the header has %s"
+                     % (got or "(none)", token))
     return h
-
-
-def dtb_model(data, h):
-    """The crestron model of the device tree in the shim (64 KiB into the kernel part)."""
-    k = h["kernel_off"]
-    dtb = data[k + SHIM_DTB:k + SHIM_LINUX]
-    if dtb[:4] != b"\xd0\x0d\xfe\xed":
-        raise Refuse("no device tree at 64 KiB in the kernel part of the package image")
-    total = struct.unpack_from(">I", dtb, 4)[0]
-    dtb = dtb[:total]
-    for m in MODELS:
-        if m + b"\0" in dtb:
-            return m.decode()
-    raise Refuse("the device tree of the package image names no UC-P model")
-
-
-def linux_release(data, h):
-    k = h["kernel_off"] + SHIM_LINUX
-    m = re.search(rb"Linux version (\S+)", data[k:k + h["kernel_size"] - SHIM_LINUX])
-    return m.group(1).decode() if m else ""
 
 
 def mkbootimg_base(data):
@@ -212,6 +336,22 @@ def assemble(data, h, res):
     n = parse_header(bytes(out[:4096]))
     struct.pack_into("32s", out, 576, image_id(n, lambda o, s: bytes(out[o:o + s])))
     return bytes(out)
+
+
+def check_assembled(img, model):
+    """Check the new image again from its own bytes: layout, id, size, token and
+    the approved resource. This is the image that goes to uc-pxx-flash-boot."""
+    n = parse_header(img[:4096])
+    if n["version"] != 0 or n["page"] != PAGE or len(img) != n["end"]:
+        raise Refuse("the new image has the wrong layout")
+    if image_id(n, lambda o, s: img[o:o + s]) != n["id"]:
+        raise Refuse("the id field of the new image does not match its content")
+    if len(img) > MAX_IMAGE:
+        raise Refuse("the new image has %d bytes, more than 64 MiB" % len(img))
+    if dtb_token(img, n) != n["name"].decode("ascii", "replace"):
+        raise Refuse("the token of the new image does not match its command line")
+    check_allowed(img[n["second_off"]:n["second_off"] + n["second_size"]], model)
+    return n
 
 
 # --- the unit -----------------------------------------------------------------
@@ -254,7 +394,7 @@ def read_dev(part, offset, size):
 
 def installed_panel():
     """None on an installed panel (/ is the partition system_a), else the reason."""
-    if os.path.exists(os.path.join(ROOT, ".dockerenv")):
+    if os.path.lexists(os.path.join(ROOT, ".dockerenv")):
         return "in a container"
     sys_a = part_by_name("system_a")
     if not sys_a:
@@ -279,13 +419,13 @@ def running_model():
     except OSError:
         return ""
     for m in MODELS:
-        if m in comp:
-            return m.decode()
+        if m.encode() in comp:
+            return m
     return ""
 
 
 def boot_b_resource():
-    """The second part of the boot image in boot_b. Return (bytes, entry names)."""
+    """The second part of the boot image in boot_b. Return (bytes, entry names, header)."""
     p = part_by_name("boot_b")
     if not p:
         raise Refuse("no eMMC partition named boot_b")
@@ -336,8 +476,112 @@ def package_release():
         return ""
 
 
-def prepare(verbose=True):
-    """Make and check the image. Return the facts. Writes only RUNDIR."""
+# --- the run folder -------------------------------------------------------------
+
+def run_folder():
+    """RUNDIR as a real folder of this user (root on a panel), mode 0700. Make
+    it when it is missing. Refuse a link, another owner or another mode."""
+    try:
+        st = os.lstat(RUNDIR)
+    except FileNotFoundError:
+        os.mkdir(RUNDIR, 0o700)
+        st = os.lstat(RUNDIR)
+    if not stat.S_ISDIR(st.st_mode):
+        raise Refuse("%s is not a folder (a link or a file)" % RUNDIR)
+    if st.st_uid != os.geteuid():
+        raise Refuse("%s belongs to uid %d, not to uid %d" % (RUNDIR, st.st_uid, os.geteuid()))
+    if stat.S_IMODE(st.st_mode) != 0o700:
+        raise Refuse("%s has mode %o, not 700" % (RUNDIR, stat.S_IMODE(st.st_mode)))
+    return RUNDIR
+
+
+def take_lock(folder):
+    """One run at a time: a lock file in the run folder, without a wait."""
+    fd = os.open(os.path.join(folder, "lock"), os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        os.close(fd)
+        if e.errno in (errno.EWOULDBLOCK, errno.EAGAIN):
+            raise Refuse("another uc-pxx-update-boot runs (%s/lock)" % folder)
+        raise
+    return fd
+
+
+def clean_old_images(folder):
+    """Remove the images of earlier runs (only names of this tool; a link is
+    removed as a link, its target stays)."""
+    for n in os.listdir(folder):
+        if re.match(r"^(boot-assembled\.img(\.new)?|boot-[A-Za-z0-9_]+\.img)$", n):
+            try:
+                os.unlink(os.path.join(folder, n))
+            except OSError:
+                pass
+
+
+def save_image(folder, img):
+    """Write IMG to a new file with a unique name (O_EXCL, O_NOFOLLOW)."""
+    fd, path = tempfile.mkstemp(prefix="boot-", suffix=".img", dir=folder)
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(img)
+            f.flush()
+            os.fsync(f.fileno())
+    except BaseException:
+        os.unlink(path)
+        raise
+    with open(path, "rb") as f:
+        if hashlib.sha256(f.read()).hexdigest() != hashlib.sha256(img).hexdigest():
+            os.unlink(path)
+            raise Refuse("the image file in %s does not read back" % folder)
+    return path
+
+
+def create_out(out):
+    """Open OUT for a new file only: no existing path, no link, not in /dev."""
+    parent = os.path.realpath(os.path.dirname(os.path.abspath(out)))
+    if parent == "/dev" or parent.startswith("/dev/"):
+        raise Refuse("%s is in /dev" % out)
+    if os.path.lexists(out):
+        raise Refuse("%s exists (give a new file name)" % out)
+    fd = os.open(out, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o644)
+    return os.fdopen(fd, "wb")
+
+
+def safe_unlink(path):
+    try:
+        os.unlink(path)
+    except OSError:
+        pass
+
+
+def bootctl_status():
+    try:
+        r = subprocess.run([BOOTCTL, "status"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                           universal_newlines=True, timeout=30)
+        return r.stdout.strip()
+    except (OSError, subprocess.SubprocessError) as e:
+        return "uc-pxx-bootctl status failed: %s" % e
+
+
+def run_wrapper(argv):
+    """Run a wrapper in its own session and wait for it. The caller ignores the
+    terminal signals, so neither a ^C nor a lost ssh session stops it, and this
+    tool never kills it. Its output goes to stderr, and SIGPIPE stays ignored
+    (restore_signals=False): a closed stdout of this tool (a pipe to head)
+    cannot end the wrapper or a program that it runs."""
+    p = subprocess.Popen(argv, start_new_session=True, restore_signals=False, stdout=2)
+    while True:
+        try:
+            return p.wait()
+        except InterruptedError:
+            continue
+
+
+# --- the commands -------------------------------------------------------------
+
+def prepare():
+    """Make and check the image in memory. Return the facts. Reads only."""
     why = installed_panel()
     if why:
         raise Refuse("not on an installed UC-P panel: " + why)
@@ -352,65 +596,29 @@ def prepare(verbose=True):
     if model != here:
         raise Refuse("the package image is for %s, this unit is %s" % (model, here or "not a UC-P"))
     res, names, hb = boot_b_resource()
+    res_sha = check_allowed(res, model)
     img = assemble(data, h, res)
-    n = check_template_assembled(img, len(res))
+    check_assembled(img, model)
     pa, a_token = boot_a_info()
     if len(img) > pa[1] * 512:
         raise Refuse("the image (%d bytes) is larger than boot_a" % len(img))
     sha = hashlib.sha256(img).hexdigest()
-    facts = dict(token=token, model=model, release=rel, res_size=len(res),
-                 res_sha=hashlib.sha256(res).hexdigest(), res_names=names, boot_b_version=hb["version"],
-                 size=len(img), sha=sha, boot_a=pa, boot_a_token=a_token, img=img, header=n)
-    if verbose:
-        say("package image: %s, kernel %s, model %s, token %s" % (BOOT_IMAGE, rel, model, token))
-        say("resource from boot_b (header version %d): %d bytes, sha256 %s, entries %s"
-            % (hb["version"], len(res), facts["res_sha"][:16], " ".join(names)))
-        say("image: %d bytes (limit %d), sha256 %s" % (len(img), MAX_IMAGE, sha))
-        say("boot_a (%s): token %s" % (pa[0], a_token or "none"))
-    return facts
+    say("package image: %s, kernel %s, model %s, token %s" % (BOOT_IMAGE, rel, model, token))
+    say("resource from boot_b (header version %d): %d bytes, sha256 %s (approved for %s), entries %s"
+        % (hb["version"], len(res), res_sha, model, " ".join(names)))
+    say("image: %d bytes (limit %d), sha256 %s" % (len(img), MAX_IMAGE, sha))
+    say("boot_a (%s): token %s" % (pa[0], a_token or "none"))
+    return dict(token=token, model=model, release=rel, size=len(img), sha=sha, boot_a=pa, img=img)
 
-
-def check_template_assembled(img, res_size):
-    n = parse_header(img[:4096])
-    if n["second_size"] != res_size or len(img) != n["end"]:
-        raise Refuse("the new image has the wrong layout")
-    if image_id(n, lambda o, s: img[o:o + s]) != n["id"]:
-        raise Refuse("the id field of the new image does not match its content")
-    if len(img) > MAX_IMAGE:
-        raise Refuse("the new image has %d bytes, more than 64 MiB" % len(img))
-    return n
-
-
-def save_image(img):
-    os.makedirs(RUNDIR, mode=0o700, exist_ok=True)
-    path = os.path.join(RUNDIR, "boot-assembled.img")
-    tmp = path + ".new"
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "wb") as f:
-        f.write(img)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(tmp, path)
-    return path
-
-
-def bootctl_status():
-    try:
-        r = subprocess.run([BOOTCTL, "status"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                           universal_newlines=True, timeout=30)
-        return r.stdout.strip()
-    except (OSError, subprocess.SubprocessError) as e:
-        return "uc-pxx-bootctl status failed: %s" % e
-
-
-# --- the commands -------------------------------------------------------------
 
 def cmd_status():
     why = installed_panel()
+    data = None
     try:
         data, h = load_template()
+        model = dtb_model(data, h)
         say("package image: %s, kernel %s, model %s, token %s"
-            % (BOOT_IMAGE, linux_release(data, h) or "?", dtb_model(data, h), h["name"].decode()))
+            % (BOOT_IMAGE, linux_release(data, h) or "?", model, h["name"].decode()))
     except Refuse as e:
         say(str(e))
         data = None
@@ -421,8 +629,10 @@ def cmd_status():
         pa, a_token = boot_a_info()
         say("boot_a (%s): token %s" % (pa[0], a_token or "none"))
         res, names, hb = boot_b_resource()
-        say("boot_b: resource of %d bytes, sha256 %s, entries %s"
-            % (len(res), hashlib.sha256(res).hexdigest()[:16], " ".join(names)))
+        sha = hashlib.sha256(res).hexdigest()
+        ok = any(sha in v for v in RESOURCES.values())
+        say("boot_b: resource of %d bytes, sha256 %s (%s), entries %s"
+            % (len(res), sha, "approved" if ok else "NOT approved", " ".join(names)))
         if data is not None:
             same = a_token == h["name"].decode()
             say("boot_a %s the kernel of the package" % ("holds" if same else "does NOT hold"))
@@ -459,26 +669,41 @@ def cmd_hook():
 
 
 def cmd_check():
-    f = prepare()
-    path = save_image(f["img"])
-    if boot_a_holds(f["boot_a"], f["img"]):
-        say("boot_a already holds this image. A write would change nothing.")
-    else:
-        say("check OK. The image is in %s (sha256 %s). Nothing written." % (path, f["sha"]))
-    return 0
+    folder = run_folder()
+    lock = take_lock(folder)
+    try:
+        f = prepare()
+        clean_old_images(folder)
+        path = save_image(folder, f["img"])
+        if boot_a_holds(f["boot_a"], f["img"]):
+            say("boot_a already holds this image. A write would change nothing.")
+        else:
+            say("check OK. The image is in %s (sha256 %s). Nothing written." % (path, f["sha"]))
+        return 0
+    finally:
+        os.close(lock)
 
 
 def confirm():
     if not sys.stdin.isatty():
         raise Refuse("no terminal to confirm: use --yes")
-    print("Type yes to arm slot A and write boot_a: ", end="", flush=True)
+    say("Type yes to arm slot A and write boot_a:")
     return sys.stdin.readline().strip() == "yes"
 
 
 def cmd_write(yes):
-    # UC_PXX_TEST_NONROOT: host tests only. The wrappers need root anyway.
-    if os.geteuid() != 0 and not ENV("UC_PXX_TEST_NONROOT"):
+    # UC_PXX_TEST_NONROOT: host tests only (non-root). The wrappers need root anyway.
+    if not IS_ROOT and not TEST_NONROOT:
         raise Refuse("must run as root")
+    folder = run_folder()
+    lock = take_lock(folder)
+    try:
+        return write_locked(folder, yes)
+    finally:
+        os.close(lock)
+
+
+def write_locked(folder, yes):
     say("--- preflight (nothing is written in this step)")
     f = prepare()
     if boot_a_holds(f["boot_a"], f["img"]):
@@ -486,27 +711,51 @@ def cmd_write(yes):
         return 0
     for line in bootctl_status().splitlines():
         say("A/B now: " + line)
-    path = save_image(f["img"])
+    clean_old_images(folder)
+    path = save_image(folder, f["img"])
     say("next: %s, then %s %s %s" % (ARM_SLOT, FLASH_BOOT, path, f["sha"]))
     if not yes and not confirm():
+        safe_unlink(path)
         say("not confirmed. Nothing written.")
         return 1
-    say("--- arming slot A (uc-pxx-arm-slot)")
-    rc = subprocess.call([ARM_SLOT])
-    if rc != 0:
-        say("uc-pxx-arm-slot exited with %d. boot_a was not written." % rc)
-        if rc == 3:
-            say("the A/B state is unknown: do NOT reboot, read the message above.")
-        return rc
-    say("--- writing boot_a (uc-pxx-flash-boot)")
-    rc = subprocess.call([FLASH_BOOT, path, f["sha"]])
-    if rc != 0:
-        say("uc-pxx-flash-boot exited with %d. Read its message above before a reboot." % rc)
-        return rc
+    # From here until uc-pxx-flash-boot returns, no terminal signal stops the
+    # tool or the wrappers (never cut a transfer short).
+    old = {s: signal.signal(s, signal.SIG_IGN) for s in SIGNALS}
     try:
-        os.unlink(path)
-    except OSError:
-        pass
+        say("--- arming slot A (uc-pxx-arm-slot)")
+        try:
+            rc = run_wrapper([ARM_SLOT])
+        except OSError as e:
+            safe_unlink(path)
+            raise Refuse("cannot start %s: %s" % (ARM_SLOT, e.strerror))
+        if rc != 0:
+            safe_unlink(path)
+            if rc < 0:
+                say("uc-pxx-arm-slot was ended by signal %d. boot_a was not written. Check uc-pxx-bootctl status." % -rc)
+                return 30
+            say("uc-pxx-arm-slot exited with %d. boot_a was not written. Slot A may be armed (trying)." % rc)
+            if rc == 3:
+                say("the A/B state is unknown: do NOT reboot, read the message above.")
+            return 10 + min(rc, 9)
+        say("--- writing boot_a (uc-pxx-flash-boot)")
+        try:
+            rc = run_wrapper([FLASH_BOOT, path, f["sha"]])
+        except OSError as e:
+            say("cannot start %s: %s. Slot A is armed (trying), boot_a was not written." % (FLASH_BOOT, e.strerror))
+            return 29
+    finally:
+        for s, h in old.items():
+            signal.signal(s, h)
+    if rc != 0:
+        if rc < 0:
+            say("uc-pxx-flash-boot was ended by signal %d. Slot A is trying, boot_a may be partial." % -rc)
+            say("Do not reboot before uc-pxx-bootctl status shows slot A trying and slot B successful.")
+            return 30
+        say("uc-pxx-flash-boot exited with %d. Slot A was armed (trying)." % rc)
+        say("boot_a may hold a partial or an old image. Do not mark the boot. A boot of slot A falls back to slot B.")
+        say("Read the message of uc-pxx-flash-boot above before a reboot. The image stays in %s." % path)
+        return 20 + min(rc, 9)
+    safe_unlink(path)
     say("done: boot_a holds kernel %s (token %s). Slot A is trying." % (f["release"], f["token"]))
     say("Reboot to start it. After a healthy boot the hook marks slot A. A bad kernel falls back to slot B.")
     return 0
@@ -518,12 +767,14 @@ def cmd_assemble(template, resource, out):
     with open(resource, "rb") as f:
         res = f.read()
     h = check_template(data)
+    model = dtb_model(data, h)
     if not 0 < len(res) <= MAX_RESOURCE:
         raise Refuse("the resource has %d bytes" % len(res))
     check_resource(res)
+    check_allowed(res, model)
     img = assemble(data, h, res)
-    check_template_assembled(img, len(res))
-    with open(out, "wb") as f:
+    check_assembled(img, model)
+    with create_out(out) as f:
         f.write(img)
     say("%s: %d bytes, sha256 %s" % (out, len(img), hashlib.sha256(img).hexdigest()))
     return 0
@@ -537,9 +788,12 @@ def cmd_extract(bootimg, out):
         raise Refuse("%s has no usable second part" % bootimg)
     res = data[h["second_off"]:h["second_off"] + h["second_size"]]
     names = check_resource(res)
-    with open(out, "wb") as f:
+    sha = hashlib.sha256(res).hexdigest()
+    with create_out(out) as f:
         f.write(res)
-    say("%s: %d bytes, sha256 %s, entries %s" % (out, len(res), hashlib.sha256(res).hexdigest(), " ".join(names)))
+    ok = [m for m, v in RESOURCES.items() if sha in v]
+    say("%s: %d bytes, sha256 %s (%s), entries %s" % (out, len(res), sha,
+        "approved for " + " ".join(ok) if ok else "NOT approved for any model", " ".join(names)))
     return 0
 
 
@@ -585,4 +839,9 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    rc = main(sys.argv)
+    try:
+        sys.stdout.flush()
+    except OSError:
+        pass
+    sys.exit(rc)
