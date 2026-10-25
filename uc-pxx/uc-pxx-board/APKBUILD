@@ -1,11 +1,12 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 # Board layer of the uc-pxx panels (UC-P10, UC-P8): the board file board.sh
-# (with the update hook tsx_board_pre_update), the hardware tools and
-# services, the audio configuration, the key map and the switch tool
-# rtl8363-init. It is the part of rootfs/overlay of uc-pxx-linux that the
-# board owns. Other owners of overlay files:
-#   uc-pxx-boot-tools   the boot control (the four pinned scripts) and uc-pxx-reboot
+# (with the update hooks tsx_board_pre_update and tsx_board_post_update), the
+# hardware tools and services, the audio configuration, the key map and the
+# switch tool rtl8363-init. It is the part of rootfs/overlay of uc-pxx-linux
+# that the board owns. Other owners of overlay files:
+#   uc-pxx-boot-tools   the boot control (the four pinned scripts), uc-pxx-reboot
+#                       and uc-pxx-post-update
 #   tsx-keys            etc/apk/keys
 #   the image build     etc/fstab and etc/inittab (profiles/image.list)
 # package() stops when the overlay has a file that no list below names, so a
@@ -14,6 +15,13 @@
 # board.sh needs a tsx-linux-common newer than 0.3.11: TSX_PKG_PREFIX and the
 # board hook of tsx-autoupdate. An older tsx-autoupdate would upgrade
 # system_a without uc-pxx-arm-slot, so the floor is a depends of this package.
+# 0.1.0-r1: tsx_board_post_update writes the kernel of uc-pxx-kernel-lts into
+# boot_a after a tsx-autoupdate install (uc-pxx-update-boot write). Only a
+# tsx-autoupdate 0.3.12_pre2026102503 or newer runs that hook with the run
+# lock and the restart block, so that is the floor now. The upgrade that brings it runs the old tsx-autoupdate, which
+# writes no kernel: install it before a kernel update. The hook only runs
+# /usr/sbin/uc-pxx-post-update of uc-pxx-boot-tools 0.1.0-r1, so that is the
+# floor of uc-pxx-boot-tools.
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
@@ -25,13 +33,13 @@
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 _tbundle_tag=uc-pxx-tools-20261024
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
-depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>0.3.11 tsx-base>0.3.11 uc-pxx-boot-tools
+depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>=0.3.12_pre2026102503 tsx-base>0.3.11 uc-pxx-boot-tools>=0.1.0-r1
 	util-linux-misc wireless-regdb"
 # /etc/securetty replaces the one of busybox (and of tsx-base up to 0.2.1).
 replaces="busybox tsx-base"
@@ -87,6 +95,7 @@ etc/init.d/uc-pxx-boot-ok
 usr/sbin/uc-pxx-flash-boot
 usr/sbin/uc-pxx-arm-slot
 usr/sbin/uc-pxx-reboot
+usr/sbin/uc-pxx-post-update
 "
 
 prepare() {
@@ -118,6 +127,6 @@ package() {
 }
 
 sha512sums="
-9696222c090efba37c5df95ac18144fcca62794219b518731a4aaf0525d3ca58dc49d43d578c9af2693d6ddfa236a02eb03f57d8ea2118d490abe5708509381d  uc-pxx-linux-0.1.0.tar.gz
+05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
 1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 "

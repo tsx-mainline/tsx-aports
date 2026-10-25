@@ -263,7 +263,7 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 | Package | Content | Sources |
 |---|---|---|
 | `uc-pxx-board` | The board files of `rootfs/overlay` (board.sh, services, tools, audio, key map) and `rtl8363-init` | tag archive, tools bundle |
-| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
+| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot`, `uc-pxx-post-update` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
 | `uc-pxx-leds` | `packages/uc-pxx-leds` of uc-pxx-linux (FILES and root/) | tag archive |
 | `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
 | `uc-pxx-console`, `uc-pxx-kiosk`, `uc-pxx-ha` | Meta packages of the image profiles of uc-pxx-linux | none |
@@ -274,7 +274,7 @@ All recipes have `arch="aarch64"`, also the ones without a program. A noarch rec
 
 ### Pinned files
 
-`uc-pxx-bootctl`, `uc-pxx-mark-boot.sh`, `uc-pxx-boot-ok`, `uc-pxx-flash-boot` and `uc-pxx-arm-slot` may write the A/B metadata of a panel (misc LBA 49156). A review approved their exact bytes. `_pins` in `uc-pxx/uc-pxx-boot-tools/APKBUILD` holds their sha256 values. `check()` refuses the build when a source file has another sha256, and `package()` checks the installed copies again. `options="!strip"` keeps the bytes of the binary. After abuild, `scripts/build.sh` runs `scripts/check-apk-pins.sh` on the final `.apk`: a package with another copy of a pinned file is removed and the build fails. `uc-pxx-update-boot` gets its pin after its review says GO (a TODO in the recipe). The package also installs the list as `/usr/share/uc-pxx/boot-control.sha256` (`sha256sum -c` on the panel). Never change a value in `_pins` without a new review of that exact file. `scripts/stage-uc-pxx-tools.sh` refuses a `uc-pxx-bootctl` with another sha256, and `scripts/stage-kernel-uc-pxx.sh` refuses a `kernel/mkimage.sh` with another sha256.
+`uc-pxx-bootctl`, `uc-pxx-mark-boot.sh`, `uc-pxx-boot-ok`, `uc-pxx-flash-boot` and `uc-pxx-arm-slot` may write the A/B metadata of a panel (misc LBA 49156). `uc-pxx-update-boot` and `uc-pxx-post-update` run them without a person. A review approved the exact bytes of these seven files. `_pins` in `uc-pxx/uc-pxx-boot-tools/APKBUILD` holds their sha256 values. `check()` refuses the build when a source file has another sha256, and `package()` checks the installed copies again. `options="!strip"` keeps the bytes of the binary. After abuild, `scripts/build.sh` runs `scripts/check-apk-pins.sh` on the final `.apk`: a package with another copy of a pinned file is removed and the build fails. The package also installs the list as `/usr/share/uc-pxx/boot-control.sha256` (`sha256sum -c` on the panel). Never change a value in `_pins` without a new review of that exact file. `scripts/stage-uc-pxx-tools.sh` refuses a `uc-pxx-bootctl` with another sha256, and `scripts/stage-kernel-uc-pxx.sh` refuses a `kernel/mkimage.sh` with another sha256.
 
 ### The boot image and the resource
 
@@ -290,7 +290,7 @@ The Android boot image of the UC-P10 has a Rockchip resource for U-Boot in its "
 
 As root the tool uses only its fixed paths: the `UC_PXX_*` variables of the host test have no effect. `assemble` and `extract` write only a new file (not an existing path, not a link, not in `/dev`).
 
-The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. To start a new kernel, run `uc-pxx-update-boot write` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
+The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. `tsx-autoupdate` writes the kernel: after each install it runs the board hook `tsx_board_post_update` of `uc-pxx-board`, which runs `/usr/sbin/uc-pxx-post-update` of `uc-pxx-boot-tools` before the restart. The script checks the reviewed files and the sha256 of `uc-pxx-update-boot`, arms slot A, runs `uc-pxx-update-boot write --yes` and checks the A/B state. A failed step stops the restart (uc-pxx-linux `docs/boot-control.md` "Kernel updates"). After a plain `apk upgrade`, run `tsx-autoupdate post-update` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
 
 ### Local build while uc-pxx-linux has no tag
 
@@ -304,7 +304,7 @@ uc-pxx-linux has no public repository and no tag yet. The recipes name the futur
 
 To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the three recipes with the tag archive, and check that the content is the same.
 
-The board needs a tsx-linux-common release newer than 0.3.11 (`TSX_PKG_PREFIX` and the board hook `tsx_board_pre_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` and `uc-pxx-console` depend on `tsx-autoupdate>0.3.11`, and the uc-pxx recipes can only build after that common release.
+The board needs a tsx-linux-common release newer than 0.3.11 (`TSX_PKG_PREFIX` and the board hook `tsx_board_pre_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` and `uc-pxx-console` depend on `tsx-autoupdate>0.3.11`, and the uc-pxx recipes can only build after that common release. `uc-pxx-board` 0.1.0-r1 has the hook `tsx_board_post_update`, which only a `tsx-autoupdate` newer than 0.3.12_pre2026102501 runs. So it depends on `tsx-autoupdate>=0.3.12_pre2026102503` (the hook with the run lock and the restart block) and on `uc-pxx-boot-tools>=0.1.0-r1` (the script `uc-pxx-post-update`). The upgrade that brings the new `tsx-autoupdate` runs the old one, which writes no kernel: install it before a kernel update.
 
 ## Private LAN repository
 
