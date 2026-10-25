@@ -33,7 +33,7 @@ SRCDEST="$startdir/dist"
 # xx70. _kernelrelease records the exact build.
 pkgname=uc-pxx-kernel-lts
 pkgver=6.18.54_git20261025
-pkgrel=0
+pkgrel=1
 _kernelrelease=6.18.54-ge74ac0e66406
 # The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
 _kbundle_tag=uc-pxx-kernel-20261025
@@ -66,5 +66,5 @@ package() {
 }
 
 sha512sums="
-ebee395e7055b11d51b55f33af57dc274017af1062f58b1e35a1c2d8c44ab9a39c0c55b3799543421b7dbd3642764351e223c750506d4ae98bd06c40ba67285f  uc-pxx-kernel-lts-bundle.tar.zst
+98cd6d7196373e491f604e8f000943f954f14ab96978f4bfc3e9670464881970abcf25946f0515c01d33ad7fda4a6d1e9b4df61f46f0e865cc37d5952cb09e4b  uc-pxx-kernel-lts-bundle.tar.zst
 "

@@ -4,11 +4,17 @@
 # program uc-pxx-bootctl, the boot-marking hook uc-pxx-mark-boot.sh and its
 # service uc-pxx-boot-ok, the flash wrapper uc-pxx-flash-boot, the helper
 # uc-pxx-arm-slot, uc-pxx-reboot (the loader and fastboot modes, a script
-# with the program uc-pxx-reboot-syscall) and uc-pxx-update-boot (puts
-# the boot image of uc-pxx-kernel-lts into boot_a through the two wrappers).
+# with the program uc-pxx-reboot-syscall), uc-pxx-update-boot (puts
+# the boot image of uc-pxx-kernel-lts into boot_a through the two wrappers)
+# and uc-pxx-post-update (the board step of tsx-autoupdate after an install:
+# it checks the reviewed files, arms slot A, runs uc-pxx-update-boot write
+# --yes and checks the A/B state before a restart).
+# 0.1.0-r1: uc-pxx-post-update (pinned), and the snapshot of uc-pxx-linux
+# 8ca875e.
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
-# 49156) of a panel. An independent review approved their exact bytes (the
+# 49156) of a panel, and two more run them without a person
+# (uc-pxx-update-boot, uc-pxx-post-update). An independent review approved their exact bytes (the
 # sha256 values in _pins). check() refuses the build when a source file has
 # another sha256, and package() checks the installed copies again. Never
 # change a value in _pins without a new review of that exact file. The
@@ -16,7 +22,7 @@
 # and options has !strip: abuild must not change its bytes.
 #
 # Sources:
-#  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux (the four
+#  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux (the five
 #    scripts of rootfs/overlay)
 #  - uc-pxx-tools-bundle.tar.zst, an asset of the tsx-aports release
 #    _tbundle_tag (uc-pxx-bootctl, uc-pxx-reboot-syscall and rtl8363-init, built on
@@ -31,7 +37,7 @@
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 _tbundle_tag=uc-pxx-tools-20261024
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -51,6 +57,9 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 # uc-pxx-update-boot is a caller of the two wrappers. Its sha256 is the one
 # that the review passed (GO in round 2, plan/uc-pxx/UPDATE-BOOT-REVIEW.md),
 # and it is in the rule 9 list. A changed copy needs a new review.
+# uc-pxx-post-update is the board step of tsx-autoupdate (POST-UPDATE-REVIEW,
+# round 3). It is in boot-control.sha256 too, so its own sha256sum -c also
+# checks itself.
 # scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
@@ -59,6 +68,7 @@ c36628b8ba2ee6d99f1eb24d343c68d047bf70b53dced0ed2748b2831a2b3235 tag:rootfs/over
 400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
 f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
 4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
+a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 tag:rootfs/overlay/usr/sbin/uc-pxx-post-update usr/sbin/uc-pxx-post-update
 "
 
 # _check_pins source|package: every pinned file has its reviewed sha256.
@@ -108,6 +118,9 @@ package() {
 	install -Dm755 "$o"/usr/sbin/uc-pxx-reboot "$pkgdir"/usr/sbin/uc-pxx-reboot
 	install -Dm755 "$srcdir"/uc-pxx-reboot-syscall "$pkgdir"/usr/libexec/uc-pxx-reboot-syscall
 	install -Dm755 "$srcdir"/uc-pxx-update-boot "$pkgdir"/usr/sbin/uc-pxx-update-boot
+	# The board step of tsx-autoupdate after an install (tsx_board_post_update
+	# of uc-pxx-board runs it).
+	install -Dm755 "$o"/usr/sbin/uc-pxx-post-update "$pkgdir"/usr/sbin/uc-pxx-post-update
 	# The list of the reviewed files, for a check on the panel:
 	#   sha256sum -c /usr/share/uc-pxx/boot-control.sha256
 	mkdir -p "$pkgdir"/usr/share/uc-pxx
@@ -116,7 +129,7 @@ package() {
 }
 
 sha512sums="
-9696222c090efba37c5df95ac18144fcca62794219b518731a4aaf0525d3ca58dc49d43d578c9af2693d6ddfa236a02eb03f57d8ea2118d490abe5708509381d  uc-pxx-linux-0.1.0.tar.gz
+05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
 1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "

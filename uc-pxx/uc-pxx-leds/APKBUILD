@@ -13,7 +13,7 @@
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-leds
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="uc-pxx LEDs: the LED daemon, its service, the command uc-pxx-led and the ESPHome plugin"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
@@ -36,5 +36,5 @@ package() {
 }
 
 sha512sums="
-9696222c090efba37c5df95ac18144fcca62794219b518731a4aaf0525d3ca58dc49d43d578c9af2693d6ddfa236a02eb03f57d8ea2118d490abe5708509381d  uc-pxx-linux-0.1.0.tar.gz
+05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
 "
