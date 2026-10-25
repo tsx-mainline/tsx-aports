@@ -1,0 +1,40 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# The LEDs of the uc-pxx panels: the daemon uc-pxx-leds (the only writer of
+# the four indicators and the RGB status LED), its service, the command
+# uc-pxx-led and the ESPHome plugin. It is packages/uc-pxx-leds of
+# uc-pxx-linux: packages/uc-pxx-leds/FILES lists each file with its mode, and
+# root/ holds the files at their install paths. The daemon reads
+# "uc-pxx-bootctl status" (read only) to show the boot state.
+#
+# Source: the GitHub archive of the tag board-v$pkgver of uc-pxx-linux.
+# PLACEHOLDER: no tag exists yet. See uc-pxx-boot-tools and README.md
+# "uc-pxx packages" for the local build from dist/.
+SRCDEST="$startdir/dist"
+pkgname=uc-pxx-leds
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="uc-pxx LEDs: the LED daemon, its service, the command uc-pxx-led and the ESPHome plugin"
+url="https://github.com/tsx-mainline/uc-pxx-linux"
+arch="aarch64"
+license="GPL-2.0-or-later"
+depends="openrc python3 uc-pxx-boot-tools"
+# The panel software lives in /usr/local, as in the image.
+options="!check !fhs"
+source="uc-pxx-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/board-v$pkgver.tar.gz"
+builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
+
+package() {
+	local d=$builddir/packages/uc-pxx-leds mode path n=0
+	while read -r mode path; do
+		case $mode in ""|\#*) continue;; esac
+		[ -f "$d/root/$path" ] || { error "FILES names $path, root/ does not have it"; return 1; }
+		install -Dm"$mode" "$d/root/$path" "$pkgdir/$path"
+		n=$((n + 1))
+	done < "$d"/FILES
+	[ "$n" = "$(cd "$d/root" && find . -type f | wc -l)" ] || { error "root/ has files that FILES does not name"; return 1; }
+}
+
+sha512sums="
+9f03fdd1310a408251976af938a01beef09a06668ae4a5d22cce35788faebffbcb0c41bc50966d26c75b627c60746c6d5ed7a3c24830c45614798efef85245c5  uc-pxx-linux-0.1.0.tar.gz
+"

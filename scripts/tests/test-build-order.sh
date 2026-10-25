@@ -77,7 +77,9 @@ for A in armv7 aarch64; do
 		done
 	else
 		for pair in "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-lts" "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-stable" \
-			"uc-pxx/uc-pxx-boot-tools uc-pxx/uc-pxx-kernel-lts"; do
+			"uc-pxx/uc-pxx-boot-tools uc-pxx/uc-pxx-kernel-lts" "uc-pxx/uc-pxx-boot-tools uc-pxx/uc-pxx-board" "uc-pxx/uc-pxx-boot-tools uc-pxx/uc-pxx-leds" \
+			"common/tsx-autoupdate uc-pxx/uc-pxx-board" "uc-pxx/uc-pxx-board uc-pxx/uc-pxx-console" "uc-pxx/uc-pxx-leds uc-pxx/uc-pxx-console" \
+			"uc-pxx/uc-pxx-console uc-pxx/uc-pxx-kiosk" "uc-pxx/uc-pxx-kiosk uc-pxx/uc-pxx-ha" "common/tsx-ha uc-pxx/uc-pxx-ha"; do
 			set -- $pair; before "$1" "$2" && ok "$A: $1 before $2" || bad "$A: $1 is not before $2"
 		done
 	fi
