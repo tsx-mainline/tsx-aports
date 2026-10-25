@@ -1,0 +1,122 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Board layer of the uc-pxx panels (UC-P10, UC-P8): the board file board.sh
+# (with the update hook tsx_board_pre_update), the hardware tools and
+# services, the audio configuration, the key map and the switch tool
+# rtl8363-init. It is the part of rootfs/overlay of uc-pxx-linux that the
+# board owns. Other owners of overlay files:
+#   uc-pxx-boot-tools   the boot control (the four pinned scripts)
+#   tsx-keys            etc/apk/keys
+#   the image build     etc/fstab and etc/inittab (profiles/image.list)
+# package() stops when the overlay has a file that no list below names, so a
+# new board file cannot go missing without a note.
+#
+# board.sh needs a tsx-linux-common newer than 0.3.11: TSX_PKG_PREFIX and the
+# board hook of tsx-autoupdate. An older tsx-autoupdate would upgrade
+# system_a without uc-pxx-arm-slot, so the floor is a depends of this package.
+#
+# Sources:
+#  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
+#  - uc-pxx-tools-bundle.tar.zst of the tsx-aports release _tbundle_tag
+#    (rtl8363-init, built with the GPL Realtek switch SDK, see
+#    tools/rtl8363-init of uc-pxx-linux)
+# PLACEHOLDER: no tag and no release exist yet. See uc-pxx-boot-tools and
+# README.md "uc-pxx packages" for the local build from dist/.
+SRCDEST="$startdir/dist"
+pkgname=uc-pxx-board
+pkgver=0.1.0
+pkgrel=0
+_tbundle_tag=uc-pxx-tools-20261024
+pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
+url="https://github.com/tsx-mainline/uc-pxx-linux"
+arch="aarch64"
+license="GPL-2.0-or-later"
+depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>0.3.11 tsx-base>0.3.11 uc-pxx-boot-tools
+	util-linux-misc wireless-regdb"
+# /etc/securetty replaces the one of busybox (and of tsx-base up to 0.2.1).
+replaces="busybox tsx-base"
+# The panel software lives in /usr/local, as in the image. !strip keeps the
+# bytes of the tested rtl8363-init.
+options="!check !fhs !strip"
+source="uc-pxx-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/board-v$pkgver.tar.gz
+	https://github.com/tsx-mainline/tsx-aports/releases/download/$_tbundle_tag/uc-pxx-tools-bundle.tar.zst
+	"
+builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
+
+# The files of rootfs/overlay that this package owns.
+_files="
+etc/asound.conf
+etc/conf.d/tsx-config
+etc/conf.d/uc-pxx-watchdog
+etc/init.d/uc-pxx-als
+etc/init.d/uc-pxx-audio
+etc/init.d/uc-pxx-clock
+etc/init.d/uc-pxx-firmware
+etc/init.d/uc-pxx-loader-key
+etc/init.d/uc-pxx-lvm
+etc/init.d/uc-pxx-presence
+etc/init.d/uc-pxx-switch
+etc/init.d/uc-pxx-watchdog
+etc/logrotate.d/uc-pxx-sensors
+etc/securetty
+etc/sysctl.d/uc-pxx-writeback.conf
+etc/tsx/audio.conf
+etc/tsx/buttons-board.conf
+etc/tsx/motd.board
+etc/tsx/panel-board.conf
+etc/tsx/panel-board.d/default.conf
+usr/local/lib/tsx/board.sh
+usr/local/sbin/tsx-als
+usr/local/sbin/tsx-hw
+usr/local/sbin/uc-pxx-als
+usr/local/sbin/uc-pxx-audio
+usr/local/sbin/uc-pxx-clock
+usr/local/sbin/uc-pxx-firmware
+usr/local/sbin/uc-pxx-loader-key
+usr/local/sbin/uc-pxx-presence
+usr/local/sbin/uc-pxx-switch
+usr/local/share/tsx/esphome.d/uc-pxx.py
+"
+# The files of rootfs/overlay that other owners have (see the header).
+_others="
+etc/apk/keys/tsx-mainline-6ab9ca44.rsa.pub
+etc/fstab
+etc/inittab
+etc/uc-pxx-mark-boot.sh
+etc/init.d/uc-pxx-boot-ok
+usr/sbin/uc-pxx-flash-boot
+usr/sbin/uc-pxx-arm-slot
+"
+
+prepare() {
+	default_prepare
+	(cd "$srcdir" && sha256sum -c CHECKSUMS.sha256) || { error "the tools bundle does not match its CHECKSUMS.sha256"; return 1; }
+}
+
+package() {
+	local o=$builddir/rootfs/overlay f unknown
+	unknown=$(cd "$o" && find . ! -type d | sed 's|^\./||' | while read -r f; do
+		case " $(echo $_files $_others) " in *" $f "*) ;; *) echo "$f";; esac
+	done)
+	[ -z "$unknown" ] || { error "rootfs/overlay has files that no list of this recipe names: $unknown"; return 1; }
+	for f in $_files; do
+		# A link (panel-board.conf) stays a link. Its target need not exist
+		# in the build.
+		if [ -L "$o/$f" ]; then
+			mkdir -p "$pkgdir/${f%/*}"
+			ln -s "$(readlink "$o/$f")" "$pkgdir/$f"
+			continue
+		fi
+		[ -f "$o/$f" ] || { error "board file missing in the source: $f"; return 1; }
+		install -Dm"$(stat -c %a "$o/$f")" "$o/$f" "$pkgdir/$f"
+	done
+	install -Dm755 "$srcdir"/rtl8363-init "$pkgdir"/usr/sbin/rtl8363-init
+	# The GitHub archive of a tag has group-writable files. tsx-config and the
+	# plugin loader of tsx-ha refuse a group-writable plugin.
+	chmod -R go-w "$pkgdir"
+}
+
+sha512sums="
+9f03fdd1310a408251976af938a01beef09a06668ae4a5d22cce35788faebffbcb0c41bc50966d26c75b627c60746c6d5ed7a3c24830c45614798efef85245c5  uc-pxx-linux-0.1.0.tar.gz
+71f5755b83a30f995a91bb7dba21cb6cb2f6419a077f76a6cbe8e002b95c584fc61309451a1469090d5daa10edf691f23808b124005932d1fdff2eecb6f2c25a  uc-pxx-tools-bundle.tar.zst
+"

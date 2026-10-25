@@ -1,0 +1,24 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# Meta package: it holds no files. It pulls the packages of the console image
+# profile of uc-pxx-linux (rootfs/profiles/console.list): the board, the boot
+# control, the LEDs and the common base packages. The image build installs the
+# kernel package uc-pxx-kernel-lts itself (rootfs/packages-tsx.txt), as on the
+# xx70.
+# The floors: the board hook of tsx-autoupdate and TSX_PKG_PREFIX are newer
+# than tsx-linux-common 0.3.11. PLACEHOLDER: set the floors to the first
+# common release that has them.
+pkgname=uc-pxx-console
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="uc-pxx console profile: text login on the panel, SSH, update tools and the hardware services"
+url="https://github.com/tsx-mainline/tsx-aports"
+arch="aarch64"
+license="GPL-2.0-or-later"
+depends="uc-pxx-board>=0.1.0 uc-pxx-boot-tools>=0.1.0 uc-pxx-leds>=0.1.0 tsx-base>0.3.11 tsx-autoupdate>0.3.11
+	tsx-buttons tsx-idled tsx-splash"
+options="!check"
+
+package() {
+	mkdir -p "$pkgdir"
+}

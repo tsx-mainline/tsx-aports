@@ -95,7 +95,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 - `xx50/tsx-xx50-kernel-lts` is a BINARY package of the xx50 kernel (see "Kernel packages" below). Its install hook writes the kernel into the normal raw slots of the boot card, and the rescue system into the rescue slot, with `tsx-kernel-slots`.
 - `xx70/tsx-xx70-boot-tools` contains `tsx-update-boot` and `tsx-bootrec` (copies of `rootfs/overlay/usr/local/sbin` in tsx-xx70-linux), `tsx-kernel-flavor` (shows or switches the booted flavor, and is also the install hook of the kernel packages) and the `tsx_is_installed_panel()` detection helper. `tsx-update-boot` writes only the `boot_b` partition. Before it writes, it checks the image for a `crestron,tswxx70` DTB. The host test is `scripts/tests/test-xx70-flavor.sh`.
 - `xx70/tsx-xx70-kernel-stable` and `xx70/tsx-xx70-kernel-lts` are BINARY packages of an already-built kernel (see "xx70 kernel packages" below). They install side by side.
-- `uc-pxx/*` are the packages of the uc-pxx family: `uc-pxx-boot-tools` and `uc-pxx-kernel-lts` (see "uc-pxx packages" below).
+- `uc-pxx/*` are the packages of the uc-pxx family: `uc-pxx-board`, `uc-pxx-boot-tools`, `uc-pxx-leds`, `uc-pxx-kernel-lts` and the profile meta packages `uc-pxx-console`, `uc-pxx-kiosk` and `uc-pxx-ha` (see "uc-pxx packages" below).
 
 ## Add a package
 
@@ -115,7 +115,7 @@ Every recipe builds from public sources. CI and a local build download the same 
 - `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
 - `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
 - The kernel packages use a release asset (see "Kernel packages"). The xx70 kernel packages use an asset of a tsx-aports release (see "xx70 kernel packages").
-- `uc-pxx/uc-pxx-boot-tools` uses the GitHub archive of the tag `board-v$pkgver` of uc-pxx-linux and the tools bundle of a tsx-aports release. `uc-pxx-kernel-lts` uses the kernel bundle of a tsx-aports release (see "uc-pxx packages").
+- `uc-pxx/uc-pxx-board`, `uc-pxx-boot-tools` and `uc-pxx-leds` use the GitHub archive of the tag `board-v$pkgver` of uc-pxx-linux, and the first two also the tools bundle of a tsx-aports release. `uc-pxx-kernel-lts` uses the kernel bundle of a tsx-aports release (see "uc-pxx packages").
 
 On the branch `testing`, a recipe can use the archive of one commit instead of a tag (see "Testing channel", "Commit sources").
 
@@ -260,8 +260,11 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 
 | Package | Content | Sources |
 |---|---|---|
+| `uc-pxx-board` | The board files of `rootfs/overlay` (board.sh, services, tools, audio, key map) and `rtl8363-init` | tag archive, tools bundle |
 | `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot`, `uc-pxx-update-boot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
+| `uc-pxx-leds` | `packages/uc-pxx-leds` of uc-pxx-linux (FILES and root/) | tag archive |
 | `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
+| `uc-pxx-console`, `uc-pxx-kiosk`, `uc-pxx-ha` | Meta packages of the image profiles of uc-pxx-linux | none |
 
 The image build of uc-pxx-linux (`rootfs/build-rootfs.sh` without the DEV options) installs `uc-pxx-<profile>` and the packages of its `rootfs/packages-tsx.txt` (with `uc-pxx-kernel-lts` and `uc-pxx-leds`). Its `rootfs/check-kernel-pins.sh` reads `/boot/uc-pxx-lts.img` and `/usr/share/uc-pxx/kernel-lts.release`.
 
@@ -288,13 +291,15 @@ The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `
 
 uc-pxx-linux has no public repository and no tag yet. The recipes name the future tag `board-v$pkgver` and the future tsx-aports releases `uc-pxx-tools-<YYYYMMDD>` and `uc-pxx-kernel-<YYYYMMDD>`. Each recipe sets `SRCDEST="$startdir/dist"`, so abuild uses a file in `dist/` with the name of the source and checks it with `sha512sums`. CI skips the recipes with a warning while the sources do not exist (`--skip-unreachable`).
 
-1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of each recipe with that source and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
+1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of the three recipes and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
 2. Copy the repository to the build host (BUILD_DIR).
 3. On the build host, run `scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT NOTE` with the static programs of `tools/` of uc-pxx-linux.
 4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. The script makes one boot image for each model with a new build token.
 5. Copy the changed APKBUILDs back, check the diff, and build with `scripts/build.sh --arch aarch64 uc-pxx/<pkg>`.
 
-To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the recipes with the tag archive, and check that the content is the same.
+To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the three recipes with the tag archive, and check that the content is the same.
+
+The board needs a tsx-linux-common release newer than 0.3.11 (`TSX_PKG_PREFIX` and the board hook `tsx_board_pre_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` and `uc-pxx-console` depend on `tsx-autoupdate>0.3.11`, and the uc-pxx recipes can only build after that common release.
 
 ## Chromium
 
