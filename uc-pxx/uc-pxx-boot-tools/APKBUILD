@@ -47,10 +47,9 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 # sha256, the file in the sources (bundle: the tools bundle, tag: the tag
 # archive), the path in the package. The values are the reviewed files of the
 # uc-pxx boot control (rule 9 exception of the UC-P10 safety rules).
-# TODO: uc-pxx-update-boot is a new caller of the two wrappers. Add its sha256
-# here (local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot) only after its
-# review says GO, together with its entry in the rule 9 list. Until then the
-# package must not go to a panel that runs "uc-pxx-update-boot write".
+# uc-pxx-update-boot is a caller of the two wrappers. Its sha256 is the one
+# that the review passed (GO in round 2, plan/uc-pxx/UPDATE-BOOT-REVIEW.md),
+# and it is in the rule 9 list. A changed copy needs a new review.
 # scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
@@ -58,6 +57,7 @@ b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d tag:rootfs/over
 c36628b8ba2ee6d99f1eb24d343c68d047bf70b53dced0ed2748b2831a2b3235 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
 400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
 f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
+4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
 "
 
 # _check_pins source|package: every pinned file has its reviewed sha256.
