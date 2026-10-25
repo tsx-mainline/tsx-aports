@@ -32,11 +32,11 @@ SRCDEST="$startdir/dist"
 # pkgver: <upstream kernel version>_git<YYYYMMDD> (the staging date), as for
 # xx70. _kernelrelease records the exact build.
 pkgname=uc-pxx-kernel-lts
-pkgver=6.18.54_git20261024
+pkgver=6.18.54_git20261025
 pkgrel=0
-_kernelrelease=6.18.54-ge28b89c4a681
+_kernelrelease=6.18.54-ge74ac0e66406
 # The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
-_kbundle_tag=uc-pxx-kernel-20261024
+_kbundle_tag=uc-pxx-kernel-20261025
 pkgdesc="uc-pxx mainline kernel, longterm (LTS) line: boot image without the resource, modules, device trees"
 url="https://github.com/tsx-mainline/linux"
 arch="aarch64"
@@ -66,5 +66,5 @@ package() {
 }
 
 sha512sums="
-f8a2b335aac28fa4a78a6dcc9c49d4809ff6e86da5b0150a18e5d389e1c7b30e08b5249b12ac4002f3ec2522e49ec901049534c25209cdadd5955e6033a333e2  uc-pxx-kernel-lts-bundle.tar.zst
+ebee395e7055b11d51b55f33af57dc274017af1062f58b1e35a1c2d8c44ab9a39c0c55b3799543421b7dbd3642764351e223c750506d4ae98bd06c40ba67285f  uc-pxx-kernel-lts-bundle.tar.zst
 "

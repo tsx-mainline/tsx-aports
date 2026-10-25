@@ -4,11 +4,12 @@
 #   uc-pxx-bootctl  the reviewed A/B tool (tools/uc-pxx-bootctl/build.sh of
 #                   uc-pxx-linux). Its sha256 must be the pinned one of
 #                   uc-pxx/uc-pxx-boot-tools/APKBUILD, or the script stops.
-#   uc-pxx-reboot   tools/uc-pxx-reboot/build.sh of uc-pxx-linux
+#   uc-pxx-reboot-syscall  tools/uc-pxx-reboot/build.sh of uc-pxx-linux (the
+#                   program of the script uc-pxx-reboot)
 #   rtl8363-init    tools/rtl8363-init/build.sh of uc-pxx-linux (it links
 #                   with the GPL Realtek switch SDK)
 #
-#   scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT [NOTE]
+#   scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT [NOTE]
 #
 # Nothing is compiled. Run the script where the programs are (the build
 # host), in the copy of this repository that scripts/build.sh builds from
@@ -22,9 +23,9 @@
 set -eu
 HERE=$(cd "$(dirname "$0")" && pwd)
 TOP=$(cd "$HERE/.." && pwd)
-BOOTCTL=${1:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT [NOTE]}
-REBOOT=${2:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT [NOTE]}
-RTL=${3:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT [NOTE]}
+BOOTCTL=${1:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT [NOTE]}
+REBOOT=${2:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT [NOTE]}
+RTL=${3:?usage: stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT [NOTE]}
 NOTE=${4:-}
 BUNDLE=uc-pxx-tools-bundle.tar.zst
 PIN=$(awk '$2 == "bundle:uc-pxx-bootctl" { print $1 }' "$TOP/uc-pxx/uc-pxx-boot-tools/APKBUILD")
@@ -45,15 +46,15 @@ W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 mkdir "$W/b"
 cp "$BOOTCTL" "$W/b/uc-pxx-bootctl"
-cp "$REBOOT" "$W/b/uc-pxx-reboot"
+cp "$REBOOT" "$W/b/uc-pxx-reboot-syscall"
 cp "$RTL" "$W/b/rtl8363-init"
-chmod 755 "$W/b/uc-pxx-bootctl" "$W/b/uc-pxx-reboot" "$W/b/rtl8363-init"
+chmod 755 "$W/b/uc-pxx-bootctl" "$W/b/uc-pxx-reboot-syscall" "$W/b/rtl8363-init"
 printf '%s\n' "${NOTE:-no note}" > "$W/b/SOURCE.txt"
-(cd "$W/b" && sha256sum uc-pxx-bootctl uc-pxx-reboot rtl8363-init SOURCE.txt > CHECKSUMS.sha256)
+(cd "$W/b" && sha256sum uc-pxx-bootctl uc-pxx-reboot-syscall rtl8363-init SOURCE.txt > CHECKSUMS.sha256)
 cat "$W/b/CHECKSUMS.sha256"
 # The same input gives the same bundle: names in order, fixed time and owner.
 (cd "$W/b" && tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -cf - \
-	CHECKSUMS.sha256 SOURCE.txt rtl8363-init uc-pxx-bootctl uc-pxx-reboot) | zstd -q -19 > "$W/$BUNDLE"
+	CHECKSUMS.sha256 SOURCE.txt rtl8363-init uc-pxx-bootctl uc-pxx-reboot-syscall) | zstd -q -19 > "$W/$BUNDLE"
 SUM=$(sha512sum "$W/$BUNDLE" | cut -d' ' -f1)
 for p in $(cd "$TOP/uc-pxx" && grep -l "^[0-9a-f]\{128\}  $BUNDLE\$" */APKBUILD | sed 's|/APKBUILD$||'); do
 	mkdir -p "$TOP/uc-pxx/$p/dist"
