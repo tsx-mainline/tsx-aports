@@ -5,7 +5,7 @@
 # services, the audio configuration, the key map and the switch tool
 # rtl8363-init. It is the part of rootfs/overlay of uc-pxx-linux that the
 # board owns. Other owners of overlay files:
-#   uc-pxx-boot-tools   the boot control (the four pinned scripts)
+#   uc-pxx-boot-tools   the boot control (the four pinned scripts) and uc-pxx-reboot
 #   tsx-keys            etc/apk/keys
 #   the image build     etc/fstab and etc/inittab (profiles/image.list)
 # package() stops when the overlay has a file that no list below names, so a
@@ -86,6 +86,7 @@ etc/uc-pxx-mark-boot.sh
 etc/init.d/uc-pxx-boot-ok
 usr/sbin/uc-pxx-flash-boot
 usr/sbin/uc-pxx-arm-slot
+usr/sbin/uc-pxx-reboot
 "
 
 prepare() {
@@ -117,6 +118,6 @@ package() {
 }
 
 sha512sums="
-9f03fdd1310a408251976af938a01beef09a06668ae4a5d22cce35788faebffbcb0c41bc50966d26c75b627c60746c6d5ed7a3c24830c45614798efef85245c5  uc-pxx-linux-0.1.0.tar.gz
-71f5755b83a30f995a91bb7dba21cb6cb2f6419a077f76a6cbe8e002b95c584fc61309451a1469090d5daa10edf691f23808b124005932d1fdff2eecb6f2c25a  uc-pxx-tools-bundle.tar.zst
+9696222c090efba37c5df95ac18144fcca62794219b518731a4aaf0525d3ca58dc49d43d578c9af2693d6ddfa236a02eb03f57d8ea2118d490abe5708509381d  uc-pxx-linux-0.1.0.tar.gz
+1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 "

@@ -262,7 +262,7 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 | Package | Content | Sources |
 |---|---|---|
 | `uc-pxx-board` | The board files of `rootfs/overlay` (board.sh, services, tools, audio, key map) and `rtl8363-init` | tag archive, tools bundle |
-| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot`, `uc-pxx-update-boot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
+| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
 | `uc-pxx-leds` | `packages/uc-pxx-leds` of uc-pxx-linux (FILES and root/) | tag archive |
 | `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
 | `uc-pxx-console`, `uc-pxx-kiosk`, `uc-pxx-ha` | Meta packages of the image profiles of uc-pxx-linux | none |
@@ -297,7 +297,7 @@ uc-pxx-linux has no public repository and no tag yet. The recipes name the futur
 
 1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of the three recipes and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
 2. Copy the repository to the build host (BUILD_DIR).
-3. On the build host, run `scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT NOTE` with the static programs of `tools/` of uc-pxx-linux.
+3. On the build host, run `scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT NOTE` with the static programs of `tools/` of uc-pxx-linux.
 4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. The script makes one boot image for each model with a new build token.
 5. Copy the changed APKBUILDs back, check the diff, and build with `scripts/build.sh --arch aarch64 uc-pxx/<pkg>`.
 
