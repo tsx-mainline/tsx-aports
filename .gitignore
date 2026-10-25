@@ -35,3 +35,9 @@ work/
 # Python byte code (a script that imports another makes it)
 __pycache__/
 *.pyc
+
+# staged sources of the uc-pxx recipes: the snapshot archive of uc-pxx-linux
+# (scripts/uc-pxx-source.sh) and the bundles of scripts/stage-uc-pxx-tools.sh
+# and scripts/stage-kernel-uc-pxx.sh. They stay on the build host, and a
+# tsx-aports release holds the published copy of a bundle.
+uc-pxx/*/dist/

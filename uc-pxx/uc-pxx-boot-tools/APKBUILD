@@ -1,0 +1,111 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+# The A/B boot control of the uc-pxx panels (UC-P10, UC-P8): the reviewed
+# program uc-pxx-bootctl, the boot-marking hook uc-pxx-mark-boot.sh and its
+# service uc-pxx-boot-ok, the flash wrapper uc-pxx-flash-boot, the helper
+# uc-pxx-arm-slot, uc-pxx-reboot (loader mode) and uc-pxx-update-boot (puts
+# the boot image of uc-pxx-kernel-lts into boot_a through the two wrappers).
+#
+# PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
+# 49156) of a panel. An independent review approved their exact bytes (the
+# sha256 values in _pins). check() refuses the build when a source file has
+# another sha256, and package() checks the installed copies again. Never
+# change a value in _pins without a new review of that exact file. The
+# binary is the reviewed static build, so this recipe does not compile it,
+# and options has !strip: abuild must not change its bytes.
+#
+# Sources:
+#  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux (the four
+#    scripts of rootfs/overlay)
+#  - uc-pxx-tools-bundle.tar.zst, an asset of the tsx-aports release
+#    _tbundle_tag (uc-pxx-bootctl, uc-pxx-reboot and rtl8363-init, built on
+#    the build host, see scripts/stage-uc-pxx-tools.sh)
+#  - uc-pxx-update-boot next to this file
+# PLACEHOLDER: uc-pxx-linux has no tag and no public repository yet, and the
+# release _tbundle_tag does not exist. A local build uses the files in dist/
+# (SRCDEST): scripts/uc-pxx-source.sh writes a snapshot of a commit under
+# the name of the tag archive, and scripts/stage-uc-pxx-tools.sh writes the
+# bundle. The sums below are the sums of those local files. After the tag and
+# the release exist, run abuild checksum (README.md "uc-pxx packages").
+SRCDEST="$startdir/dist"
+pkgname=uc-pxx-boot-tools
+pkgver=0.1.0
+pkgrel=0
+_tbundle_tag=uc-pxx-tools-20261024
+pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
+url="https://github.com/tsx-mainline/uc-pxx-linux"
+arch="aarch64"
+license="GPL-2.0-or-later"
+depends="busybox openrc python3"
+options="!strip"
+source="uc-pxx-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/board-v$pkgver.tar.gz
+	https://github.com/tsx-mainline/tsx-aports/releases/download/$_tbundle_tag/uc-pxx-tools-bundle.tar.zst
+	uc-pxx-update-boot
+	"
+builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
+
+# sha256, the file in the sources (bundle: the tools bundle, tag: the tag
+# archive), the path in the package. The values are the reviewed files of the
+# uc-pxx boot control (rule 9 exception of the UC-P10 safety rules).
+_pins="
+38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
+b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
+c36628b8ba2ee6d99f1eb24d343c68d047bf70b53dced0ed2748b2831a2b3235 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
+400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
+f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
+"
+
+# _check_pins source|package: every pinned file has its reviewed sha256.
+_check_pins() {
+	local sum src dst f got bad=0
+	while read -r sum src dst; do
+		[ -n "$sum" ] || continue
+		case $1:$src in
+		source:bundle:*) f=$srcdir/${src#bundle:};;
+		source:tag:*) f=$builddir/${src#tag:};;
+		package:*) f=$pkgdir/$dst;;
+		esac
+		got=$(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)
+		if [ "$got" = "$sum" ]; then
+			msg "pinned file OK: /$dst $sum"
+		else
+			error "pinned file CHANGED: $f has sha256 '$got', the reviewed file has $sum"
+			bad=1
+		fi
+	done <<-EOF
+	$_pins
+	EOF
+	return $bad
+}
+
+prepare() {
+	default_prepare
+	# the bundle has its own list of sums
+	(cd "$srcdir" && sha256sum -c CHECKSUMS.sha256) || { error "the tools bundle does not match its CHECKSUMS.sha256"; return 1; }
+}
+
+check() {
+	_check_pins source
+}
+
+package() {
+	local o=$builddir/rootfs/overlay
+	install -Dm755 "$srcdir"/uc-pxx-bootctl "$pkgdir"/usr/sbin/uc-pxx-bootctl
+	install -Dm755 "$o"/etc/uc-pxx-mark-boot.sh "$pkgdir"/etc/uc-pxx-mark-boot.sh
+	install -Dm755 "$o"/etc/init.d/uc-pxx-boot-ok "$pkgdir"/etc/init.d/uc-pxx-boot-ok
+	install -Dm755 "$o"/usr/sbin/uc-pxx-flash-boot "$pkgdir"/usr/sbin/uc-pxx-flash-boot
+	install -Dm755 "$o"/usr/sbin/uc-pxx-arm-slot "$pkgdir"/usr/sbin/uc-pxx-arm-slot
+	install -Dm755 "$srcdir"/uc-pxx-reboot "$pkgdir"/usr/sbin/uc-pxx-reboot
+	install -Dm755 "$srcdir"/uc-pxx-update-boot "$pkgdir"/usr/sbin/uc-pxx-update-boot
+	# The list of the reviewed files, for a check on the panel:
+	#   sha256sum -c /usr/share/uc-pxx/boot-control.sha256
+	mkdir -p "$pkgdir"/usr/share/uc-pxx
+	echo "$_pins" | awk 'NF == 3 { print $1 "  /" $3 }' > "$pkgdir"/usr/share/uc-pxx/boot-control.sha256
+	_check_pins package
+}
+
+sha512sums="
+9f03fdd1310a408251976af938a01beef09a06668ae4a5d22cce35788faebffbcb0c41bc50966d26c75b627c60746c6d5ed7a3c24830c45614798efef85245c5  uc-pxx-linux-0.1.0.tar.gz
+71f5755b83a30f995a91bb7dba21cb6cb2f6419a077f76a6cbe8e002b95c584fc61309451a1469090d5daa10edf691f23808b124005932d1fdff2eecb6f2c25a  uc-pxx-tools-bundle.tar.zst
+eb94a555afe588f2f73cb9c5fd48660fb2290f64d8ac0846a18ac7e3c68bc50bf8780d16786352a930131f7248fc358745b7e1e542cc82e84a7a917d4113be25  uc-pxx-update-boot
+"

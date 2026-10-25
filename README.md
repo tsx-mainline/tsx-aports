@@ -2,7 +2,7 @@
 
 tsx-aports is the apk package repository for the TSX panels. It holds signed Alpine packages. With this repository, `apk upgrade` on a panel updates the kernel, sendspin, the ES2-patched Chromium and the patched wlroots, together with the Alpine packages.
 
-The repository has four repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). `xx50` holds the packages of the xx50 family (TSS-752). `xx70` holds the kernel packages of the xx70 family (TSW-570, TSW-770 and TSW-1070). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`).
+The repository has five repos. `common` holds the hardware-independent packages. `xx60` holds the packages of the xx60 family (TSW-760, TSW-1060 and TSS-10). `xx50` holds the packages of the xx50 family (TSS-752). `xx70` holds the kernel packages of the xx70 family (TSW-570, TSW-770 and TSW-1070). `uc-pxx` holds the packages of the uc-pxx family (the Crestron UC-P10 and UC-P8 room phones). The `/etc/apk/repositories` file of a panel lists the Alpine repos, the `common` repo and the repo of its family. The name of a family package starts with the family (`tsx-xx60-*`, and `uc-pxx-*` for the uc-pxx family, which has no `tsx` prefix).
 
 ## Layout
 
@@ -11,6 +11,7 @@ common/<pkg>/APKBUILD      hardware-independent packages
 xx60/<pkg>/APKBUILD        Meson8m2 packages (xx60: TSW-760, TSW-1060 and TSS-10)
 xx50/<pkg>/APKBUILD        i.MX53 packages (xx50: TSS-752)
 xx70/<pkg>/APKBUILD        APQ8053 kernel packages (xx70: TSW-570, TSW-770 and TSW-1070)
+uc-pxx/<pkg>/APKBUILD      RK3399 packages (uc-pxx: UC-P10 and UC-P8), see "uc-pxx packages"
 scripts/build.sh           build one package or all, in a container of the package architecture (armv7 or aarch64)
 scripts/pin-kernel.sh      pin a kernel package to the bundle of a tsx-xx60-linux release
 scripts/resign.sh          re-sign the output of a BUILD_HOST build with the real key, locally
@@ -19,6 +20,9 @@ scripts/apk-split.py       split an apk into its sig/control/data members (used 
 scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/stage-kernel-xx70.sh   stage the bundle of an xx70 kernel package on a build host
+scripts/stage-kernel-uc-pxx.sh stage the bundle of the uc-pxx kernel package on a build host
+scripts/stage-uc-pxx-tools.sh  stage the tools bundle of the uc-pxx recipes on a build host
+scripts/uc-pxx-source.sh   the local source archive of uc-pxx-linux (a tag or a snapshot)
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/channels.py        the tree logic of the testing channel: assemble, promote, compare, sort (see "Testing channel")
 scripts/manifest.py        the manifest of a deploy: make, wait, verify (see "Manifest of a deploy")
@@ -33,7 +37,7 @@ scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
 scripts/keep-pins.sh       keep/keep.txt for the initramfs pins of a tsx-xx60-linux tag (pin-kernel.sh runs it)
 scripts/keep-alpine.sh     keep an Alpine package that Alpine removed (keep/keep-alpine.txt)
 keep/                      the kept packages: never pruned, restored by index.sh (see "Kept packages")
-scripts/tests/             host tests (resign, board DTBs, CI Pages, testing channel, manifest, run mode, site trees, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, testing channel, manifest, run mode, site trees, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor, uc-pxx-update-boot)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -45,6 +49,7 @@ v3.24/xx60/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/xx50/armv7/{*.apk, APKINDEX.tar.gz}
 v3.24/common/aarch64/{*.apk, APKINDEX.tar.gz}
 v3.24/xx70/aarch64/{*.apk, APKINDEX.tar.gz}
+v3.24/uc-pxx/aarch64/{*.apk, APKINDEX.tar.gz}
 ```
 
 ## A panel's /etc/apk/repositories
@@ -56,7 +61,7 @@ https://dl-cdn.alpinelinux.org/alpine/v3.24/main
 https://dl-cdn.alpinelinux.org/alpine/v3.24/community
 ```
 
-An xx50 panel lists `v3.24/xx50` in place of `v3.24/xx60`. An xx70 panel lists `v3.24/xx70`.
+An xx50 panel lists `v3.24/xx50` in place of `v3.24/xx60`. An xx70 panel lists `v3.24/xx70`. A uc-pxx panel lists `v3.24/uc-pxx`.
 
 **List the repos of this project FIRST.** See "Which chromium wins" below. When two candidates have the same version, apk picks the first one in repository order. This applies to a real pkgname and to a `provides=` match. `tsx-xx60-chromium` must win this tie, so that `apk add chromium` (and the `chromium=<ver>` pin of a rootfs) gets the ES2-patched build of this repo and not the Alpine build.
 
@@ -90,6 +95,7 @@ This order is safe for every other package name. Only `tsx-xx60-chromium` and `t
 - `xx50/tsx-xx50-kernel-lts` is a BINARY package of the xx50 kernel (see "Kernel packages" below). Its install hook writes the kernel into the normal raw slots of the boot card, and the rescue system into the rescue slot, with `tsx-kernel-slots`.
 - `xx70/tsx-xx70-boot-tools` contains `tsx-update-boot` and `tsx-bootrec` (copies of `rootfs/overlay/usr/local/sbin` in tsx-xx70-linux), `tsx-kernel-flavor` (shows or switches the booted flavor, and is also the install hook of the kernel packages) and the `tsx_is_installed_panel()` detection helper. `tsx-update-boot` writes only the `boot_b` partition. Before it writes, it checks the image for a `crestron,tswxx70` DTB. The host test is `scripts/tests/test-xx70-flavor.sh`.
 - `xx70/tsx-xx70-kernel-stable` and `xx70/tsx-xx70-kernel-lts` are BINARY packages of an already-built kernel (see "xx70 kernel packages" below). They install side by side.
+- `uc-pxx/*` are the packages of the uc-pxx family: `uc-pxx-boot-tools` and `uc-pxx-kernel-lts` (see "uc-pxx packages" below).
 
 ## Add a package
 
@@ -109,6 +115,7 @@ Every recipe builds from public sources. CI and a local build download the same 
 - `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
 - `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
 - The kernel packages use a release asset (see "Kernel packages"). The xx70 kernel packages use an asset of a tsx-aports release (see "xx70 kernel packages").
+- `uc-pxx/uc-pxx-boot-tools` uses the GitHub archive of the tag `board-v$pkgver` of uc-pxx-linux and the tools bundle of a tsx-aports release. `uc-pxx-kernel-lts` uses the kernel bundle of a tsx-aports release (see "uc-pxx packages").
 
 On the branch `testing`, a recipe can use the archive of one commit instead of a tag (see "Testing channel", "Commit sources").
 
@@ -247,6 +254,48 @@ To make a new bundle:
 
 The install hook is the same as for xx60: `post-install` and `post-upgrade` run `tsx-kernel-flavor --hook <flavor>` of `tsx-xx70-boot-tools`. The hook writes only when `tsx_is_installed_panel()` finds that `/` is the `system_b` partition, the flavor of the package is the selected flavor, and `boot_b` does not already hold the image. The selected flavor is `KERNEL_FLAVOR` of `tsx-config`. If that is not set, it is the installed flavor with the series of the running kernel. The hook writes `boot_b` through `tsx-update-boot`, which keeps the previous content in `/data/tsx/boot_b.prev.img` and reads the write back. It never writes `boot_a`, the GPT or the boot record. To switch the flavor, run `tsx-kernel-flavor lts|stable` and reboot.
 
+## uc-pxx packages
+
+The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a test yet). Its board repository is uc-pxx-linux. The packages and their sources:
+
+| Package | Content | Sources |
+|---|---|---|
+| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot`, `uc-pxx-update-boot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
+| `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
+
+The image build of uc-pxx-linux (`rootfs/build-rootfs.sh` without the DEV options) installs `uc-pxx-<profile>` and the packages of its `rootfs/packages-tsx.txt` (with `uc-pxx-kernel-lts` and `uc-pxx-leds`). Its `rootfs/check-kernel-pins.sh` reads `/boot/uc-pxx-lts.img` and `/usr/share/uc-pxx/kernel-lts.release`.
+
+All recipes have `arch="aarch64"`, also the ones without a program. A noarch recipe goes to the armv7 folder of its category when it is built on its own.
+
+### Pinned files
+
+`uc-pxx-bootctl`, `uc-pxx-mark-boot.sh`, `uc-pxx-boot-ok`, `uc-pxx-flash-boot` and `uc-pxx-arm-slot` may write the A/B metadata of a panel (misc LBA 49156). A review approved their exact bytes. `_pins` in `uc-pxx/uc-pxx-boot-tools/APKBUILD` holds their sha256 values. `check()` refuses the build when a source file has another sha256, and `package()` checks the installed copies again. `options="!strip"` keeps the bytes of the binary. The package also installs the list as `/usr/share/uc-pxx/boot-control.sha256` (`sha256sum -c` on the panel). Never change a value in `_pins` without a new review of that exact file. `scripts/stage-uc-pxx-tools.sh` refuses a `uc-pxx-bootctl` with another sha256, and `scripts/stage-kernel-uc-pxx.sh` refuses a `kernel/mkimage.sh` with another sha256.
+
+### The boot image and the resource
+
+The Android boot image of the UC-P10 has a Rockchip resource for U-Boot in its "second" part. The resource of the stock firmware (the device tree for U-Boot and the Crestron logo) derives from vendor files, so no package and no bundle holds it. The image in `uc-pxx-kernel-lts` has an empty second part. It is not a complete boot image, and nobody must write it to a partition as it is.
+
+`uc-pxx-update-boot` (package `uc-pxx-boot-tools`) makes the complete image on the panel:
+
+1. It checks the package image: header version 0, page size 2048, no second part, a build token, the id field, the model of its device tree and the kernel release.
+2. It reads the boot image header of `boot_b` (read only) and takes its second part. The resource must start with `RSCE` and have an `rk-kernel.dtb` entry.
+3. It puts the resource into a copy of the package image, in `/run/uc-pxx/boot-assembled.img`. The result has the same bytes as `kernel/mkimage.sh --resource` with that resource (tested with the v4 image of the UC-P10).
+4. `uc-pxx-update-boot write` shows these checks and the A/B state. Then it runs `uc-pxx-arm-slot` and `uc-pxx-flash-boot IMAGE SHA256`. The tool itself opens every block device read only. The flash wrapper is the only writer of `boot_a`.
+
+The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. To start a new kernel, run `uc-pxx-update-boot write` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
+
+### Local build while uc-pxx-linux has no tag
+
+uc-pxx-linux has no public repository and no tag yet. The recipes name the future tag `board-v$pkgver` and the future tsx-aports releases `uc-pxx-tools-<YYYYMMDD>` and `uc-pxx-kernel-<YYYYMMDD>`. Each recipe sets `SRCDEST="$startdir/dist"`, so abuild uses a file in `dist/` with the name of the source and checks it with `sha512sums`. CI skips the recipes with a warning while the sources do not exist (`--skip-unreachable`).
+
+1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of each recipe with that source and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
+2. Copy the repository to the build host (BUILD_DIR).
+3. On the build host, run `scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT RTL8363_INIT NOTE` with the static programs of `tools/` of uc-pxx-linux.
+4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. The script makes one boot image for each model with a new build token.
+5. Copy the changed APKBUILDs back, check the diff, and build with `scripts/build.sh --arch aarch64 uc-pxx/<pkg>`.
+
+To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the recipes with the tag archive, and check that the content is the same.
+
 ## Chromium
 
 The build does not compile Chromium from source, because a from-source build takes hours. CI tracks the `chromium` armv7 package of Alpine v3.24. For each new version it does these steps:
@@ -339,7 +388,7 @@ apk update && apk upgrade
 Every deploy starts from the live site and uploads both trees. Pages serves one artifact, so a deploy must not start from an old copy. Two things make that safe (see "Manifest of a deploy"): the run takes the files of the last deploy from its manifest and not from the CDN, and it stops before the upload if another deploy finished while it built.
 
 - **main** (a push to `main`, or a manual run on `main`): builds the new stable versions, prunes to the newest 2 versions, indexes and signs stable. It then builds the testing tree again from the new stable tree and the testing-only packages that are still newer, and signs it. A testing package with the same or an older version than stable is dropped.
-- **testing** (a push to `testing`, or a manual run on `main` with `channel` testing and a `source_sha`): a push to `testing` deploys nothing itself. The job `trigger-testing` starts the workflow on `main` (`workflow_dispatch`, with `channel=testing` and the sha of the push), because the environment `github-pages` allows deploys from `main` only. The run on `main` stops unless the sha is on the branch `testing` (`scripts/check-testing-sha.sh`). It takes the recipe folders (`common`, `xx60`, `xx50`, `xx70`, `keep`) from that sha and keeps the scripts of `main`, so a change of `scripts/` on `testing` is not used until it is on `main`. To run a build again, start the workflow by hand on `main` with `channel` testing and the full sha. The base of the build is the live testing tree. It builds only the versions that are new. The stable tree is copied from the live site without a change, and the run stops unless it equals the stable tree of the manifest of the last deploy, file by file (`scripts/manifest.py check-tree`). The testing tree is stable plus the newer testing packages, and keeps only the newest version of each package (`TESTING_KEEP`, so that two trees stay under the size limit of Pages).
+- **testing** (a push to `testing`, or a manual run on `main` with `channel` testing and a `source_sha`): a push to `testing` deploys nothing itself. The job `trigger-testing` starts the workflow on `main` (`workflow_dispatch`, with `channel=testing` and the sha of the push), because the environment `github-pages` allows deploys from `main` only. The run on `main` stops unless the sha is on the branch `testing` (`scripts/check-testing-sha.sh`). It takes the recipe folders (`common`, `xx60`, `xx50`, `xx70`, `uc-pxx`, `keep`) from that sha and keeps the scripts of `main`, so a change of `scripts/` on `testing` is not used until it is on `main`. To run a build again, start the workflow by hand on `main` with `channel` testing and the full sha. The base of the build is the live testing tree. It builds only the versions that are new. The stable tree is copied from the live site without a change, and the run stops unless it equals the stable tree of the manifest of the last deploy, file by file (`scripts/manifest.py check-tree`). The testing tree is stable plus the newer testing packages, and keeps only the newest version of each package (`TESTING_KEEP`, so that two trees stay under the size limit of Pages).
 - **promote** (a manual run on `main`, action `promote`, input `packages`): `packages` has package names or apk names (as listed in the testing tree), separated by spaces or commas, or `all`. The run copies the apk files of the live testing tree into the stable tree. It promotes whole builds: with an apk it also takes every apk of the same origin and version (the subpackages, for example `tsx-xx60-board-kiosk` and `tsx-xx60-board-ha` with `tsx-xx60-board`) and every apk that it pins with an exact depend (`name=version`) when stable lacks that version. It reads this from the index of the testing tree. It fails if an exact depend is nowhere, or if the index is missing. The bytes are the same, nothing is built again. It signs the stable index again, appends the names and sha256 sums to `promoted.txt` (at the site root, `https://tsx-aports.unexceptional.net/promoted.txt`) and builds the testing tree again. A name that has nothing to promote fails the run before anything is published. There is no gate: the person who starts the run decides.
 - **cron** (daily): only the two watch jobs. They publish nothing. A scheduled run uses the workflow of `main`.
 
@@ -442,7 +491,7 @@ To add or change a kept Alpine file, run `scripts/keep-alpine.sh CATEGORY URL`. 
 
 `.github/workflows/build.yml` builds and publishes the repository. It has five jobs:
 
-- **build** runs on a push to `main` that changes `common/`, `xx60/`, `xx50/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
+- **build** runs on a push to `main` that changes `common/`, `xx60/`, `xx50/`, `xx70/`, `uc-pxx/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
   2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a package with a warning when its tag archive or its release asset does not exist yet (a kernel bundle, the xx50 panel app source). The published copy of that package stays.
   3. `scripts/assemble-site.sh` runs `scripts/index.sh --keep 2`. It puts back a kept package that the tree lacks (see "Kept packages"), prunes, and re-indexes and signs the merged tree. It then builds the testing tree and checks both trees against the committed key.

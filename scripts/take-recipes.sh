@@ -11,7 +11,7 @@ SHA=${1:?usage: take-recipes.sh SHA}
 KEEPKEYS=$(mktemp -d)
 trap 'rm -rf "$KEEPKEYS"' EXIT
 [ ! -d common/tsx-keys ] || cp -a common/tsx-keys "$KEEPKEYS/tsx-keys"
-for d in common xx60 xx50 xx70 keep; do
+for d in common xx60 xx50 xx70 uc-pxx keep; do
 	rm -rf "$d"
 	git checkout "$SHA" -- "$d" 2>/dev/null || true
 done
