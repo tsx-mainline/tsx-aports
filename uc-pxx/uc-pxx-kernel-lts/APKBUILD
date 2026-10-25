@@ -1,0 +1,70 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+#
+# BINARY packaging of an already-built kernel: no compiler runs in this
+# APKBUILD. source= is ONE release asset of this repository (tsx-aports),
+# uc-pxx-kernel-lts-bundle.tar.zst of the release _kbundle_tag.
+# ../../scripts/stage-kernel-uc-pxx.sh makes the bundle on the build host from
+# the output of ci/build-kernel.sh of uc-pxx-linux (README.md "uc-pxx kernel
+# package"). The bundle holds the boot image of each model
+# (uc-pxx-<model>-lts.img, from kernel/mkimage.sh of uc-pxx-linux), the two
+# device trees, the modules tree tarball, kernel.release, kernel.commit, the
+# build token and CHECKSUMS.sha256.
+#
+# THE BOOT IMAGE HAS NO RESOURCE. The Rockchip resource for U-Boot (the
+# "second" part of the image) derives from vendor files, so no package holds
+# it. The image in this package has an empty second part. It is not a
+# complete boot image: never write it to a partition as it is.
+# uc-pxx-update-boot (uc-pxx-boot-tools) takes the resource from the stock
+# boot image in boot_b of the unit, puts it into a copy of this image and
+# writes boot_a only through uc-pxx-arm-slot and uc-pxx-flash-boot. The
+# install and upgrade scripts of this package write NOTHING. They only say if
+# boot_a holds this kernel. Run "uc-pxx-update-boot write" and reboot.
+#
+# A local build uses the staged file in dist/: SRCDEST below makes abuild use
+# that file (checked by sha512sums) and not the network. The stage script
+# fills in pkgver, pkgrel, _kernelrelease and sha512sums below: do not edit
+# them by hand. PLACEHOLDER: the release _kbundle_tag does not exist yet. Make
+# it and attach the staged bundle without a change before the recipe goes to
+# main.
+SRCDEST="$startdir/dist"
+#
+# pkgver: <upstream kernel version>_git<YYYYMMDD> (the staging date), as for
+# xx70. _kernelrelease records the exact build.
+pkgname=uc-pxx-kernel-lts
+pkgver=6.18.54_git20261024
+pkgrel=0
+_kernelrelease=6.18.54-ge28b89c4a681
+# The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
+_kbundle_tag=uc-pxx-kernel-20261024
+pkgdesc="uc-pxx mainline kernel, longterm (LTS) line: boot image without the resource, modules, device trees"
+url="https://github.com/tsx-mainline/linux"
+arch="aarch64"
+license="GPL-2.0-only"
+depends="uc-pxx-boot-tools"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+source="https://github.com/tsx-mainline/tsx-aports/releases/download/$_kbundle_tag/uc-pxx-kernel-lts-bundle.tar.zst"
+
+package() {
+	cd "$srcdir"
+	sha256sum -c CHECKSUMS.sha256 || { error "the bundle does not match its CHECKSUMS.sha256"; return 1; }
+	[ "$(cat kernel.release)" = "$_kernelrelease" ] || { error "the bundle has kernel $(cat kernel.release), the recipe says $_kernelrelease"; return 1; }
+	# The UC-P10 image. The bundle also holds the UC-P8 image, which is not
+	# packaged yet (the UC-P8 has no unit for a test).
+	install -Dm644 uc-pxx-ucp10-lts.img "$pkgdir"/boot/uc-pxx-lts.img
+	mkdir -p "$pkgdir"/usr/share/uc-pxx/dtbs-lts
+	echo "$_kernelrelease" > "$pkgdir"/usr/share/uc-pxx/kernel-lts.release
+	install -m644 rk3399-crestron-ucp10.dtb rk3399-crestron-ucp8.dtb "$pkgdir"/usr/share/uc-pxx/dtbs-lts/
+	tar -xzf modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# The bundle keeps the owner and the modes of the machine that packed it.
+	chown -R 0:0 "$pkgdir"/lib
+	chmod -R go-w "$pkgdir"/lib
+	# modules_install's build and source links point into the kernel build
+	# directory of the build machine. They mean nothing on a panel.
+	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
+}
+
+sha512sums="
+f8a2b335aac28fa4a78a6dcc9c49d4809ff6e86da5b0150a18e5d389e1c7b30e08b5249b12ac4002f3ec2522e49ec901049534c25209cdadd5955e6033a333e2  uc-pxx-kernel-lts-bundle.tar.zst
+"

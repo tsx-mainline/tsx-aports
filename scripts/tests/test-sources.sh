@@ -7,7 +7,9 @@
 #      top directory of that archive (<repo>-<tag without a leading v>).
 #   3. A kernel package names a release (_kbundle_tag), and its
 #      _kernelrelease starts with the version of pkgver. An xx70 kernel
-#      package names the tsx-aports release xx70-kernel-<date of pkgver>.
+#      package names the tsx-aports release xx70-kernel-<date of pkgver>, a
+#      uc-pxx kernel package uc-pxx-kernel-<date of pkgver>, and a uc-pxx
+#      recipe with the tools bundle uc-pxx-tools-<date>.
 #   4. scripts/pin-kernel.sh, against a local server with a fixture bundle:
 #      it writes the three values and keep/ (keep-pins.sh), and it refuses
 #      a bundle with a wrong kernel.release, a wrong CHECKSUMS.sha256 and a
@@ -51,17 +53,18 @@ recipe_vars() {
 		echo "builddir ${builddir:-$srcdir/$pkgname-$pkgver}"
 		echo "kbundle ${_kbundle_tag:-}"
 		echo "kernelrelease ${_kernelrelease:-}"
+		echo "tbundle ${_tbundle_tag:-}"
 		for s in $source; do echo "source $s"; done
 		echo "$sha512sums" | while read -r sum name; do [ -n "$sum" ] && echo "sum $sum $name"; done
 	)
 }
 
 echo "== 1/2/3. the recipes =="
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/ "$REPO"/uc-pxx/*/; do
 	[ -f "$D/APKBUILD" ] || continue
 	P=$(basename "$D")
 	V=$(recipe_vars "${D%/}")
-	NAMES=; SUMS=; GH=
+	NAMES=; SUMS=; GH=; TB=
 	while read -r k a b; do case $k in
 		source)
 			case "$a" in
@@ -90,6 +93,7 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 		pkgname) PN=$a;;
 		kbundle) KB=$a;;
 		kernelrelease) KR=$a;;
+		tbundle) TB=$a;;
 		pkgver) PV=$a;;
 		pkgdesclen) DL=$a;;
 	esac; done <<<"$V"
@@ -114,7 +118,17 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 		# with the date of pkgver.
 		case $KB in "xx70-kernel-${PV##*_git}") ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB', expected xx70-kernel-${PV##*_git}";; esac
 		case $KR in "${PV%%_*}"-[0-9]*-g[0-9a-f]*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac;;
+	uc-pxx-kernel-*)
+		# The bundle is an asset of a tsx-aports release uc-pxx-kernel-<YYYYMMDD>
+		# with the date of pkgver. The release of a kernel that is exactly on
+		# a tag of the fork has no commit count (6.18.54-gHASH).
+		case $KB in "uc-pxx-kernel-${PV##*_git}") ok "$P: _kbundle_tag $KB";; *) bad "$P: _kbundle_tag is '$KB', expected uc-pxx-kernel-${PV##*_git}";; esac
+		case $KR in "${PV%%_*}"-g[0-9a-f]*|"${PV%%_*}"-[0-9]*-g[0-9a-f]*) ok "$P: _kernelrelease $KR fits pkgver $PV";; *) bad "$P: _kernelrelease '$KR' does not fit pkgver $PV";; esac;;
 	esac
+	# The uc-pxx tools bundle is an asset of a tsx-aports release uc-pxx-tools-<YYYYMMDD>.
+	if [ -n "${TB:-}" ]; then
+		case $TB in uc-pxx-tools-20[0-9][0-9][01][0-9][0-3][0-9]) ok "$P: _tbundle_tag $TB";; *) bad "$P: _tbundle_tag is '$TB', expected uc-pxx-tools-<YYYYMMDD>";; esac
+	fi
 	if grep -q "^0\{128\}  " "$D/APKBUILD"; then
 		case $P in tsx-xx60-kernel-*) ;; *) warn "$P: a sha512 is pending (all zeros): run abuild checksum after the tag or the release";; esac
 	fi
@@ -124,12 +138,12 @@ echo "== 5. file modes =="
 # A GitHub tag archive has group-writable files. tsx-config and the plugin
 # loader of tsx-ha refuse a group-writable plugin. The bundle of a kernel
 # release has the user of the CI runner as the owner of its files.
-for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
+for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/ "$REPO"/uc-pxx/*/; do
 	A=$D/APKBUILD; [ -f "$A" ] || continue; P=$(basename "$D")
 	if grep -qE 'cp -a "\$builddir"|stat -c %a' "$A"; then
 		grep -q 'chmod -R go-w "$pkgdir"$' "$A" && ok "$P: no group-writable files" || bad "$P: keeps the modes of the archive without chmod -R go-w"
 	fi
-	case $P in tsx-xx60-kernel-*|tsx-xx50-kernel-*|tsx-xx70-kernel-*)
+	case $P in tsx-xx60-kernel-*|tsx-xx50-kernel-*|tsx-xx70-kernel-*|uc-pxx-kernel-*)
 		grep -q 'chown -R 0:0 "$pkgdir"/lib$' "$A" && grep -q 'chmod -R go-w "$pkgdir"/lib$' "$A" \
 			&& ok "$P: root owns the module tree, no group-writable files" || bad "$P: the module tree keeps the owner or the modes of the bundle";;
 	esac
@@ -160,7 +174,7 @@ for u in "https://codeload.github.com/o/r/tar.gz/$SHA" "https://raw.githubuserco
 done
 source_policy stable "https://codeload.github.com/o/r/tar.gz/main" >/dev/null && bad "a branch at codeload accepted" || ok "a branch name at codeload is refused"
 source_policy stable "HTTPS://GITHUB.com/o/r/archive/refs/tags/v1.tar.gz" >/dev/null && ok "scheme and host are compared in lower case" || bad "upper-case host refused"
-source_policy stable "https://github.com/o/tsx-aports/releases/download/xx60-kernel-20261024/b.tar.zst" >/dev/null && ok "a release asset is allowed on stable" || bad "release asset refused"
+source_policy stable "https://github.com/o/tsx-aports/releases/download/uc-pxx-tools-20261024/b.tar.zst" >/dev/null && ok "a release asset is allowed on stable" || bad "release asset refused"
 # D7: the host must be exactly one of the three GitHub hosts
 for u in "https://github.com:443/o/r/archive/refs/tags/v1.tar.gz" "https://github.com./o/r/archive/refs/tags/v1.tar.gz" \
 	"https://user@github.com/o/r/archive/refs/tags/v1.tar.gz" "https://www.github.com/o/r/archive/refs/tags/v1.tar.gz" \

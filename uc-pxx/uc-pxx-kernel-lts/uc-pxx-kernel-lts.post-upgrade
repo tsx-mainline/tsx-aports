@@ -1,0 +1,10 @@
+#!/bin/sh
+# Writes NOTHING. The image of this package has no resource for U-Boot, so it
+# never goes into boot_a as it is. uc-pxx-update-boot --hook only says if
+# boot_a holds this kernel and how to write it (uc-pxx-update-boot write).
+if [ -x /usr/sbin/uc-pxx-update-boot ]; then
+	/usr/sbin/uc-pxx-update-boot --hook
+else
+	echo "uc-pxx-kernel-lts: uc-pxx-update-boot is missing (uc-pxx-boot-tools too old?). Nothing written."
+fi
+exit 0

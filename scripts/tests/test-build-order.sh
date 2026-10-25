@@ -49,7 +49,7 @@ OUT=$( (src_build "$R"; printf '%s\n' common/a common/b | order_dirs) 2>&1); RC=
 
 echo "== 2. the real tree =="
 for A in armv7 aarch64; do
-	LIST=$(cd "$REPO" && src_build "$REPO" && case $A in armv7) CATS="common xx60 xx50";; *) CATS="common xx70";; esac
+	LIST=$(cd "$REPO" && src_build "$REPO" && case $A in armv7) CATS="common xx60 xx50";; *) CATS="common xx70 uc-pxx";; esac
 		for D in $( (for c in $CATS; do find "$c" -mindepth 1 -maxdepth 1 -type d; done) | sort); do [ -n "$(pkg_arch "$D" "$A")" ] && echo "$D"; done)
 	ORDERED=$(cd "$REPO" && src_build "$REPO" && printf '%s\n' "$LIST" | order_dirs)
 	[ "$(echo "$LIST" | sort)" = "$(echo "$ORDERED" | sort)" ] && ok "$A: the order holds the same $(echo "$LIST" | wc -l) packages" || bad "$A: the order lost or added a package"
@@ -76,7 +76,8 @@ for A in armv7 aarch64; do
 			set -- $pair; before "$1" "$2" && ok "$A: $1 before $2" || bad "$A: $1 is not before $2"
 		done
 	else
-		for pair in "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-lts" "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-stable"; do
+		for pair in "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-lts" "xx70/tsx-xx70-boot-tools xx70/tsx-xx70-kernel-stable" \
+			"uc-pxx/uc-pxx-boot-tools uc-pxx/uc-pxx-kernel-lts"; do
 			set -- $pair; before "$1" "$2" && ok "$A: $1 before $2" || bad "$A: $1 is not before $2"
 		done
 	fi
