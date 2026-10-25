@@ -24,6 +24,7 @@ scripts/stage-kernel-uc-pxx.sh stage the bundle of the uc-pxx kernel package on 
 scripts/stage-uc-pxx-tools.sh  stage the tools bundle of the uc-pxx recipes on a build host
 scripts/uc-pxx-source.sh   the local source archive of uc-pxx-linux (a tag or a snapshot)
 scripts/check-apk-pins.sh  check the pinned files of a built .apk (_pins of the recipe)
+scripts/lan-repo.sh        build, index and sign a private LAN repository (see "Private LAN repository")
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
 scripts/channels.py        the tree logic of the testing channel: assemble, promote, compare, sort (see "Testing channel")
 scripts/manifest.py        the manifest of a deploy: make, wait, verify (see "Manifest of a deploy")
@@ -304,6 +305,22 @@ uc-pxx-linux has no public repository and no tag yet. The recipes name the futur
 To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the three recipes with the tag archive, and check that the content is the same.
 
 The board needs a tsx-linux-common release newer than 0.3.11 (`TSX_PKG_PREFIX` and the board hook `tsx_board_pre_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` and `uc-pxx-console` depend on `tsx-autoupdate>0.3.11`, and the uc-pxx recipes can only build after that common release.
+
+## Private LAN repository
+
+A panel on a LAN can update from a private repository on a build host, before the sources are public. `scripts/lan-repo.sh` builds it from a commit of tsx-linux-common and of uc-pxx-linux, and signs it with a private LAN key. Nothing goes to GitHub or to the public site.
+
+The LAN key is a key of its own (for example `uc-pxx-lan-private-<id>.rsa`). It stays on the build host, and it is never the project key or a throwaway test key. Its `.pub` goes into `/etc/apk/keys/` of each panel. The index is signed with the LAN key. A package that is copied from the published tree keeps the signature of the project key.
+
+1. On the workstation, run `scripts/uc-pxx-source.sh REPO REF` (the uc-pxx-linux archive) and make the common archive: `git archive --prefix=tsx-linux-common-VERSION/ REF | gzip -n`. VERSION must be newer than the published common packages, for example `0.3.12_pre2026102501`.
+2. Copy this repository without `.git` to a new BUILD_DIR on the build host. The script refuses to run in a git checkout, because it changes the recipes of the copy.
+3. Stage the bundles there: `scripts/stage-uc-pxx-tools.sh` and `scripts/stage-kernel-uc-pxx.sh`.
+4. Run `scripts/lan-repo.sh common COMMON_TGZ VERSION`. It sets that version on the common recipes of the copy.
+5. Run `LAN_KEY=<key> scripts/lan-repo.sh build`.
+6. Run `LAN_KEY=<key> LAN_KEEP_DIR=<published files> scripts/lan-repo.sh publish REPO_DIR`. REPO_DIR gets `v3.24/common/aarch64` and `v3.24/uc-pxx/aarch64`. `LAN_KEEP` names the published packages that the panels have and that are not rebuilt (`tsx-keys`, `sendspin-cli` and `tensorflow-lite-c`, the exact installed versions).
+7. Serve REPO_DIR over HTTP. A panel sets `APK_URL` in panel.conf to the server, and `tsx-config apply` writes the two repository lines.
+
+A panel without WAN access cannot reach the Alpine repositories. `tsx-autoupdate` does not install while a repository other than the two of this project is unreachable, so comment out the Alpine lines of such a panel. Then the panel gets no Alpine updates. Put any Alpine package that a new package needs into the LAN repository.
 
 ## Chromium
 
