@@ -13,7 +13,7 @@
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-leds
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 pkgdesc="uc-pxx LEDs: the LED daemon, its service, the command uc-pxx-led and the ESPHome plugin"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
