@@ -7,8 +7,10 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.8: tsx-display-power starts fewer processes.
 # 0.3.10: the KIOSK_DARK setting adds the dark mode flags of the browser.
+# 0.3.12: the file /run/tsx/kiosk.ready when the page has painted, and the on-screen
+# keyboard follows KIOSK_DARK.
 pkgname=tsx-kiosk
-pkgver=0.3.10
+pkgver=0.3.12
 pkgrel=0
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -79,5 +81,5 @@ _cursors() {
 }
 
 sha512sums="
-b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
+ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
 "

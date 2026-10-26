@@ -7,8 +7,10 @@
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
 # 0.3.10: the setup page has the Dark mode setting.
 # 0.3.11: the setup page shows ORIENTATION_HW of hw.conf as the default orientation.
+# 0.3.12: the setup page shows the distance field for a tof sensor only. Needs
+# tsx_presence.py of tsx-base 0.3.12.
 pkgname=tsx-setup
-pkgver=0.3.11
+pkgver=0.3.12
 pkgrel=0
 pkgdesc="TSX on-panel setup page and its root helper"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -17,7 +19,7 @@ license="GPL-2.0-or-later"
 # tsx-setupd 0.3.4 needs the key HA_URL of tsx-config and `tsx-panelctl state`
 # (the Panel section of the page) of tsx-base 0.3.4. 0.3.5: the group
 # tsx-setup-screen may read the pairing code for the screen (the panel app).
-depends="tsx-base>=0.3.6 python3"
+depends="tsx-base>=0.3.12 python3"
 install="$pkgname.pre-install $pkgname.pre-upgrade"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
@@ -33,5 +35,5 @@ package() {
 }
 
 sha512sums="
-20a5294e79947903b827b67edff89a7cc3920439cbc52e0215bc3cca98d11e2ce9b1561747cc8485063ebbc085f46943b21513621f686e0c5512c15f59ef11ac  tsx-linux-common-0.3.11.tar.gz
+ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
 "
