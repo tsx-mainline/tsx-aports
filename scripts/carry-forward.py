@@ -14,6 +14,7 @@ versions, and scripts/index.sh re-indexes and signs the merged result again.
   --from BASE_URL        the published tree to fetch, as
                          BASE_URL/v3.24/<category>/<arch>/
                          (default https://tsx-aports.unexceptional.net).
+                         The testing channel is the base URL with /testing.
                          The status 404 for an index means that nothing is
                          published yet. This is not an error. Any other
                          error fails the run.
@@ -135,6 +136,9 @@ class Source:
         if os.path.isdir(self.base):
             p = os.path.join(self.base, rel)
             return open(p, 'rb').read() if os.path.exists(p) else None
+        # The CDN of Pages can serve an older tree for 10 minutes. No request
+        # header or query string changes that. CI checks the files against the
+        # manifest of the last deploy (scripts/manifest.py) and waits.
         req = urllib.request.Request(f'{self.base.rstrip("/")}/{rel}',
                                      headers={'User-Agent': 'tsx-aports-ci'})
         try:

@@ -54,6 +54,8 @@
 #                    tsx-mainline/keys/tsx-mainline-<id>.rsa. The keys/
 #                    directory of this repo is gitignored and never holds it.
 #                    The key stays outside every repo.
+#   TSX_APORTS_CHANNEL  stable (the default) or testing. Only testing may build
+#                    from the archive of a full commit sha (scripts/source-policy.sh).
 #   BUILD_HOST       ssh destination to build on instead of this machine
 #                    (optional).
 #   BUILD_DIR        remote path that mirrors this repo (required with
@@ -111,6 +113,7 @@ REPO=$(cd "$HERE/.." && pwd)
 # arch_platform, ensure_image, check_image_arch and arch_image. Each
 # architecture has its own image tag (see that file).
 . "$(dirname "${BASH_SOURCE[0]}")/arch-image.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/source-policy.sh"
 
 # to_build_host ARGS...: runs `rsync -a ARGS...`. It refuses if any argument
 # names a private key. This is $TSX_APORTS_KEY itself, or anything that ends
@@ -285,7 +288,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	# tsx-xx60-boot-tools) then has a signature that the container of THIS call
 	# trusts, when it resolves the package as a build dependency from
 	# packages/v3.24 (REPODEST). See the comment at the top of this file.
-	REMOTE_CMD="set -e; KD='$BUILD_DIR/.throwaway-key'; mkdir -p \"\$KD\"; [ -f \"\$KD/throwaway.rsa\" ] || { openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; }; ON_HOST=1 TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh'$PASS '$TARGET'"
+	REMOTE_CMD="set -e; KD='$BUILD_DIR/.throwaway-key'; mkdir -p \"\$KD\"; [ -f \"\$KD/throwaway.rsa\" ] || { openssl genrsa -out \"\$KD/throwaway.rsa\" 4096 >/dev/null 2>&1; openssl rsa -in \"\$KD/throwaway.rsa\" -pubout -out \"\$KD/throwaway.rsa.pub\" >/dev/null 2>&1; }; ON_HOST=1 TSX_APORTS_CHANNEL='$(channel_name)' TSX_APORTS_KEY=\"\$KD/throwaway.rsa\" '$BUILD_DIR/scripts/build.sh'$PASS '$TARGET'"
 	assert_remote_cmd_safe "$REMOTE_CMD"
 	ssh -o BatchMode=yes "$BUILD_HOST" "$REMOTE_CMD"
 
@@ -374,6 +377,18 @@ want_build() {
 	fi
 	return 0
 }
+
+# The source policy (scripts/source-policy.sh): stable builds from signed tags
+# only, testing may also build from a full commit sha. Check every job first,
+# so a refused source stops the run before the first build.
+CHANNEL=$(channel_name)
+while read -r PKGDIR PKGARCH; do
+	[ -n "$PKGDIR" ] || continue
+	while read -r url file; do
+		[ -n "$url" ] || continue
+		why=$(source_policy "$CHANNEL" "$url") || { echo "build.sh: $PKGDIR: $url: $why (channel $CHANNEL)" >&2; exit 1; }
+	done <<<"$(apkbuild_info "$PKGDIR" | tail -n +2)"
+done <<<"$JOBS"
 
 echo "[build.sh] build order:$(printf '%s\n' "$JOBS" | awk 'NF{printf " %s(%s)", $1, $2}')"
 # READY: the architectures whose image is pulled and checked in this run. The

@@ -14,6 +14,7 @@
 # call. The signing key is a throwaway fixture key, never the key of the
 # project.
 set -uo pipefail
+export PYTHONDONTWRITEBYTECODE=1   # no .pyc in the work tree
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 N=0 F=0
 ok() { echo "  ok: $*"; N=$((N + 1)); }
@@ -95,7 +96,7 @@ $CF --from $URL --fallback-seed "$W/none.tar.gz" --dest "$W/d10" 2>&1 | grep -q 
 
 echo "== 2/3. build.sh --skip-existing / --skip-unreachable (fake docker) =="
 R=$W/repo; mkdir -p "$R/scripts" "$R/common/tsx-fixture" "$R/xx60/tsx-fixture-kernel" "$R/packages/v3.24/common/armv7" "$W/bin"
-cp "$HERE/build.sh" "$HERE/arch-image.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
+cp "$HERE/build.sh" "$HERE/arch-image.sh" "$HERE/source-policy.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
 # The fake docker answers the image steps of scripts/arch-image.sh (pull, tag,
 # and `apk --print-arch`). A build (`docker run ... sh -euc SCRIPT`) prints
 # DOCKER-CALLED and its script.
@@ -151,7 +152,7 @@ case "$OUT" in *"abuild -F checksum"*) bad "--verify still runs abuild checksum"
 
 echo "== 4. index.sh --keep 2 over carried-forward + fresh packages =="
 P=$W/idx; mkdir -p "$P/scripts" "$P/packages/v3.24"
-cp "$HERE/index.sh" "$HERE/arch-image.sh" "$P/scripts/"; cp -r "$W/d1/." "$P/packages/v3.24/"
+cp "$HERE/index.sh" "$HERE/arch-image.sh" "$HERE/channels.py" "$P/scripts/"; cp -r "$W/d1/." "$P/packages/v3.24/"
 mkpkg 3 "$P/packages/v3.24"   # the "fresh build" of this run, next to the carried r0..r2
 ls "$P"/packages/v3.24/common/armv7/*.apk | wc -l | grep -qx 4 && ok "mixed tree holds r0-r2 (carried) + r3 (built)" || bad "mixed tree wrong"
 if OUT=$(TSX_APORTS_KEY="$W/project.rsa" "$P/scripts/index.sh" --keep 2 --out "$P/repo" 2>&1); then

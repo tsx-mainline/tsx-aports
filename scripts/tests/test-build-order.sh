@@ -24,7 +24,7 @@ src_build() { TSX_APORTS_BUILD_SH_SOURCE_ONLY=1 . "$1/scripts/build.sh"; REPO=$1
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 
 echo "== 1. fixture tree =="
-R=$W/repo; mkdir -p "$R/scripts"; cp "$HERE/build.sh" "$HERE/arch-image.sh" "$R/scripts/"
+R=$W/repo; mkdir -p "$R/scripts"; cp "$HERE/build.sh" "$HERE/arch-image.sh" "$HERE/source-policy.sh" "$R/scripts/"
 mk() {   # DIR NAME DEPENDS MAKEDEPENDS [SUBPACKAGES] [PROVIDES]
 	mkdir -p "$R/$1"
 	printf 'pkgname=%s\npkgver=1\npkgrel=0\narch=noarch\ndepends="%s"\nmakedepends="%s"\nsubpackages="%s"\nprovides="%s"\n' "$2" "$3" "$4" "${5:-}" "${6:-}" > "$R/$1/APKBUILD"

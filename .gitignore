@@ -30,3 +30,8 @@ xx50/*/dist/
 # staged kernel bundles of xx70 (scripts/stage-kernel-xx70.sh keeps them on
 # the build host, and a tsx-aports release holds the published copy)
 xx70/*/dist/
+work/
+
+# Python byte code (a script that imports another makes it)
+__pycache__/
+*.pyc

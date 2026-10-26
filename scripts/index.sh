@@ -9,7 +9,7 @@
 # "Hosting and size"). The script also copies a ready tree to $OUT
 # (default repo/).
 #
-#   scripts/index.sh [--keep N] [--out DIR]
+#   scripts/index.sh [--keep N] [--out DIR] [--src DIR] [--prefix PATH]
 #
 # --keep N   keep the newest N versions of each package (sorted by
 #            pkgver/pkgrel), delete the others, then re-index. The default
@@ -23,19 +23,30 @@
 #            and that our packages depend on (see README.md "Kept packages").
 # --out DIR  the directory for the published tree (default: repo/,
 #            gitignored). CI publishes it (see .github/workflows/build.yml).
+# --src DIR  the tree to index (default: packages/v3.24 of this repo). It has
+#            <category>/<arch>/*.apk. The script prunes and indexes it in place.
+# --prefix P put the result in DIR/P/v3.24 and not in DIR/v3.24. CI uses
+#            "testing" for the testing channel. The script never touches
+#            any other path of DIR.
 #
 # Environment: TSX_APORTS_KEY (the private key). The script always rebuilds
 # and signs the index.
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
+# The prune sorts with scripts/channels.py. Without it the prune would delete nothing, silently.
+[ -x "$HERE/channels.py" ] || { echo "index.sh: $HERE/channels.py is missing or not executable" >&2; exit 1; }
 . "$HERE/arch-image.sh"
 KEEP=2
 OUT="$REPO/repo"
+SRC="$REPO/packages/v3.24"
+PREFIX=
 while [ $# -gt 0 ]; do case $1 in
 	--keep) KEEP=$2; shift;;
 	--out) OUT=$2; shift;;
-	-h|--help) sed -n '2,25p' "$0"; exit 0;;
+	--src) SRC=$2; shift;;
+	--prefix) PREFIX=${2#/}; PREFIX=${PREFIX%/}; shift;;
+	-h|--help) sed -n '2,31p' "$0"; exit 0;;
 	*) echo "unknown arg $1" >&2; exit 1;;
 esac; shift; done
 
@@ -98,17 +109,17 @@ prune_dir() {  # ARCH_DIR
 	# Group the files by the whole pkgname, and keep the KEEP newest files
 	# of each group. Do not use a glob such as "<pkgname>-*.apk": it also
 	# matches the subpackages (tsx-xx60-board-ha, tsx-ledbar-fw), and then
-	# the prune deleted the newest main package. The order comes from a
-	# plain version sort. This is close enough for a prune, and the prune
-	# alone does nothing that affects security.
+	# the prune deleted the newest main package. The order is the order of
+	# apk (scripts/channels.py sort). A plain `sort -V` is wrong for
+	# 1.0_pre1, 1.0_rc1 and 1.0a: it puts 1.0-r0 before 1.0_pre1.
 	for pkgname in $(apk_names "$d" | cut -f1 | sort -u); do
 		files=$(apk_names "$d" | awk -F'\t' -v p="$pkgname" -v k="$kept" '
 			BEGIN { n = split(k, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") K[a[i]] = 1 }
-			$1 == p && !($2 in K) { print $2 }' | sort -V)
+			$1 == p && !($2 in K) { print $2 }' | "$HERE/channels.py" sort)
 		[ -n "$files" ] || continue
 		n=$(printf '%s\n' "$files" | wc -l)
 		if [ "$n" -gt "$KEEP" ]; then
-			old=$(printf '%s\n' "$files" | head -n $((n - KEEP)))
+			old=$(printf '%s\n' "$files" | sed -n "1,$((n - KEEP))p")
 			for f in $old; do
 				echo "index.sh: pruning $d/$f"
 				rm -f "$d/$f"
@@ -122,9 +133,9 @@ prune_dir() {  # ARCH_DIR
 # The host test loads the functions only.
 if [ "${TSX_APORTS_INDEX_SH_SOURCE_ONLY:-0}" = 1 ]; then return 0 2>/dev/null || exit 0; fi
 
-SRC="$REPO/packages/v3.24"
 [ -d "$SRC" ] || { echo "index.sh: no $SRC -- run scripts/build.sh first" >&2; exit 1; }
 
+SRC=$(cd "$SRC" && pwd)
 restore_kept "$SRC"
 
 READY=   # the architectures whose image is pulled and checked in this run
@@ -167,8 +178,10 @@ for cat_dir in "$SRC"/*/; do
 done
 
 echo "index.sh: assembling $OUT"
-mkdir -p "$OUT"
-rsync -a --delete "$SRC/" "$OUT/v3.24/"
+DEST=$OUT${PREFIX:+/$PREFIX}/v3.24
+mkdir -p "$DEST"
+rsync -a --delete "$SRC/" "$DEST/"
 du -sh "$OUT" 2>/dev/null || true
-find "$OUT" -name '*.apk' -exec du -h {} + | sort -rh | head -10
+# sed, not head: head exits early, sort gets SIGPIPE, and pipefail fails the run.
+find "$OUT" -name '*.apk' -exec du -h {} + | sort -rh | sed -n 1,10p
 echo "index.sh: done. Published tree: $OUT (copy its contents to the Pages/release destination)"

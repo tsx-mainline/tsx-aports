@@ -1,16 +1,22 @@
 # Build the packages and publish the apk repository to GitHub Pages behind
 # tsx-aports.unexceptional.net.
 #
-#   build           runs on a push to main (only when packages, scripts or this
-#                   file change), on manual runs, and on pull requests.
-#                   It restores the published tree (scripts/carry-forward.py).
-#                   It builds only the new versions (scripts/build.sh
-#                   --skip-existing). It then re-indexes and signs the tree
-#                   (scripts/index.sh --keep 2). The kept packages of
-#                   keep/keep.txt are never pruned, and index.sh puts them
-#                   back from keep/v3.24/ if the tree lost them. A pull
-#                   request builds with a throwaway key and publishes nothing.
-#   deploy          publishes the tree that `build` assembled.
+#   build           runs on a push to main (only when packages, scripts or
+#                   this file change), on manual runs, and on pull requests. It restores the published trees
+#                   (scripts/carry-forward.py). It builds only the new versions
+#                   (scripts/build.sh --skip-existing). It then re-indexes and
+#                   signs what changed (scripts/index.sh --keep 2). The kept
+#                   packages of keep/keep.txt are never pruned, and index.sh
+#                   puts them back from keep/v3.24/ if the tree lost them. A
+#                   pull request builds with a throwaway key and publishes
+#                   nothing.
+#   deploy          publishes the trees that `build` assembled. After a
+#                   successful deploy it keeps the manifest of the site as the
+#                   artifact live-manifest. The next run starts from it
+#                   (scripts/manifest.py, scripts/live-manifest.sh).
+#   trigger-testing runs on a push to the branch testing. It deploys nothing.
+#                   It starts this workflow on main (workflow_dispatch) with
+#                   channel=testing and the sha of the push.
 #   chromium-watch  runs on a schedule. It checks Alpine v3.24 armv7 for a
 #                   newer chromium and opens a pull request that changes
 #                   the pin.
@@ -39,9 +45,23 @@
 # so it checks each download against the sha512sums of the APKBUILD and stops
 # on a difference (README.md, "Source of the packages").
 #
-# A run on a branch (workflow_dispatch) builds the same packages, signs with a
-# throwaway key and publishes nothing: the key and the Pages steps need the
-# ref main (step "Decide if this run publishes").
+# The site has two trees (README.md "Testing channel"): stable at /v3.24 and
+# testing at /testing/v3.24. GitHub Pages serves one artifact for the site, so
+# each deploy starts from the live site, changes the tree of its mode and
+# uploads both trees. Every deploy runs on main, because the environment
+# github-pages allows main only. scripts/decide-mode.sh decides the mode:
+#   stable    a push to main, or a manual run on main
+#   testing   a manual run on main with channel=testing and source_sha. The
+#             job trigger-testing makes this run after a push to the branch
+#             testing. The run takes the recipes (common, xx60, xx50, xx70,
+#             keep) from source_sha and the scripts from main. It
+#             stops unless source_sha is on the branch testing
+#             (scripts/check-testing-sha.sh).
+#   promote   a manual run on main with the action promote
+# A stable run with trust_live skips the manifest check (a deploy went live
+# without its live-manifest). It is refused for testing and promote.
+# A run on any other branch builds the same packages, signs with a throwaway
+# key and publishes nothing: the key and the Pages steps need the ref main.
 #
 # First deploy: the live site holds only the first packages, so most of the
 # tree is built new. A kernel package whose release bundle does not exist is
@@ -52,7 +72,7 @@ name: build
 
 on:
   push:
-    branches: [main]
+    branches: [main, testing]
     paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   pull_request:
     paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
@@ -65,38 +85,113 @@ on:
         description: 'Tarball (URL) of a published tree to start from instead of the live site (the first deploy)'
         required: false
         default: ''
+      channel:
+        description: 'stable: build main. testing: build the recipes at source_sha (a commit on the branch testing) into the testing tree'
+        type: choice
+        options: [stable, testing]
+        default: stable
+      source_sha:
+        description: 'For channel testing: the full sha of a commit on the branch testing'
+        required: false
+        default: ''
+      trust_live:
+        description: 'Stable only: skip the manifest check and trust the live site (use it when a deploy went live without its live-manifest)'
+        type: boolean
+        default: false
+      action:
+        description: 'build: the normal build. promote: copy packages from testing to stable'
+        type: choice
+        options: [build, promote]
+        default: build
+      packages:
+        description: 'For promote: package names (or apk names) of the testing tree, separated by spaces or commas, or all'
+        required: false
+        default: ''
 
 # A publish is never cancelled part-way. A pull-request build does not wait
-# for a publish and does not block one.
+# for a publish and does not block one. The daily watch run, and the small run
+# that a push to testing makes, have their own groups, so they never take the
+# place of a waiting deploy. GitHub keeps ONE waiting run for a group and
+# cancels an older waiting run when a newer one comes. So a deploy that was
+# started by the trigger job must not wait next to a waiting deploy of main:
+# scripts/trigger-testing.sh does not start it while another run waits. A
+# deploy of main that comes while a testing deploy waits replaces it (start the
+# testing build again). A deploy does not start from a stale tree: it takes the
+# last manifest, and it stops if another deploy finished while it built.
 concurrency:
-  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'tsx-aports-publish' }}
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || github.event_name == 'schedule' && 'tsx-aports-watch' || (github.event_name == 'push' && github.ref == 'refs/heads/testing' && 'tsx-aports-trigger') || 'tsx-aports-publish' }}
   cancel-in-progress: false
 
 permissions:
   contents: read
+  actions: read
 
 env:
+  # No byte code in the work tree: a .pyc holds the absolute path of the runner.
+  PYTHONDONTWRITEBYTECODE: '1'
   SITE_URL: https://tsx-aports.unexceptional.net
   SITE_DOMAIN: tsx-aports.unexceptional.net
 
 jobs:
+  # A push to the branch testing deploys nothing. The deploy must run on main,
+  # so this job starts the workflow on main. GITHUB_TOKEN may start a
+  # workflow_dispatch run (the one event type that it may start).
+  trigger-testing:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/testing'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start the testing build on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/trigger-testing.sh "$GITHUB_SHA"
+
   build:
-    if: github.event_name != 'schedule'
+    if: github.event_name != 'schedule' && !(github.event_name == 'push' && github.ref == 'refs/heads/testing')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 360
     outputs:
       publish: ${{ steps.mode.outputs.publish }}
+      mode: ${{ steps.mode.outputs.mode }}
     steps:
+      # All history: a testing run checks that source_sha is on the branch testing.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Decide if this run publishes
         id: mode
+        env:
+          ACTION: ${{ inputs.action }}
+          CHANNEL: ${{ inputs.channel }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          SEED_URL: ${{ inputs.seed_url }}
+          TRUST_LIVE: ${{ inputs.trust_live }}
+          PACKAGES: ${{ inputs.packages }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" != pull_request ] && [ "$GITHUB_REF" = refs/heads/main ]; then
-            echo "publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-          fi
+          set -eu
+          # decide-mode.sh checks every value and prints only key=value lines
+          # without a newline inside a value. The workflow uses its output as
+          # it is and parses nothing again.
+          out=$(scripts/decide-mode.sh)
+          echo "$out" | tee -a "$GITHUB_OUTPUT"
+          # Only the testing channel may build from the archive of a commit
+          # (scripts/source-policy.sh).
+          echo "TSX_APORTS_CHANNEL=$(echo "$out" | sed -n 's/^channel=//p')" >> "$GITHUB_ENV"
+
+      # The testing run takes the recipes of source_sha and keeps the scripts
+      # and the public keys of main. The check comes first: the commit must be
+      # on the branch testing.
+      - name: Take the recipes from the commit on the testing branch
+        if: steps.mode.outputs.mode == 'testing'
+        env:
+          SOURCE_SHA: ${{ steps.mode.outputs.source_sha }}
+        run: scripts/take-recipes.sh "$SOURCE_SHA"
 
       - name: Restore signing key
         if: steps.mode.outputs.publish == 'true'
@@ -144,25 +239,137 @@ jobs:
             check_image_arch "$a"
           done
 
-      # Start from the published tree. Then the older versions
+      # The truth about the live site is the manifest of the last deploy (the
+      # artifact live-manifest), not what the CDN of Pages returns: the CDN can
+      # serve an older tree for 10 minutes, whatever the request says.
+      # Without a manifest (the first deploy with this workflow, or after the
+      # retention of 90 days) a stable run trusts the site as before. A testing
+      # or promote run fails: it must not rebuild stable from an unchecked fetch.
+      - name: Find the manifest of the last deploy
+        id: manifest
+        if: steps.mode.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ steps.mode.outputs.mode }}
+          SEED_URL: ${{ inputs.seed_url }}
+          TRUST_LIVE: ${{ steps.mode.outputs.trust_live }}
+        run: |
+          set -u
+          mkdir -p work
+          if [ -n "$SEED_URL" ] || [ "$TRUST_LIVE" = true ]; then
+            echo "seed_url or trust_live: this stable run trusts the site and does not check a manifest"
+            echo "have=false" >> "$GITHUB_OUTPUT"; echo "artifact_id=none" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # Exit 3 means "no artifact". Any other failure (the API too) stops the run.
+          rc=0
+          out=$(scripts/live-manifest.sh fetch work/live-manifest.txt) || rc=$?
+          if [ "$rc" = 0 ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"; echo "$out" >> "$GITHUB_OUTPUT"
+          elif [ "$rc" = 3 ]; then
+            echo "have=false" >> "$GITHUB_OUTPUT"; echo "artifact_id=none" >> "$GITHUB_OUTPUT"
+            case "$MODE" in
+            testing|promote) echo "::error::no manifest of a deploy. Run a stable build on main first (action build, channel stable). If a deploy went live without its manifest, run it with trust_live."; exit 1;;
+            esac
+            echo "::warning::no manifest of a deploy: this stable run trusts the live site"
+          else
+            echo "::error::could not read the manifest of the last deploy (exit $rc)"; exit 1
+          fi
+
+      # Wait until the CDN serves the files of the last deploy (up to 11 min).
+      - name: Wait for the live site to match the last deploy
+        if: steps.manifest.outputs.have == 'true'
+        run: scripts/manifest.py wait --manifest work/live-manifest.txt --base "$SITE_URL" --timeout 700
+
+      # Start from the published trees. Then the older versions
       # (index.sh --keep 2) and the packages that this run does not rebuild
       # stay after the deploy. The step checks every index against the
       # committed public key.
-      - name: Carry forward the published tree
+      #   stable, none   the stable tree goes to packages/v3.24 (the base of
+      #                  the build).
+      #   testing        the stable tree goes to work/stable (it is published
+      #                  without a change). The testing tree goes to
+      #                  packages/v3.24 (the base of the build). If no testing
+      #                  tree is live yet, the base is the stable tree.
+      #   promote        the stable tree goes to work/stable and the testing
+      #                  tree to work/testing-live. The run builds nothing.
+      # The seed (the fallback seed, or seed_url) is for a stable run only,
+      # and only when nothing is published. A testing or promote run never
+      # uses it.
+      - name: Carry forward the published stable tree
         env:
           SEED_URL: ${{ inputs.seed_url }}
+          MODE: ${{ steps.mode.outputs.mode }}
         run: |
-          if [ -n "$SEED_URL" ]; then
-            scripts/carry-forward.py --seed "$SEED_URL"
-          else
-            scripts/carry-forward.py --from "$SITE_URL" \
-              --fallback-seed "https://github.com/$GITHUB_REPOSITORY/releases/download/seed/tsx-aports-seed.tar.gz"
+          set -eu
+          DEST=packages/v3.24
+          case "$MODE" in testing|promote) DEST=work/stable;; esac
+          case "$MODE" in
+          testing|promote)
+            scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST";;
+          *)
+            if [ -n "$SEED_URL" ]; then
+              scripts/carry-forward.py --seed "$SEED_URL" --dest "$DEST"
+            else
+              scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST" \
+                --fallback-seed "https://github.com/$GITHUB_REPOSITORY/releases/download/seed/tsx-aports-seed.tar.gz"
+            fi;;
+          esac
+          mkdir -p "$DEST"
+
+      - name: Carry forward the published testing tree
+        if: steps.mode.outputs.mode != 'none'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -eu
+          DEST=work/testing-live
+          [ "$MODE" != testing ] || DEST=packages/v3.24
+          scripts/carry-forward.py --from "$SITE_URL/testing" --dest "$DEST"
+          mkdir -p "$DEST"
+
+      # promoted.txt lists what a promote copied to stable. Every deploy
+      # carries it forward. A 404 means that no promote has run yet. With a
+      # manifest, the next step checks the file against it.
+      - name: Carry forward promoted.txt
+        if: steps.mode.outputs.publish == 'true'
+        run: |
+          set -eu
+          mkdir -p work
+          code=$(curl -sSL -o work/promoted.txt -w '%{http_code}' "$SITE_URL/promoted.txt")
+          case "$code" in
+          200) ;;
+          404) : > work/promoted.txt;;
+          *) echo "::error::promoted.txt: HTTP $code"; exit 1;;
+          esac
+
+      # The fetched trees must be the trees of the last deploy: the same
+      # files with the same bytes. A 404 for one index (a category that is
+      # missing) or a stale file stops the run here.
+      - name: Check the fetched trees against the manifest
+        if: steps.manifest.outputs.have == 'true'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -eu
+          case "$MODE" in
+          stable) scripts/manifest.py verify --manifest work/live-manifest.txt --stable packages/v3.24 --testing work/testing-live;;
+          testing) scripts/manifest.py verify --manifest work/live-manifest.txt --stable work/stable --testing packages/v3.24;;
+          promote) scripts/manifest.py verify --manifest work/live-manifest.txt --stable work/stable --testing work/testing-live;;
+          esac
+          scripts/manifest.py check-file --manifest work/live-manifest.txt --path promoted.txt --file work/promoted.txt
+          # The base of a testing build is the live testing tree. If none is
+          # live yet, it is the stable tree.
+          if [ "$MODE" = testing ] && ! find packages/v3.24 -name APKINDEX.tar.gz | grep -q .; then
+            echo "no testing tree is live yet: the build starts from the stable tree"
+            cp -a work/stable/. packages/v3.24/
           fi
 
       # --verify: the build does not write new sha512sums. It fails when a
       # download does not match the APKBUILD.
       # --skip-existing: the build does not rebuild a published version
-      # (tensorflow-lite-c is a long C++ build).
+      # (tensorflow-lite-c is a long C++ build). A package of the testing
+      # branch with the version of a stable package is not built: raise
+      # pkgrel to test a change.
       # --skip-unreachable: the build skips a kernel package whose release
       # bundle does not exist yet, with a warning. Its carried-forward copy
       # stays.
@@ -171,23 +378,53 @@ jobs:
       # A package builds in a pass only when its arch= lists that
       # architecture. tensorflow-lite-c and sendspin-cli list both.
       - name: Build the new versions
+        if: steps.mode.outputs.mode != 'promote'
         run: scripts/build.sh --verify --skip-existing --skip-unreachable --all
 
-      - name: Assemble the published tree (latest and one previous version)
+      # scripts/assemble-site.sh builds both trees of the site from the
+      # trees above (its header says how). It ends with a check of every
+      # index signature and apk checksum in the tree that goes live.
+      - name: Assemble the published trees (stable and testing)
         if: steps.mode.outputs.publish == 'true'
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+          PROMOTE: ${{ inputs.packages }}
         run: |
-          scripts/index.sh --keep 2 --out repo
-          echo "$SITE_DOMAIN" > repo/CNAME
-          # Last check: every index signature and apk checksum in the tree
-          # that goes live must verify against the committed key.
-          scripts/carry-forward.py --from repo --dest "$RUNNER_TEMP/verify"
-          du -sh repo
-          find repo -name '*.apk' -exec du -h {} + | sort -rh | head -5
+          set -eu
+          MANIFEST_FILE=""
+          [ ! -s work/live-manifest.txt ] || MANIFEST_FILE=$PWD/work/live-manifest.txt
+          export MANIFEST_FILE
+          SITE_DOMAIN="$SITE_DOMAIN" scripts/assemble-site.sh "$MODE"
+          du -sh repo repo/testing
+          # sed, not head: head exits early, sort gets SIGPIPE, and the shell
+          # of GitHub (pipefail) fails the step.
+          find repo -name '*.apk' -exec du -h {} + | sort -rh | sed -n 1,5p
+
+      # The last check before the upload: no other deploy finished while this
+      # run built. Else this run would publish a tree that lacks that deploy.
+      - name: Check that the live site did not change during the build
+        if: steps.mode.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ID: ${{ steps.manifest.outputs.artifact_id }}
+          SEED_URL: ${{ inputs.seed_url }}
+          TRUST_LIVE: ${{ steps.mode.outputs.trust_live }}
+        run: |
+          # A run with seed_url or trust_live has no manifest on purpose.
+          { [ -z "$SEED_URL" ] && [ "$TRUST_LIVE" != true ]; } || { echo "seed_url or trust_live: no check"; exit 0; }
+          scripts/live-manifest.sh same "$ID"
 
       - uses: actions/upload-pages-artifact@v5
         if: steps.mode.outputs.publish == 'true'
         with:
           path: repo
+
+      - uses: actions/upload-artifact@v4
+        if: steps.mode.outputs.publish == 'true'
+        with:
+          name: site-manifest
+          path: repo/manifest.txt
+          retention-days: 1
 
   deploy:
     needs: build
@@ -202,6 +439,19 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+
+      # Only after a successful deploy: keep the manifest of the live site.
+      # The next run takes the newest live-manifest as the truth.
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-manifest
+          path: manifest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: live-manifest
+          path: manifest/manifest.txt
+          retention-days: 90
 
   # tsx-xx60-wlroots0.20 holds back Alpine's wlroots0.20 on the panels, also
   # its security updates. When Alpine publishes another wlroots0.20 build,

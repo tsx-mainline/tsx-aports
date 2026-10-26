@@ -20,11 +20,20 @@ scripts/index.sh           prune old versions + assemble the published tree
 scripts/stage-kernel.sh    stage the binaries of a prebuilt kernel for packaging
 scripts/stage-kernel-xx70.sh   stage the bundle of an xx70 kernel package on a build host
 scripts/carry-forward.py   restore the published tree and check its signatures (CI)
+scripts/channels.py        the tree logic of the testing channel: assemble, promote, compare, sort (see "Testing channel")
+scripts/manifest.py        the manifest of a deploy: make, wait, verify (see "Manifest of a deploy")
+scripts/live-manifest.sh   find the manifest of the last deploy (the artifact live-manifest)
+scripts/trigger-testing.sh start the testing build on main from a push to testing
+scripts/take-recipes.sh    for a testing build: the recipes of a commit on testing, the scripts and keys of main
+scripts/decide-mode.sh     the mode of a CI run (stable, testing, promote, none)
+scripts/check-testing-sha.sh   stop unless a commit is on the branch testing
+scripts/assemble-site.sh   assemble both trees of the site for one deploy (CI)
+scripts/source-policy.sh   which GitHub sources a channel may use (tag or commit)
 scripts/check-bootimg-dtbs.py   check the board DTBs of a boot image
 scripts/keep-pins.sh       keep/keep.txt for the initramfs pins of a tsx-xx60-linux tag (pin-kernel.sh runs it)
 scripts/keep-alpine.sh     keep an Alpine package that Alpine removed (keep/keep-alpine.txt)
 keep/                      the kept packages: never pruned, restored by index.sh (see "Kept packages")
-scripts/tests/             host tests (resign, board DTBs, CI Pages, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor)
+scripts/tests/             host tests (resign, board DTBs, CI Pages, testing channel, manifest, run mode, site trees, remote deps, source pins, build order, index prune, kept packages, xx70 kernel staging and flavor)
 .github/workflows/build.yml   CI: build, publish, and the daily watch jobs
 ```
 
@@ -100,6 +109,8 @@ Every recipe builds from public sources. CI and a local build download the same 
 - `xx50/tsx-xx50-board` uses the GitHub archive of the signed tag `board-v$pkgver` of tsx-xx50-linux. The top directory of this archive is `tsx-xx50-linux-board-v$pkgver`.
 - `xx50/tsx-xx50-panel-app` uses the release asset `tsx-xx50-panel-app-src-$pkgver.tar.gz` of the tag `v$pkgver` of tsx-xx50-linux.
 - The kernel packages use a release asset (see "Kernel packages"). The xx70 kernel packages use an asset of a tsx-aports release (see "xx70 kernel packages").
+
+On the branch `testing`, a recipe can use the archive of one commit instead of a tag (see "Testing channel", "Commit sources").
 
 The tag fixes the content of an archive. `sha512sums` fixes the bytes. GitHub makes the archive again on each request, with its own gzip. The bytes are the same on each download, but they are not the same as the output of `git archive | gzip`. A change of the GitHub gzip program changes the sum. The build then fails and nothing is signed. To fix this, run `abuild checksum` and check that the content is the same as before.
 
@@ -300,6 +311,105 @@ Expect these results:
 
 apk-tools 3 (Alpine 3.24) refuses every upgrade while a listed repository is unavailable ("Not continuing due to stale/unavailable repositories"). While this repository is not reachable, a panel that lists it needs `--force-missing-repositories`. It can also use `APK_URL=off` in its panel configuration. tsx-autoupdate adds the option by itself and reports the repository as unreachable.
 
+## Testing channel
+
+The site has two trees:
+
+```
+https://tsx-aports.unexceptional.net/v3.24/<category>/<arch>/            stable (branch main)
+https://tsx-aports.unexceptional.net/testing/v3.24/<category>/<arch>/    testing (branch testing)
+```
+
+The testing tree is complete: it has all of stable, and for each package the testing build when it is newer than the newest stable version. A test panel needs only one URL. CI builds and signs both trees with the same key.
+
+### Use it on a panel
+
+Set `APK_URL` in the panel configuration and apply it:
+
+```
+tsx-config set APK_URL https://tsx-aports.unexceptional.net/testing
+tsx-config apply
+apk update && apk upgrade
+```
+
+`tsx-config apply` writes `https://tsx-aports.unexceptional.net/testing/v3.24/common` and `.../testing/v3.24/<category>` as the first lines of `/etc/apk/repositories`. To go back to stable, run `tsx-config unset APK_URL` and `tsx-config apply`. A panel on testing can also get a package that is older than its installed version only with `apk add package=version`.
+
+### Flows
+
+Every deploy starts from the live site and uploads both trees. Pages serves one artifact, so a deploy must not start from an old copy. Two things make that safe (see "Manifest of a deploy"): the run takes the files of the last deploy from its manifest and not from the CDN, and it stops before the upload if another deploy finished while it built.
+
+- **main** (a push to `main`, or a manual run on `main`): builds the new stable versions, prunes to the newest 2 versions, indexes and signs stable. It then builds the testing tree again from the new stable tree and the testing-only packages that are still newer, and signs it. A testing package with the same or an older version than stable is dropped.
+- **testing** (a push to `testing`, or a manual run on `main` with `channel` testing and a `source_sha`): a push to `testing` deploys nothing itself. The job `trigger-testing` starts the workflow on `main` (`workflow_dispatch`, with `channel=testing` and the sha of the push), because the environment `github-pages` allows deploys from `main` only. The run on `main` stops unless the sha is on the branch `testing` (`scripts/check-testing-sha.sh`). It takes the recipe folders (`common`, `xx60`, `xx50`, `xx70`, `keep`) from that sha and keeps the scripts of `main`, so a change of `scripts/` on `testing` is not used until it is on `main`. To run a build again, start the workflow by hand on `main` with `channel` testing and the full sha. The base of the build is the live testing tree. It builds only the versions that are new. The stable tree is copied from the live site without a change, and the run stops unless it equals the stable tree of the manifest of the last deploy, file by file (`scripts/manifest.py check-tree`). The testing tree is stable plus the newer testing packages, and keeps only the newest version of each package (`TESTING_KEEP`, so that two trees stay under the size limit of Pages).
+- **promote** (a manual run on `main`, action `promote`, input `packages`): `packages` has package names or apk names (as listed in the testing tree), separated by spaces or commas, or `all`. The run copies the apk files of the live testing tree into the stable tree. It promotes whole builds: with an apk it also takes every apk of the same origin and version (the subpackages, for example `tsx-xx60-board-kiosk` and `tsx-xx60-board-ha` with `tsx-xx60-board`) and every apk that it pins with an exact depend (`name=version`) when stable lacks that version. It reads this from the index of the testing tree. It fails if an exact depend is nowhere, or if the index is missing. The bytes are the same, nothing is built again. It signs the stable index again, appends the names and sha256 sums to `promoted.txt` (at the site root, `https://tsx-aports.unexceptional.net/promoted.txt`) and builds the testing tree again. A name that has nothing to promote fails the run before anything is published. There is no gate: the person who starts the run decides.
+- **cron** (daily): only the two watch jobs. They publish nothing. A scheduled run uses the workflow of `main`.
+
+Concurrency. All deploys (main, testing, promote) share the group `tsx-aports-publish`, so only one runs at a time and a new run waits for a running one. GitHub keeps ONE waiting run for a group and cancels an older waiting run. Three rules keep that harmless:
+
+- The daily watch run, the pull-request runs and the small trigger run have their own groups. They never take the place of a waiting deploy.
+- `scripts/trigger-testing.sh` does not start a testing build while another deploy waits. It checks three times, one minute apart, and then fails with a message. Push to `testing` again (or start the build by hand) when the queue is empty. A running deploy does not block it: the testing build then waits alone behind it.
+- A push to `main` while a testing build waits replaces that testing build (it is the only waiting run). Then start the testing build again by hand: Actions > build > Run workflow on `main` with `channel` testing and the full sha.
+
+The rule that a testing run never cancels a waiting stable deploy has one gap: GitHub does not offer a queue, so a person who starts a manual run on `main` while a deploy waits can still replace the waiting run. The check before the upload (see "Manifest of a deploy") stops a deploy whose base is out of date, so two deploys that run at the same time cannot publish a tree that lacks the other one.
+
+### Manifest of a deploy
+
+Each deploy writes `manifest.txt` at the root of the site. It lists the sha256 of every published file, and the run id. After a successful deploy, the deploy job keeps it as the artifact `live-manifest` (90 days). The CDN of Pages can serve the tree of an older deploy for up to 10 minutes. A request header or a query string does not change that (checked on the live site). So a run does not trust the CDN. It does these steps:
+
+1. It takes the newest `live-manifest` (`scripts/live-manifest.sh`). Only an artifact of a run of this workflow counts: the run is `build.yml`, its branch is `main`, its head repository is this repository (no fork), and its event is `push` or `workflow_dispatch`. The script reads up to 5 pages of 30 artifacts. Only "no such artifact" means none. An API error stops the run at once. Without a manifest, a testing or promote run fails. A stable run trusts the live site, with a warning. This is the case for the first deploy with this workflow: run a stable build on `main` first.
+2. It polls the index files, `promoted.txt` and `CNAME` of the live site until they equal the manifest (`scripts/manifest.py wait`, up to 11 minutes).
+3. It fetches the trees and requires that they equal the manifest: the same files with the same bytes. A 404 for one index, which would drop a category, fails here.
+4. A testing deploy checks that the stable tree it publishes equals the stable tree of the manifest. It does not compare with its own fetched copy.
+5. Right before the upload, the run checks that no other deploy finished meanwhile. If one did, the run stops and you start it again.
+
+If a deploy went live without its `live-manifest` (the deploy job failed after `deploy-pages`, or the artifact expired), start a stable build by hand on `main` with `trust_live` set. It skips the manifest check and trusts the live site, like the first deploy. `trust_live` is refused for testing and promote. Use it only after you checked that the live site is what you expect.
+
+If the wait for the CDN ends after 700 s with an error, the live site still shows an older tree. Wait a few minutes and start the run again.
+
+A testing or promote run never uses the seed: `seed_url` is refused for them, and the fallback seed is only for a stable run when nothing is published.
+
+To test a change, raise `pkgrel` or `pkgver`. A package with the version that stable has is not built again, and a testing build of an existing version is dropped.
+
+### Commit sources
+
+On the branch `testing` only, a recipe can build from the GitHub archive of one commit, so a change that has no tag yet can be tested:
+
+```
+_commit=<40 hex characters>
+source="tsx-linux-common-$_commit.tar.gz::https://github.com/<org>/tsx-linux-common/archive/$_commit.tar.gz"
+builddir="$srcdir/tsx-linux-common-$_commit"
+```
+
+1. Pin the full 40-character sha. A branch name or a short sha is refused, because the bytes of such an archive change. `sha512sums` stays in the recipe as always.
+2. Write `pkgver` as the next release plus `_pre<YYYYMMDD>`, for example `0.4.0_pre20261026`. In the order of apk, `0.4.0_pre20261026` is newer than `0.3.9` (stable) and older than `0.4.0`, so the tagged release is newer than the test build. For a second build on the same day, raise `pkgrel`.
+3. `scripts/build.sh` refuses a commit source unless `TSX_APORTS_CHANNEL=testing` (CI sets it for the branch `testing`). On `main` and on other branches, a commit source stops the build before the first package. `scripts/tests/test-sources.sh` uses the same rule: it accepts commit sources on the branch `testing` and fails on every other branch.
+
+Workflow:
+
+1. Push the change to a branch of the source repository (for example tsx-linux-common) and note the commit sha.
+2. On the branch `testing` of tsx-aports, put the sha and the `_pre` version in the recipe, run `abuild checksum`, and push. The trigger job starts the testing build on `main`, and it deploys the testing tree.
+3. Test on a panel with `APK_URL` set to the testing URL.
+4. Merge the change in the source repository, and put the signed tag on **the same commit** that you tested. If the tag is on another commit, the release is not what you tested.
+5. On `main`, point the recipe at the tag (`pkgver` without `_pre`, the `refs/tags/` source) and push. CI builds the release from the tag. This is the normal way. The stable package has the clean release version, and the build from the signed tag has the same source as the tested commit.
+6. Use promote only when the tested bytes must go to stable at once (for example a fix that cannot wait). Then stable gets `0.4.0_pre20261026`, built from the commit. The tag must still point at that commit. The later release `0.4.0` replaces it.
+
+### Branches
+
+- `main` stays linear: a fast-forward of tested commits, no merge commits, no force push.
+- `testing` moves freely. Force push is allowed. Rebase it on `main` after each change of `main`, so that its workflow file (with the trigger job) is the one of `main`. Do not merge `testing` into `main`: pick the commits that go to stable.
+- A push to `testing` leads to a build with the real signing key and a deploy, like a push to `main`: the recipes of the commit run in the build, and a recipe can read the key. So a commit on `testing` has the same power as a commit on `main`. Give push rights to `testing` to the same people as for `main`. The workflow stops a build whose sha is not on `testing`, but it cannot tell who pushed. The secret `TSX_APORTS_PRIVKEY` can be moved to an environment secret that only `main` may read. That is a GitHub setting for the user to decide, and the trigger flow does not need it.
+- A force push of `testing` does not remove a build from the testing tree. A package stays there until a newer version of it comes in stable or testing.
+- A recipe version that is not in the tree that `--skip-existing` reads is built again by every run, and then dropped or pruned. This happens when `testing` lags behind `main` for a package, or when `main` lags behind a promoted version. Keep the versions of `testing` and `main` in step, in particular for `tsx-xx60-chromium` and `tensorflow-lite-c`, which build for a long time.
+
+### One-time GitHub step
+
+Create the branch `testing` from `main`, after the workflow with the trigger job is on `main`. No setting changes: the deploy runs on `main`, which the environment `github-pages` already allows. The trigger job asks for the permission `actions: write` in the workflow file itself.
+
+### Size
+
+Two trees are in one Pages artifact. Stable keeps 2 versions of each package and testing keeps 1. Measured on a copy of the live tree: stable is 344 MiB (88 apks), and the site with both trees is 616 MiB (142 apks), which is 1.79 times stable. Pages has a soft limit of 1 GB. The site is at risk when a large package arrives: a new `tsx-xx60-chromium` adds about 127 MiB in stable (two versions), and a newer testing chromium adds 127 MiB more. A new kernel adds 27 to 38 MiB each. With a new chromium in both trees, the site can reach about 900 MiB. Watch the size (see "Hosting and size"). If it gets near the limit, lower `STABLE_KEEP` or list only the packages that are newer in testing and give a test panel two repository lines.
+
+The tests are `scripts/tests/test-mode.sh` (the mode of a run, the check of the testing sha, the recipes of a testing run, the trigger), `scripts/tests/test-manifest.sh` (the manifest and the wait for the CDN), `scripts/tests/test-channels.sh` (assemble, promote with subpackages, apk order), these three without docker, and `scripts/tests/test-site.sh` (docker, builds fixture packages).
+
 ## Hosting and size
 
 GitHub Actions builds and publishes the packages. GitHub Pages serves them behind the custom domain `tsx-aports.unexceptional.net` (a `CNAME` file in the published tree). GitHub Pages has a soft limit of about 1 GB and no CDN-side pruning. `tsx-xx60-chromium` alone is over 100 MB for each build. It only repacks and does not compile, so a new build publishes within minutes of an Alpine release.
@@ -330,14 +440,15 @@ To add or change a kept Alpine file, run `scripts/keep-alpine.sh CATEGORY URL`. 
 
 ## CI
 
-`.github/workflows/build.yml` builds and publishes the repository. It has four jobs:
+`.github/workflows/build.yml` builds and publishes the repository. It has five jobs:
 
 - **build** runs on a push to `main` that changes `common/`, `xx60/`, `xx50/`, `scripts/`, or the workflow. It also runs on manual runs and on pull requests. It does these steps:
   1. `scripts/carry-forward.py` restores the published tree into `packages/v3.24`. It checks every index signature against the committed public key. It checks every apk against the checksum in its signed index.
   2. `scripts/build.sh --verify --skip-existing --skip-unreachable --all` builds in dependency order: a package comes after each package of the repo that it depends on or makes depends on. It builds only the versions that are not in the published tree. `--verify` makes the build fail when a download does not match the `sha512sums` of its APKBUILD. It skips a package with a warning when its tag archive or its release asset does not exist yet (a kernel bundle, the xx50 panel app source). The published copy of that package stays.
-  3. `scripts/index.sh --keep 2` puts back a kept package that the tree lacks (see "Kept packages"), prunes, and re-indexes and signs the merged tree.
+  3. `scripts/assemble-site.sh` runs `scripts/index.sh --keep 2`. It puts back a kept package that the tree lacks (see "Kept packages"), prunes, and re-indexes and signs the merged tree. It then builds the testing tree and checks both trees against the committed key.
 
-  A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`.
+  A pull request builds with a throwaway key and publishes nothing. A manual run on a branch other than `main` does the same: the signing key and the Pages deploy need the ref `main`. Every deploy uploads both trees (see "Testing channel").
+- **trigger-testing** runs on a push to `testing`. It deploys nothing. It starts the workflow on `main` for the testing channel (see "Testing channel").
 - **deploy** publishes that tree with `actions/deploy-pages`.
 - **wlroots-watch** runs daily. It compares `tsx-xx60-wlroots0.20` with the Alpine v3.24 armv7 `wlroots0.20`. If Alpine has another build, it opens an issue (once for each version). A person then checks the fix and rebases the package, or switches the panels back (see "Packages" above).
 - **chromium-watch** runs daily. It checks the Alpine v3.24 armv7 `chromium`. If that is newer, it opens a pull request that changes the pin. It needs the setting "Allow GitHub Actions to create and approve pull requests" in the Actions settings of the repo.

@@ -12,6 +12,12 @@
 #      it writes the three values and keep/ (keep-pins.sh), and it refuses
 #      a bundle with a wrong kernel.release, a wrong CHECKSUMS.sha256 and a
 #      missing release.
+#   6. The source policy (scripts/source-policy.sh): a commit source (the
+#      GitHub archive of a full sha) is accepted on the testing channel and
+#      refused on stable. The channel is TSX_APORTS_CHANNEL, else "testing"
+#      on the git branch testing, else stable. A recipe with a commit source
+#      has a pkgver with _pre<YYYYMMDD>, so the later tagged release sorts
+#      newer, and its builddir is <repo>-<sha>.
 #   0. The pkgdesc of each recipe has at most 128 characters (abuild refuses a
 #      longer one: "pkgdesc is too long").
 #   5. A recipe that keeps the file modes of a tag archive (cp -a or
@@ -22,6 +28,11 @@
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/.." && pwd)   # scripts/tests -> scripts
 REPO=$(cd "$HERE/.." && pwd)
+. "$HERE/source-policy.sh"
+if [ -z "${TSX_APORTS_CHANNEL:-}" ] && [ "$(git -C "$REPO" rev-parse --abbrev-ref HEAD 2>/dev/null)" = testing ]; then
+	TSX_APORTS_CHANNEL=testing
+fi
+CHANNEL=$(channel_name)
 N=0 F=0 WARN=0
 ok() { echo "  ok: $*"; N=$((N + 1)); }
 bad() { echo "  FAIL: $*"; F=$((F + 1)); }
@@ -60,7 +71,14 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 			esac
 			NAMES="$NAMES $n"
 			[ -n "$u" ] || [ -f "$D/$n" ] || bad "$P: the local source $n does not exist"
+			why=$(source_policy "$CHANNEL" "$u") && ok "$P: source policy ($CHANNEL) accepts $n" || bad "$P: $u: $why (channel $CHANNEL)"
 			case "$u" in
+			https://github.com/*/archive/[0-9a-f]*.tar.gz)
+				if is_commit_source "$u"; then
+					r=${u#https://github.com/*/}; repo=${r%%/*}; c=${u##*/archive/}; c=${c%.tar.gz}
+					GH="$GH ${repo}-${c}"
+					case $PV in *_pre20[0-9][0-9][01][0-9][0-3][0-9]*) ok "$P: commit source, pkgver $PV has _pre<date>";; *) bad "$P: a commit source needs _pre<YYYYMMDD> in pkgver (is $PV)";; esac
+				fi;;
 			https://github.com/*/archive/refs/tags/*.tar.gz)
 				r=${u#https://github.com/*/}; repo=${r%%/*}; t=${u##*/refs/tags/}; t=${t%.tar.gz}
 				GH="$GH ${repo}-${t#v}";;
@@ -116,6 +134,53 @@ for D in "$REPO"/common/*/ "$REPO"/xx60/*/ "$REPO"/xx50/*/ "$REPO"/xx70/*/; do
 			&& ok "$P: root owns the module tree, no group-writable files" || bad "$P: the module tree keeps the owner or the modes of the bundle";;
 	esac
 done
+
+echo "== 6. the source policy for commit sources =="
+SHA=0123456789abcdef0123456789abcdef01234567
+TAGU=https://github.com/o/r/archive/refs/tags/v1.0.0.tar.gz
+COMU=https://github.com/o/r/archive/$SHA.tar.gz
+source_policy stable "$TAGU" >/dev/null && ok "stable accepts a tag archive" || bad "stable refuses a tag"
+source_policy testing "$TAGU" >/dev/null && ok "testing accepts a tag archive" || bad "testing refuses a tag"
+source_policy testing "$COMU" >/dev/null && ok "testing accepts a full commit sha" || bad "testing refuses a commit"
+W6=$(source_policy stable "$COMU") && bad "stable accepts a commit source" || ok "stable refuses a commit source: $W6"
+for u in https://github.com/o/r/archive/main.tar.gz https://github.com/o/r/archive/refs/heads/main.tar.gz \
+	https://github.com/o/r/archive/${SHA:0:12}.tar.gz https://github.com/o/r/archive/${SHA}0.tar.gz https://github.com/o/r/archive/${SHA^^}.tar.gz; do
+	source_policy testing "$u" >/dev/null && bad "testing accepts $u" || ok "testing refuses ${u#https://github.com/o/r/archive/}"
+done
+# D7: forms that a glob let through
+for u in "https://github.com/o/r/archive/refs/tags/x/../../../$SHA.tar.gz" "https://github.com/o/r/archive/refs/tags/v1.tar.gz?x=1" \
+	"https://github.com/o/r/archive/refs/tags/v1%2e%2e/x.tar.gz" "http://github.com/o/r/archive/refs/tags/v1.tar.gz" \
+	"https://github.com/o/r/archive/refs/tags/a/b.tar.gz"; do
+	source_policy stable "$u" >/dev/null && bad "stable accepts $u" || ok "stable refuses ${u#https://github.com/o/r/archive/}"
+	source_policy testing "$u" >/dev/null && bad "testing accepts $u" || ok "testing refuses ${u#https://github.com/o/r/archive/}"
+done
+for u in "https://codeload.github.com/o/r/tar.gz/$SHA" "https://raw.githubusercontent.com/o/r/$SHA/file"; do
+	source_policy stable "$u" >/dev/null && bad "stable accepts $u" || ok "stable refuses ${u%%/o/r*}/... at a commit"
+	source_policy testing "$u" >/dev/null && ok "testing accepts ${u%%/o/r*}/... at a commit" || bad "testing refuses $u"
+done
+source_policy stable "https://codeload.github.com/o/r/tar.gz/main" >/dev/null && bad "a branch at codeload accepted" || ok "a branch name at codeload is refused"
+source_policy stable "HTTPS://GITHUB.com/o/r/archive/refs/tags/v1.tar.gz" >/dev/null && ok "scheme and host are compared in lower case" || bad "upper-case host refused"
+source_policy stable "https://github.com/o/tsx-aports/releases/download/xx60-kernel-20261024/b.tar.zst" >/dev/null && ok "a release asset is allowed on stable" || bad "release asset refused"
+# D7: the host must be exactly one of the three GitHub hosts
+for u in "https://github.com:443/o/r/archive/refs/tags/v1.tar.gz" "https://github.com./o/r/archive/refs/tags/v1.tar.gz" \
+	"https://user@github.com/o/r/archive/refs/tags/v1.tar.gz" "https://www.github.com/o/r/archive/refs/tags/v1.tar.gz" \
+	"https://github.com.example.org/o/r/archive/refs/tags/v1.tar.gz" "https://raw.githubusercontent.com:443/o/r/$SHA/f"; do
+	source_policy testing "$u" >/dev/null && bad "testing accepts the host of $u" || ok "a host that is not exactly a GitHub host is refused: ${u%%/o/r*}"
+done
+source_policy stable "https://example.org/x.tar.gz" >/dev/null && ok "an unrelated host is not checked" || bad "other host refused"
+source_policy stable https://example.org/x.tar.gz >/dev/null && ok "a source that is not a GitHub archive is not checked" || bad "other URL refused"
+# build.sh refuses a commit-source recipe before it builds anything.
+T6=$(mktemp -d)
+mkdir -p "$T6/scripts" "$T6/common/tsx-fixture-commit" "$T6/bin"
+cp "$HERE/build.sh" "$HERE/arch-image.sh" "$HERE/source-policy.sh" "$T6/scripts/"
+printf 'pkgname=tsx-fixture-commit\npkgver=1.1_pre20261026\npkgrel=0\narch=armv7\nsource="https://github.com/o/r/archive/%s.tar.gz"\n' "$SHA" > "$T6/common/tsx-fixture-commit/APKBUILD"
+printf '#!/bin/sh\ncase "$1" in pull|tag|image) exit 0;; esac\ncase "$*" in *"apk --print-arch"*) echo armv7; exit 0;; esac\necho DOCKER-CALLED\n' > "$T6/bin/docker"; chmod +x "$T6/bin/docker"
+touch "$T6/k" "$T6/k.pub"
+B6() { (cd "$T6" && PATH="$T6/bin:$PATH" TSX_APORTS_KEY="$T6/k" TSX_APORTS_CHANNEL=$1 scripts/build.sh --all 2>&1); }
+OUT=$(B6 stable) && bad "build.sh (stable) accepted a commit source" || case "$OUT" in *"testing branch only"*) ok "build.sh on stable refuses the commit source, no docker call";; *) bad "build.sh stable: $OUT";; esac
+case "$OUT" in *DOCKER-CALLED*) bad "docker ran before the refusal";; esac
+OUT=$(B6 testing); case "$OUT" in *"testing branch only"*) bad "build.sh on testing refused: $OUT";; *) ok "build.sh on testing passes the source policy";; esac
+rm -rf "$T6"
 
 echo "== 4. pin-kernel.sh with a fixture release =="
 if ! command -v zstd >/dev/null; then echo "  no zstd: section skipped"; fin; fi

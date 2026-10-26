@@ -66,6 +66,20 @@ echo "== prune_dir again =="
 prune_dir "$D" >/dev/null; rc=$?
 [ $rc = 0 ] && ok "nothing more to prune" || bad "second prune returned $rc"
 
+echo "== prune in apk order (not sort -V): _pre, _rc, letters =="
+# sort -V puts x-0.4.0-r0 before x-0.4.0_pre20261026-r0. apk puts it after.
+P1=$W/pre1; mkdir -p "$P1"; : > "$P1/tsx-a-0.4.0_pre20261026-r0.apk"; : > "$P1/tsx-a-0.4.0-r0.apk"
+KEEP=1; prune_dir "$P1" >/dev/null
+[ -e "$P1/tsx-a-0.4.0-r0.apk" ] && [ ! -e "$P1/tsx-a-0.4.0_pre20261026-r0.apk" ] && ok "KEEP=1: the release 0.4.0 stays, the _pre is pruned" || bad "KEEP=1 kept: $(ls "$P1")"
+P2=$W/pre2; mkdir -p "$P2"; for v in 0.4.0_pre20261026-r0 0.4.0_pre20261101-r0 0.4.0-r0; do : > "$P2/tsx-a-$v.apk"; done
+KEEP=2; prune_dir "$P2" >/dev/null
+[ -e "$P2/tsx-a-0.4.0-r0.apk" ] && [ -e "$P2/tsx-a-0.4.0_pre20261101-r0.apk" ] && [ ! -e "$P2/tsx-a-0.4.0_pre20261026-r0.apk" ] \
+	&& ok "KEEP=2: the release and the newest _pre stay" || bad "KEEP=2 kept: $(ls "$P2")"
+P3=$W/rc; mkdir -p "$P3"; for v in 1.0_rc1-r0 1.0-r0 1.0a-r0 1.0_alpha-r0; do : > "$P3/tsx-b-$v.apk"; done
+KEEP=1; prune_dir "$P3" >/dev/null
+[ "$(ls "$P3")" = "tsx-b-1.0a-r0.apk" ] && ok "KEEP=1: 1.0a is newer than 1.0, 1.0_rc1 and 1.0_alpha" || bad "letter/rc kept: $(ls "$P3")"
+KEEP=2
+
 echo "== kept files (keep/keep.txt): not pruned, not counted, restored =="
 K=$W/keep; T=$W/tree/v3.24; mkdir -p "$K/v3.24/xx60/armv7" "$T/xx60/armv7" "$T/common/armv7"
 echo "board 0.2.0-r1" > "$K/v3.24/xx60/armv7/tsx-xx60-board-0.2.0-r1.apk"
