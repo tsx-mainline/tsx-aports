@@ -24,17 +24,18 @@
 # A local build uses the staged file in dist/: SRCDEST below makes abuild use
 # that file (checked by sha512sums) and not the network. The stage script
 # fills in pkgver, pkgrel, _kernelrelease and sha512sums below: do not edit
-# them by hand. PLACEHOLDER: the release _kbundle_tag does not exist yet. Make
-# it and attach the staged bundle without a change before the recipe goes to
-# main.
+# them by hand. The sum at the end is that of the bundle, the asset of the
+# release _kbundle_tag. Attach the staged bundle without a change.
 SRCDEST="$startdir/dist"
 #
 # pkgver: <upstream kernel version>_git<YYYYMMDD> (the staging date), as for
 # xx70. _kernelrelease records the exact build.
 pkgname=uc-pxx-kernel-lts
 pkgver=6.18.54_git20261025
-pkgrel=1
-_kernelrelease=6.18.54-ge74ac0e66406
+pkgrel=2
+# r2: the kernel commit d02e92631f28 (r1 was a private build of
+# the same sources before the Signed-off-by lines).
+_kernelrelease=6.18.54-gd02e92631f28
 # The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
 _kbundle_tag=uc-pxx-kernel-20261025
 pkgdesc="uc-pxx mainline kernel, longterm (LTS) line: boot image without the resource, modules, device trees"
@@ -66,5 +67,5 @@ package() {
 }
 
 sha512sums="
-98cd6d7196373e491f604e8f000943f954f14ab96978f4bfc3e9670464881970abcf25946f0515c01d33ad7fda4a6d1e9b4df61f46f0e865cc37d5952cb09e4b  uc-pxx-kernel-lts-bundle.tar.zst
+44771ed94ad6bb79b2043fa375a608f2a86894458c27f154afb9a34cfe57e0d22267b9045df04b8b735a46967a52f2c2e8e5406ccdbec269339b539e63c57ef5  uc-pxx-kernel-lts-bundle.tar.zst
 "

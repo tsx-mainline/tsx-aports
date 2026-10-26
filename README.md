@@ -292,9 +292,9 @@ As root the tool uses only its fixed paths: the `UC_PXX_*` variables of the host
 
 The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. `tsx-autoupdate` writes the kernel: after each install it runs the board hook `tsx_board_post_update` of `uc-pxx-board`, which runs `/usr/sbin/uc-pxx-post-update` of `uc-pxx-boot-tools` before the restart. The script checks the reviewed files and the sha256 of `uc-pxx-update-boot`, arms slot A, runs `uc-pxx-update-boot write --yes` and checks the A/B state. A failed step stops the restart (uc-pxx-linux `docs/boot-control.md` "Kernel updates"). After a plain `apk upgrade`, run `tsx-autoupdate post-update` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
 
-### Local build while uc-pxx-linux has no tag
+### Sources and local build
 
-uc-pxx-linux has no public repository and no tag yet. The recipes name the future tag `board-v$pkgver` and the future tsx-aports releases `uc-pxx-tools-<YYYYMMDD>` and `uc-pxx-kernel-<YYYYMMDD>`. Each recipe sets `SRCDEST="$startdir/dist"`, so abuild uses a file in `dist/` with the name of the source and checks it with `sha512sums`. CI skips the recipes with a warning while the sources do not exist (`--skip-unreachable`).
+The recipes use the signed tag `board-v$pkgver` of uc-pxx-linux and the tsx-aports releases `uc-pxx-tools-<YYYYMMDD>` and `uc-pxx-kernel-<YYYYMMDD>`. A sum of all zeros in an APKBUILD means that the source file is not final yet: `test-sources.sh` shows a warning, and the sum must be set (`abuild checksum` on the real file) before a push. CI skips a recipe with a warning while its source does not exist (`--skip-unreachable`). Each recipe sets `SRCDEST="$startdir/dist"`, so abuild uses a file in `dist/` with the name of the source and checks it with `sha512sums`. This is how a local build works before the tag or the release exists.
 
 1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of the three recipes and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
 2. Copy the repository to the build host (BUILD_DIR).
@@ -302,9 +302,11 @@ uc-pxx-linux has no public repository and no tag yet. The recipes name the futur
 4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. The script makes one boot image for each model with a new build token.
 5. Copy the changed APKBUILDs back, check the diff, and build with `scripts/build.sh --arch aarch64 uc-pxx/<pkg>`.
 
-To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the three recipes with the tag archive, and check that the content is the same.
+To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the four recipes with the tag archive or a bundle, and check that the content is the same. Do not commit the sums of a local snapshot.
 
-The board needs a tsx-linux-common release newer than 0.3.11 (`TSX_PKG_PREFIX` and the board hook `tsx_board_pre_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` and `uc-pxx-console` depend on `tsx-autoupdate>0.3.11`, and the uc-pxx recipes can only build after that common release. `uc-pxx-board` 0.1.0-r1 has the hook `tsx_board_post_update`, which only a `tsx-autoupdate` newer than 0.3.12_pre2026102501 runs. So it depends on `tsx-autoupdate>=0.3.12_pre2026102503` (the hook with the run lock and the restart block) and on `uc-pxx-boot-tools>=0.1.0-r1` (the script `uc-pxx-post-update`). The upgrade that brings the new `tsx-autoupdate` runs the old one, which writes no kernel: install it before a kernel update.
+The board needs tsx-linux-common 0.3.12 (`TSX_PKG_PREFIX` and the board hooks `tsx_board_pre_update` and `tsx_board_post_update` of `tsx-autoupdate`). An older `tsx-autoupdate` would change `system_a` without `uc-pxx-arm-slot`. So `uc-pxx-board` depends on `tsx-autoupdate>=0.3.12` and `tsx-base>=0.3.12`, and on `uc-pxx-boot-tools>=0.1.0-r2` (the script `uc-pxx-post-update`). The profile packages and the kiosk and Home Assistant floors are 0.3.12 too. The upgrade that brings the new `tsx-autoupdate` runs the old one, which writes no kernel: install it before a kernel update.
+
+The first public builds are `-r2` (`uc-pxx-board`, `uc-pxx-boot-tools`, `uc-pxx-kernel-lts`), `-r3` (`uc-pxx-leds`) and `-r1` (the three profile packages). They are newer than the private LAN builds, so a panel upgrades from the LAN repository to the public one without a downgrade.
 
 ## Private LAN repository
 
