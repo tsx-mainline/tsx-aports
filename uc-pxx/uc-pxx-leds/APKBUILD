@@ -8,12 +8,11 @@
 # "uc-pxx-bootctl status" (read only) to show the boot state.
 #
 # Source: the GitHub archive of the tag board-v$pkgver of uc-pxx-linux.
-# PLACEHOLDER: no tag exists yet. See uc-pxx-boot-tools and README.md
-# "uc-pxx packages" for the local build from dist/.
+# The sum at the end is that of the real tag archive board-v0.1.0.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-leds
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="uc-pxx LEDs: the LED daemon, its service, the command uc-pxx-led and the ESPHome plugin"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
@@ -36,5 +35,5 @@ package() {
 }
 
 sha512sums="
-05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
+bc336739df19ab5f84b2a6dbcc6d93f388cffe7d03b6aee1572c26a40ba873c83436ea1110352400262543652c6408e1ad88038a43b4f7358114923d58087d96  uc-pxx-linux-0.1.0.tar.gz
 "

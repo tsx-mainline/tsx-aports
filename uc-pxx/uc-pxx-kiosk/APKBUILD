@@ -2,16 +2,16 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 # Meta package: it holds no files. It pulls the packages of the kiosk image
 # profile of uc-pxx-linux (rootfs/profiles/kiosk.list). uc-pxx-leds waits for
-# /run/tsx/kiosk.ready, which tsx-kiosk writes from the release after 0.3.10
-# on. PLACEHOLDER: set the floor to that release.
+# /run/tsx/kiosk.ready, which tsx-kiosk writes from 0.3.12 on.
+# 0.1.0-r1: the first public build (r0 was a private build).
 pkgname=uc-pxx-kiosk
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 pkgdesc="uc-pxx kiosk profile: console plus the Chromium kiosk and the setup page"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="aarch64"
 license="GPL-2.0-or-later"
-depends="uc-pxx-console>=0.1.0 tsx-kiosk>0.3.10 tsx-setup>0.3.11 chromium"
+depends="uc-pxx-console>=0.1.0 tsx-kiosk>=0.3.12 tsx-setup>=0.3.12 chromium"
 options="!check"
 
 package() {

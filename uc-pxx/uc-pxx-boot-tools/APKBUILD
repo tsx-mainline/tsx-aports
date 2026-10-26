@@ -9,8 +9,8 @@
 # and uc-pxx-post-update (the board step of tsx-autoupdate after an install:
 # it checks the reviewed files, arms slot A, runs uc-pxx-update-boot write
 # --yes and checks the A/B state before a restart).
-# 0.1.0-r1: uc-pxx-post-update (pinned), and the snapshot of uc-pxx-linux
-# 8ca875e.
+# 0.1.0-r2: the first public build (r1 was a private build). The source is the
+# tag board-v0.1.0.
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
 # 49156) of a panel, and two more run them without a person
@@ -28,16 +28,16 @@
 #    _tbundle_tag (uc-pxx-bootctl, uc-pxx-reboot-syscall and rtl8363-init, built on
 #    the build host, see scripts/stage-uc-pxx-tools.sh)
 #  - uc-pxx-update-boot next to this file
-# PLACEHOLDER: uc-pxx-linux has no tag and no public repository yet, and the
-# release _tbundle_tag does not exist. A local build uses the files in dist/
-# (SRCDEST): scripts/uc-pxx-source.sh writes a snapshot of a commit under
-# the name of the tag archive, and scripts/stage-uc-pxx-tools.sh writes the
-# bundle. The sums below are the sums of those local files. After the tag and
-# the release exist, run abuild checksum (README.md "uc-pxx packages").
+# The sums at the end are those of the tag archive and of the tools bundle; they
+# need the real files. A local build uses the files in dist/ (SRCDEST):
+# scripts/uc-pxx-source.sh writes a snapshot of a commit under the name of the
+# tag archive, and scripts/stage-uc-pxx-tools.sh writes the bundle. Then
+# run abuild checksum (README.md "uc-pxx packages"). Do not commit the sums of a
+# local snapshot.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 _tbundle_tag=uc-pxx-tools-20261024
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -129,7 +129,7 @@ package() {
 }
 
 sha512sums="
-05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
+bc336739df19ab5f84b2a6dbcc6d93f388cffe7d03b6aee1572c26a40ba873c83436ea1110352400262543652c6408e1ad88038a43b4f7358114923d58087d96  uc-pxx-linux-0.1.0.tar.gz
 1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "

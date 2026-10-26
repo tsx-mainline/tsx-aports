@@ -12,34 +12,35 @@
 # package() stops when the overlay has a file that no list below names, so a
 # new board file cannot go missing without a note.
 #
-# board.sh needs a tsx-linux-common newer than 0.3.11: TSX_PKG_PREFIX and the
-# board hook of tsx-autoupdate. An older tsx-autoupdate would upgrade
-# system_a without uc-pxx-arm-slot, so the floor is a depends of this package.
-# 0.1.0-r1: tsx_board_post_update writes the kernel of uc-pxx-kernel-lts into
-# boot_a after a tsx-autoupdate install (uc-pxx-update-boot write). Only a
-# tsx-autoupdate 0.3.12_pre2026102503 or newer runs that hook with the run
-# lock and the restart block, so that is the floor now. The upgrade that brings it runs the old tsx-autoupdate, which
-# writes no kernel: install it before a kernel update. The hook only runs
-# /usr/sbin/uc-pxx-post-update of uc-pxx-boot-tools 0.1.0-r1, so that is the
-# floor of uc-pxx-boot-tools.
+# board.sh needs tsx-linux-common 0.3.12: TSX_PKG_PREFIX and the board hooks of
+# tsx-autoupdate. An older tsx-autoupdate would upgrade system_a without
+# uc-pxx-arm-slot, so the floor is a depends of this package.
+# tsx_board_post_update writes the kernel of uc-pxx-kernel-lts into boot_a
+# after a tsx-autoupdate install (uc-pxx-update-boot write). Only tsx-autoupdate
+# 0.3.12 or newer runs that hook with the run lock and the restart block. The
+# upgrade that brings it runs the old tsx-autoupdate, which writes no kernel:
+# install it before a kernel update. The hook only runs
+# /usr/sbin/uc-pxx-post-update of uc-pxx-boot-tools, so uc-pxx-boot-tools
+# 0.1.0-r2 is the floor.
+# 0.1.0-r2: the first public build (r1 was a private build).
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
 #  - uc-pxx-tools-bundle.tar.zst of the tsx-aports release _tbundle_tag
 #    (rtl8363-init, built with the GPL Realtek switch SDK, see
 #    tools/rtl8363-init of uc-pxx-linux)
-# PLACEHOLDER: no tag and no release exist yet. See uc-pxx-boot-tools and
-# README.md "uc-pxx packages" for the local build from dist/.
+# The sums at the end are those of the real tag archive board-v0.1.0 and
+# the real tools bundle. See README.md "uc-pxx packages".
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 _tbundle_tag=uc-pxx-tools-20261024
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
-depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>=0.3.12_pre2026102503 tsx-base>0.3.11 uc-pxx-boot-tools>=0.1.0-r1
+depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>=0.3.12 tsx-base>=0.3.12 uc-pxx-boot-tools>=0.1.0-r2
 	util-linux-misc wireless-regdb"
 # /etc/securetty replaces the one of busybox (and of tsx-base up to 0.2.1).
 replaces="busybox tsx-base"
@@ -127,6 +128,6 @@ package() {
 }
 
 sha512sums="
-05786c22bec6ea5f2c5973e4bc8c950f46b690fae55c4fe5af0c9dbead0248d222b3a953c138faee1b6beb8355108933aeb8dbd2df4194793cf3acde404f7c9e  uc-pxx-linux-0.1.0.tar.gz
+bc336739df19ab5f84b2a6dbcc6d93f388cffe7d03b6aee1572c26a40ba873c83436ea1110352400262543652c6408e1ad88038a43b4f7358114923d58087d96  uc-pxx-linux-0.1.0.tar.gz
 1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 "

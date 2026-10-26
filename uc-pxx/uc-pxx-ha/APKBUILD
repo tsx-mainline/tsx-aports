@@ -2,16 +2,16 @@
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
 # Meta package: it holds no files. It pulls the packages of the Home Assistant
 # image profile of uc-pxx-linux (rootfs/profiles/ha.list). The presence kinds
-# (PRESENCE=pir) of tsx-ha come after 0.3.10. PLACEHOLDER: set the floor to
-# that release.
+# (PRESENCE=pir) of tsx-ha come with 0.3.12.
+# 0.1.0-r1: the first public build (r0 was a private build).
 pkgname=uc-pxx-ha
 pkgver=0.1.0
-pkgrel=0
+pkgrel=1
 pkgdesc="uc-pxx Home Assistant profile: kiosk plus the Home Assistant layer"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="aarch64"
 license="GPL-2.0-or-later"
-depends="uc-pxx-kiosk>=0.1.0 tsx-ha>0.3.10 tsx-panel-app"
+depends="uc-pxx-kiosk>=0.1.0 tsx-ha>=0.3.12 tsx-panel-app"
 options="!check"
 
 package() {
