@@ -15,8 +15,11 @@
 # apk info -v once (the same output files).
 # 0.3.11: "tsx-autoupdate status" shows the line "LED bar image" while a newer
 # image waits for tsx-ledbar-fw-install.
+# 0.3.12: board hooks (tsx_board_pre_update before an install, tsx_board_post_update
+# after apk upgrade), TSX_PKG_PREFIX for the packages of the board family, and
+# the file restart-block that stops the Restart button while a board step runs.
 pkgname=tsx-autoupdate
-pkgver=0.3.11
+pkgver=0.3.12
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -37,5 +40,5 @@ package() {
 }
 
 sha512sums="
-20a5294e79947903b827b67edff89a7cc3920439cbc52e0215bc3cca98d11e2ce9b1561747cc8485063ebbc085f46943b21513621f686e0c5512c15f59ef11ac  tsx-linux-common-0.3.11.tar.gz
+ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
 "

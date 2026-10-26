@@ -5,9 +5,10 @@
 # Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
+# 0.3.12: LED_MODE=onoff and LED_KEY_N for key LEDs that are independent on/off LEDs.
 pkgname=tsx-buttons
-pkgver=0.2.0
-pkgrel=3
+pkgver=0.3.12
+pkgrel=0
 pkgdesc="TSX front-panel button daemon with its key map"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
@@ -37,5 +38,5 @@ package() {
 }
 
 sha512sums="
-97123b7ac4fa1b72deb20291a562b3d0159ec1577efbf8ae1eead721de43b355f9a66cdf46db1a00742866fda83926a9448e39f7443cb688a0e0a64957c28d3e  tsx-linux-common-0.2.0.tar.gz
+ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
 "

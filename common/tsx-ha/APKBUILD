@@ -10,8 +10,11 @@
 # 0.3.9: the MQTT Backlight number is a percent (1 to 100), as the ESPHome entity.
 # 0.3.10: the Dark mode switch, a rate limit for the CPU temperature, the light and
 # the distance sensors, and "Last boot" in place of "Uptime".
+# 0.3.12: tsx-mqtt and the ESPHome shim show the distance for a tof sensor only
+# (a pir sensor has presence and no distance). Needs presence-kind.sh and
+# tsx_presence.py of tsx-base 0.3.12.
 pkgname=tsx-ha
-pkgver=0.3.10
+pkgver=0.3.12
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -29,7 +32,7 @@ license="GPL-2.0-or-later"
 # (tsx-base 0.3.4). The setup plugin has the field HA_URL (tsx-setup 0.3.4).
 # 0.3.5: the Sendspin player is the package tsx-sendspin. tsx-ha depends on it,
 # so a panel keeps the player, its runlevel entry and its settings.
-depends="tsx-base>=0.3.6 tsx-kiosk tsx-setup>=0.3.6 alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
+depends="tsx-base>=0.3.12 tsx-kiosk tsx-setup>=0.3.6 alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
 	mosquitto-clients mpv-libs py3-aiohappyeyeballs py3-cryptography py3-mpv py3-numpy
 	py3-protobuf py3-tzlocal py3-zeroconf python3 tsx-sendspin>=0.3.5 tensorflow-lite-c>=2.17.1-r1"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
@@ -52,5 +55,5 @@ package() {
 }
 
 sha512sums="
-b7822565ac81448f2cb8bb165745b875f966054e4de7fb934d9e05ec725ee19a38689b069c0ce92c9ca6a1ba2d0e169210b1250bc04c507a8f341f5a5374ee39  tsx-linux-common-0.3.10.tar.gz
+ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
 "
