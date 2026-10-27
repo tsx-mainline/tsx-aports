@@ -81,15 +81,21 @@ LM() { (PATH="$FB:$PATH" FAKE_DIR=$W/fz GITHUB_REPOSITORY=o/r "$HERE/live-manife
 # art ID RUN [BRANCH [HEAD_REPO [EXPIRED [CREATED]]]]: one artifact entry. With the
 # same CREATED (the default) the higher id is the newer one.
 art() { printf '{"id":%s,"expired":%s,"created_at":"%s","workflow_run":{"id":%s,"head_branch":"%s","head_repository_id":%s,"repository_id":1}}' "$1" "${5:-false}" "${6:-2026-10-01T00:00:00Z}" "$2" "${3:-main}" "${4:-1}"; }
-# run RUN [EVENT [PATH [HEAD_REPO]]]: the run behind it
-run() { printf '{"id":%s,"path":"%s","event":"%s","head_branch":"main","conclusion":"success","head_repository":{"id":%s},"repository":{"id":1}}' "$1" "${3:-.github/workflows/build.yml}" "${2:-push}" "${4:-1}" > $W/fz/run_$1.json; }
+# run RUN [EVENT [PATH [HEAD_REPO [CONCLUSION]]]]: the run behind it
+run() { printf '{"id":%s,"path":"%s","event":"%s","head_branch":"main","conclusion":"%s","head_repository":{"id":%s},"repository":{"id":1}}' "$1" "${3:-.github/workflows/build.yml}" "${2:-push}" "${5:-success}" "${4:-1}" > $W/fz/run_$1.json; }
 page() { printf '{"artifacts":[%s]}' "$2" > $W/fz/artifacts_$1.json; }
 rm -f $W/fz/*.json $W/fz/fail
 page 1 "$(art 777 70)"; run 70
 OUT=$(LM fetch $W/got.txt) && [ "$OUT" = artifact_id=777 ] && cmp -s $W/got.txt $W/manifest.txt && ok "fetch: the manifest of the newest live-manifest, with its id" || bad "fetch: $OUT"
-page 1 "$(art 900 90 main 2),$(art 901 91 feature 1),$(art 902 92 main 1 true),$(art 903 93),$(art 904 94),$(art 905 95),$(art 777 70)"
+# The entries that must be skipped are newer than 905, so the run checks are really used.
+T9=2026-10-01T00:00:09Z
+page 1 "$(art 900 90 main 2 false $T9),$(art 901 91 feature 1 false $T9),$(art 902 92 main 1 true $T9),$(art 903 93 main 1 false $T9),$(art 904 94 main 1 false $T9),$(art 906 96 main 1 false $T9),$(art 907 97 main 1 false $T9),$(art 905 95),$(art 777 70)"
 run 90 push .github/workflows/build.yml 2; run 91; run 93 pull_request; run 94 push .github/workflows/other.yml; run 95 workflow_dispatch; run 70
-OUT=$(LM fetch $W/got.txt); case "$OUT" in artifact_id=905) ok "fetch: skips a fork artifact (head repository 2), a feature branch, an expired one, a pull_request run and another workflow; takes the dispatch run";; *) bad "filtering gave: $OUT";; esac
+run 96 push .github/workflows/build.yml 1 failure; run 97 push .github/workflows/build.yml 2
+OUT=$(LM fetch $W/got.txt); case "$OUT" in artifact_id=905) ok "fetch: skips a fork artifact (head repository 2), a feature branch, an expired one, a pull_request run, another workflow, a failed run and a fork run; takes the dispatch run";; *) bad "filtering gave: $OUT";; esac
+page 1 "$(art 10 70 main 1 false 2026-10-01T00:00:01Z),{\"id\":20,\"expired\":false,\"created_at\":null,\"workflow_run\":{\"id\":70,\"head_branch\":\"main\",\"head_repository_id\":1,\"repository_id\":1}}"; run 70
+OUT=$(LM fetch $W/got5.txt); rc=$?; [ $rc = 1 ] && ok "fetch: an artifact without created_at is an error (exit 1)" || bad "null created_at: rc $rc $OUT"
+LM same 10 >/dev/null && bad "same accepted a list with an artifact without created_at" || ok "same: an artifact without created_at fails"
 page 1 "$(art 900 90 main 2),$(art 901 91 feature 1)"; page 2 ""
 OUT=$(LM fetch $W/got2.txt); rc=$?; [ $rc = 3 ] && [ "$OUT" = artifact_id=none ] && ok "fetch: only foreign artifacts give exit 3 (none)" || bad "foreign only: rc $rc $OUT"
 # page 2: 30 entries on page 1 that fail the checks, the good one on page 2

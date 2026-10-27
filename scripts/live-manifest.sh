@@ -36,8 +36,9 @@ newest() {
 	for page in 1 2 3 4 5; do
 		json=$(api "repos/$REPO/actions/artifacts?name=live-manifest&per_page=30&page=$page") || exit 1
 		# candidates: not expired, from a run on main of this repository.
-		# One line "<created_at> <artifact id> <run id>"; a missing created_at
-		# sorts last.
+		# One line "<created_at> <artifact id> <run id>". A candidate without
+		# created_at is an error: it cannot be put in order, and taking it as
+		# the oldest could hide a newer deploy from "same".
 		cand=$(printf '%s' "$json" | python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -47,7 +48,9 @@ for a in d.get("artifacts", []):
         continue
     if r.get("head_branch") != "main" or r.get("head_repository_id") != r.get("repository_id") or not r.get("id"):
         continue
-    print(a.get("created_at") or "0", a["id"], r["id"])
+    if not a.get("created_at"):
+        sys.exit("live-manifest: the artifact %s has no created_at" % a["id"])
+    print(a["created_at"], a["id"], r["id"])
 ') || { echo "live-manifest: cannot read the artifact list" >&2; exit 1; }
 		[ -z "$cand" ] || all="$all$cand"$'\n'
 		# fewer than 30 entries: no more pages
