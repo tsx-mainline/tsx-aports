@@ -78,8 +78,9 @@ chmod +x $FB/gh
 (cd $W/fz && cp $W/manifest.txt manifest.txt && python3 -c "import zipfile;z=zipfile.ZipFile('$W/m.zip','w');z.write('manifest.txt');z.close()")
 cp $W/m.zip $W/fz/zip
 LM() { (PATH="$FB:$PATH" FAKE_DIR=$W/fz GITHUB_REPOSITORY=o/r "$HERE/live-manifest.sh" "$@" 2>&1); }
-# art ID RUN [BRANCH [HEAD_REPO [EXPIRED]]]: one artifact entry
-art() { printf '{"id":%s,"expired":%s,"workflow_run":{"id":%s,"head_branch":"%s","head_repository_id":%s,"repository_id":1}}' "$1" "${5:-false}" "$2" "${3:-main}" "${4:-1}"; }
+# art ID RUN [BRANCH [HEAD_REPO [EXPIRED [CREATED]]]]: one artifact entry. With the
+# same CREATED (the default) the higher id is the newer one.
+art() { printf '{"id":%s,"expired":%s,"created_at":"%s","workflow_run":{"id":%s,"head_branch":"%s","head_repository_id":%s,"repository_id":1}}' "$1" "${5:-false}" "${6:-2026-10-01T00:00:00Z}" "$2" "${3:-main}" "${4:-1}"; }
 # run RUN [EVENT [PATH [HEAD_REPO]]]: the run behind it
 run() { printf '{"id":%s,"path":"%s","event":"%s","head_branch":"main","conclusion":"success","head_repository":{"id":%s},"repository":{"id":1}}' "$1" "${3:-.github/workflows/build.yml}" "${2:-push}" "${4:-1}" > $W/fz/run_$1.json; }
 page() { printf '{"artifacts":[%s]}' "$2" > $W/fz/artifacts_$1.json; }
@@ -95,6 +96,16 @@ OUT=$(LM fetch $W/got2.txt); rc=$?; [ $rc = 3 ] && [ "$OUT" = artifact_id=none ]
 FILL=""; for i in $(seq 1 30); do FILL="$FILL$(art $((1000+i)) 90 main 2),"; done
 page 1 "${FILL%,}"; page 2 "$(art 888 70)"
 OUT=$(LM fetch $W/got.txt); [ "$OUT" = artifact_id=888 ] && ok "fetch: reads the second page when the first has 30 entries" || bad "page 2: $OUT"
+# 2026-10-27: the API lists by id, and an earlier deploy had the higher id. The newest by
+# created_at wins, also when it is on a later page.
+page 1 "$(art 12704695781 71 main 1 false 2026-10-27T02:04:58Z),$(art 12704178491 72 main 1 false 2026-10-27T02:08:29Z)"; page 2 ""
+run 71; run 72 workflow_dispatch
+OUT=$(LM fetch $W/got.txt); [ "$OUT" = artifact_id=12704178491 ] && ok "fetch: the newest by created_at, not the highest id" || bad "created_at order: $OUT"
+LM same 12704178491 >/dev/null && ok "same: the newest by created_at is the current deploy" || bad "same with created_at order"
+FILL=""; for i in $(seq 1 30); do FILL="$FILL$(art $((5000+i)) 71 main 1 false 2026-10-27T01:00:00Z),"; done
+page 1 "${FILL%,}"; page 2 "$(art 4000 72 main 1 false 2026-10-27T03:00:00Z)"; page 3 ""
+OUT=$(LM fetch $W/got.txt); [ "$OUT" = artifact_id=4000 ] && ok "fetch: a newer artifact on page 2 wins over 30 older ones on page 1" || bad "page 2 newest: $OUT"
+rm -f $W/fz/artifacts_3.json
 # R3-1: the run lookup fails (HTTP 502) while the artifact list works. The old pipeline lost the
 # failure and ended as "none" (exit 3).
 page 1 "$(art 777 70)"; run 70

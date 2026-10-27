@@ -7,7 +7,9 @@
 # Only an artifact of a run of THIS workflow on main in THIS repository counts:
 # the run is build.yml, its head branch is main, its head repository is this
 # repository (no fork), and its event is push or workflow_dispatch. The script
-# looks at up to 5 pages of 30 artifacts, newest first.
+# reads up to 5 pages of 30 artifacts, then checks them newest first by
+# created_at. The API lists the artifacts by id, and the id order is not the
+# time order: an artifact of an earlier deploy can have the higher id.
 #
 #   scripts/live-manifest.sh fetch FILE   write the manifest to FILE and print
 #                                         "artifact_id=N". Exit 3 if there is
@@ -30,10 +32,12 @@ api() { gh api "$1" || { echo "live-manifest: the API call failed: $1" >&2; exit
 
 # newest: print the id of the newest artifact that passes the checks, or "none".
 newest() {
-	local page json cand id run runjson count
+	local page json cand all="" created id run runjson count
 	for page in 1 2 3 4 5; do
 		json=$(api "repos/$REPO/actions/artifacts?name=live-manifest&per_page=30&page=$page") || exit 1
-		# candidates: not expired, from a run on main of this repository
+		# candidates: not expired, from a run on main of this repository.
+		# One line "<created_at> <artifact id> <run id>"; a missing created_at
+		# sorts last.
 		cand=$(printf '%s' "$json" | python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -43,14 +47,20 @@ for a in d.get("artifacts", []):
         continue
     if r.get("head_branch") != "main" or r.get("head_repository_id") != r.get("repository_id") or not r.get("id"):
         continue
-    print(a["id"], r["id"])
+    print(a.get("created_at") or "0", a["id"], r["id"])
 ') || { echo "live-manifest: cannot read the artifact list" >&2; exit 1; }
-		while read -r id run; do
-			[ -n "$id" ] || continue
-			# The run is read into a variable first: in a pipeline the failure of
-			# gh would be lost, and the artifact would count as "not ours".
-			runjson=$(api "repos/$REPO/actions/runs/$run") || exit 1
-			if printf '%s' "$runjson" | python3 -I -c '
+		[ -z "$cand" ] || all="$all$cand"$'\n'
+		# fewer than 30 entries: no more pages
+		count=$(printf '%s' "$json" | python3 -I -c 'import json,sys; print(len(json.load(sys.stdin).get("artifacts", [])))') || exit 1
+		[ "$count" -ge 30 ] || break
+	done
+	# newest first: created_at (ISO 8601 UTC sorts as text), then the higher id
+	while read -r created id run; do
+		[ -n "$id" ] || continue
+		# The run is read into a variable first: in a pipeline the failure of
+		# gh would be lost, and the artifact would count as "not ours".
+		runjson=$(api "repos/$REPO/actions/runs/$run") || exit 1
+		if printf '%s' "$runjson" | python3 -I -c '
 import json, sys
 path = sys.argv[1]
 r = json.load(sys.stdin)
@@ -59,13 +69,9 @@ ok = (r.get("path") == path and r.get("event") in ("push", "workflow_dispatch")
       and (r.get("head_repository") or {}).get("id") == (r.get("repository") or {}).get("id")
       and r.get("conclusion") in (None, "success"))
 sys.exit(0 if ok else 1)' "$WORKFLOW_PATH"; then
-				echo "$id"; return 0
-			fi
-		done <<<"$cand"
-		# fewer than 30 entries: no more pages
-		count=$(printf '%s' "$json" | python3 -I -c 'import json,sys; print(len(json.load(sys.stdin).get("artifacts", [])))') || exit 1
-		[ "$count" -ge 30 ] || break
-	done
+			echo "$id"; return 0
+		fi
+	done <<<"$(printf '%s' "$all" | sort -k1,1r -k2,2nr)"
 	echo none
 }
 
