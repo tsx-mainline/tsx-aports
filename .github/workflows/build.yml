@@ -38,7 +38,8 @@
 # Sources. Every recipe downloads public files: the GitHub archive of a signed
 # tag (tsx-linux-common, tsx-xx60-linux, tsx-xx50-linux, tsx-ledbar-fw),
 # upstream archives, the kernel bundles of a tsx-xx60-linux or tsx-xx50-linux
-# release, the xx70 kernel bundles of a tsx-aports release, and the panel app
+# release, the xx70 and uc-pxx kernel bundles and the uc-pxx tools bundle of a
+# tsx-aports release, the GitHub archive of a uc-pxx-linux board tag, and the panel app
 # source archive of a tsx-xx50-linux release.
 # tsx-xx50-panel-app also downloads PlatformIO and its pinned libraries in
 # build(). The build runs with --verify,
@@ -54,7 +55,7 @@
 #   testing   a manual run on main with channel=testing and source_sha. The
 #             job trigger-testing makes this run after a push to the branch
 #             testing. The run takes the recipes (common, xx60, xx50, xx70,
-#             keep) from source_sha and the scripts from main. It
+#             uc-pxx, keep) from source_sha and the scripts from main. It
 #             stops unless source_sha is on the branch testing
 #             (scripts/check-testing-sha.sh).
 #   promote   a manual run on main with the action promote
@@ -73,9 +74,9 @@ name: build
 on:
   push:
     branches: [main, testing]
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'uc-pxx/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   pull_request:
-    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
+    paths: ['common/**', 'xx60/**', 'xx50/**', 'xx70/**', 'uc-pxx/**', 'scripts/**', 'keep/**', '.github/workflows/build.yml']
   schedule:
     # chromium-watch and wlroots-watch use this schedule. The time is UTC, once a day.
     - cron: '17 6 * * *'
@@ -374,7 +375,7 @@ jobs:
       # bundle does not exist yet, with a warning. Its carried-forward copy
       # stays.
       # --all builds two passes: armv7 (common, xx60, xx50) and aarch64
-      # (common, xx70).
+      # (common, xx70, uc-pxx).
       # A package builds in a pass only when its arch= lists that
       # architecture. tensorflow-lite-c and sendspin-cli list both.
       - name: Build the new versions

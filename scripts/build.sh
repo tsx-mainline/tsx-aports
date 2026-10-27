@@ -20,7 +20,7 @@
 #                       matters for a noarch package (common/tsx-keys, armv7
 #                       by default) and for --all. With --all and no --arch,
 #                       the script builds two passes: armv7 (common/, xx60/
-#                       and xx50/) and aarch64 (common/ and xx70/). A package
+#                       and xx50/) and aarch64 (common/, xx70/ and uc-pxx/). A package
 #                       whose arch= does not list the pass architecture is
 #                       left out of that pass.
 #
@@ -71,7 +71,7 @@
 # the script leaves this step out, and `abuild -r` checks the sums that the
 # APKBUILD has. Then `abuild -r` fetches the missing build dependencies,
 # builds, packages, signs, and indexes.
-# Output: packages/v3.24/<common|xx60|xx50|xx70>/<arch>/*.apk and APKINDEX.tar.gz.
+# Output: packages/v3.24/<common|xx60|xx50|xx70|uc-pxx>/<arch>/*.apk and APKINDEX.tar.gz.
 # With BUILD_HOST, the script also copies the APKBUILD back, because the
 # checksum step can change it. Then the real checksum is what you commit.
 # Check the diff before you commit.
@@ -146,8 +146,8 @@ assert_remote_cmd_safe() {
 }
 
 # apkbuild_info PKGDIR: prints "<pkgname> <pkgver> <pkgrel>". Then it prints
-# one line for each download URL in source=, without the optional "name::"
-# prefix. It reads the APKBUILD in a subshell, like abuild does. The APKBUILDs
+# one line "<URL> <file name>" for each download URL in source=. The file name
+# is the optional "name::" prefix, else the last part of the URL. It reads the APKBUILD in a subshell, like abuild does. The APKBUILDs
 # of this repo define only variables and functions at the top level.
 apkbuild_info() {
 	(
@@ -156,7 +156,10 @@ apkbuild_info() {
 		. "$REPO/$1/APKBUILD" >/dev/null 2>&1
 		echo "$pkgname $pkgver $pkgrel"
 		for s in $source; do
-			case "${s#*::}" in http://*|https://*) echo "${s#*::}";; esac
+			case "${s#*::}" in http://*|https://*)
+				case $s in *::*) n=${s%%::*};; *) n=${s##*/};; esac
+				echo "${s#*::} $n";;
+			esac
 		done
 	)
 }
@@ -279,7 +282,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	# and not part of the pushed source tree. .throwaway-key/ is the
 	# persistent throwaway signing keypair (see below). It is also state on
 	# the host. The local side never pushes it and never deletes it.
-	to_build_host --delete --exclude packages/ --exclude '.throwaway-key/' --filter 'P xx70/*/dist/' --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
+	to_build_host --delete --exclude packages/ --exclude '.throwaway-key/' --filter 'P xx70/*/dist/' --filter 'P uc-pxx/*/dist/' --exclude '.git/' --exclude 'src/' --exclude 'pkg/' --exclude 'extract/' \
 		"$REPO/" "$BUILD_HOST:$BUILD_DIR/"
 
 	echo "[build.sh] building on $BUILD_HOST with a throwaway signing key (generated there and reused for this BUILD_DIR -- the real key stays here)"
@@ -307,7 +310,7 @@ if [ -n "${BUILD_HOST:-}" ] && [ -z "${ON_HOST:-}" ]; then
 	if [ "$TARGET" != --all ]; then
 		rsync -a "$BUILD_HOST:$BUILD_DIR/$TARGET/APKBUILD" "$REPO/$TARGET/APKBUILD"
 	else
-		for CAT in common xx60 xx50 xx70; do
+		for CAT in common xx60 xx50 xx70 uc-pxx; do
 			for d in "$REPO/$CAT"/*/; do
 				[ -f "${d}APKBUILD" ] || continue
 				p="$CAT/$(basename "$d")/APKBUILD"
@@ -327,7 +330,7 @@ KEYNAME=$(basename "$TSX_APORTS_KEY")
 JOBS=
 if [ "$TARGET" = --all ]; then
 	for A in ${WANT_ARCH:-armv7 aarch64}; do
-		case $A in armv7) CATS="common xx60 xx50";; *) CATS="common xx70";; esac
+		case $A in armv7) CATS="common xx60 xx50";; *) CATS="common xx70 uc-pxx";; esac
 		LIST=
 		for D in $( (cd "$REPO" && for c in $CATS; do [ -d "$c" ] && find "$c" -mindepth 1 -maxdepth 1 -type d; done) | sort); do
 			[ -f "$REPO/$D/APKBUILD" ] || continue
@@ -363,8 +366,9 @@ want_build() {
 		fi
 	fi
 	if [ "$SKIP_UNREACHABLE" = 1 ]; then
-		for url in $(echo "$info" | tail -n +2); do
-			[ -f "$REPO/$1/dist/$(basename "$url")" ] && continue
+		while read -r url file; do
+			[ -n "$url" ] || continue
+			[ -f "$REPO/$1/dist/$file" ] && continue
 			code=$(curl -sL -r 0-0 -o /dev/null -w '%{http_code}' "$url" || true)
 			case "$code" in
 			200|206) ;;
@@ -373,7 +377,9 @@ want_build() {
 				return 1;;
 			*) echo "build.sh: $1: cannot check $url (HTTP $code)" >&2; exit 1;;
 			esac
-		done
+		done <<-EOF
+		$(echo "$info" | tail -n +2)
+		EOF
 	fi
 	return 0
 }
@@ -405,6 +411,7 @@ while read -r PKGDIR PKGARCH; do
 	*) ensure_image "$PKGARCH"; check_image_arch "$PKGARCH"; READY="$READY $PKGARCH";;
 	esac
 	echo "=== building $PKGDIR ($PKGARCH) ==="
+	read -r PKGNAME PKGVER PKGREL <<<"$(apkbuild_info "$PKGDIR" | head -n 1)"
 	# A family package (xx60/...) depends on common packages (tsx-base,
 	# tsx-ledbar and more). abuild -r resolves a dependency only from the
 	# repository of the package itself, so the build adds the common packages
@@ -442,6 +449,11 @@ while read -r PKGDIR PKGARCH; do
 			cd /repo/$PKGDIR
 			$CHECKSUM_CMD
 			abuild -F -r -P /repo/packages/v3.24
+			# A recipe with _pins (uc-pxx-boot-tools): the final .apk must hold
+			# the reviewed bytes. The script removes a package that does not.
+			if grep -q '^_pins=' APKBUILD; then
+				sh /repo/scripts/check-apk-pins.sh APKBUILD /repo/packages/v3.24/${PKGDIR%%/*}/$PKGARCH/$PKGNAME-$PKGVER-r$PKGREL.apk
+			fi
 		"
 done <<EOF
 $JOBS
