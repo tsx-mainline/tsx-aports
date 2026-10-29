@@ -1,56 +1,136 @@
 # Contributor: unex <7575866+unex@users.noreply.github.com>
 # Maintainer: unex <7575866+unex@users.noreply.github.com>
-# The panel app program of the xx50 panels (ESPHome, LVGL, the tsx_drm display
-# and the tsx_evdev input). One program for every xx50 panel: the service
-# tsx-panel-app of tsx-panel-app gives it the name, the MAC and the API key of
-# the panel at start.
+# The panel app program of the xx50 panels: Tessera (the touch-screen firmware
+# of github.com/MaxGramser/homeassistant_espscreen) as an ESPHome host program
+# with LVGL, the tsx_drm display and the tsx_evdev input. One program for every
+# xx50 panel: the service tsx-panel-app of tsx-panel-app gives it the name, the
+# MAC and the API key of the panel at start. The classic panel app (tsx_cards,
+# esphome-lvgl/ of tsx-xx50-linux) is not packaged.
 #
 # Source: the release asset tsx-xx50-panel-app-src-$pkgver.tar.gz of the tag
-# v$pkgver of tsx-xx50-linux. release.yml makes it with
-# esphome-lvgl/build.sh and esphome-lvgl/mksource.sh: ESPHome writes the C++
-# project of esphome-lvgl/panel-app.yaml and of panel-app/esphome of
-# tsx-linux-common (the tag in COMMON_REF). BUILDINFO in the archive names the
-# versions and the commits. ESPHome itself does not run here: it needs Python
-# modules with Rust and C parts that Alpine armv7 does not have as wheels.
+# v$pkgver of tsx-xx50-linux. release.yml makes it with tessera/build.sh and
+# tessera/mksource.sh: ESPHome writes the C++ project of Tessera and of
+# panel-app/esphome of tsx-linux-common (the tag in COMMON_REF). BUILDINFO in
+# the archive names the versions and the commits. The archive has the
+# corresponding source of the program (docs/tessera.md "License" of
+# tsx-xx50-linux): the project, the libraries LVGL, ArduinoJson, noise-c and
+# libsodium (libdeps/), the PlatformIO platform native and tool-scons
+# (pio-core/), Tessera at the pinned commit, the folder tessera/ of
+# tsx-xx50-linux, the folder panel-app/esphome of tsx-linux-common, and every
+# license text (LICENSE, NOTICE, licenses/). ESPHome itself does not run here:
+# it needs Python modules with Rust and C parts that Alpine armv7 does not
+# have as wheels.
 #
-# build() compiles the project with compile.sh of the archive: PlatformIO
-# (pip, in a venv in $srcdir) and the g++ and libdrm of Alpine. PlatformIO
-# downloads the libraries that platformio.ini names with exact versions
-# (ArduinoJson, LVGL, noise-c, libsodium) and the native platform, and checks
-# them. So the build needs the network (options net).
-# After a new release, run `abuild checksum`.
+# build() compiles the project with compile.sh of the archive: PlatformIO and
+# the g++, libdrm and libjpeg-turbo of Alpine. PlatformIO $_pio and its Python
+# dependencies are the wheels in source= (exact versions, all py3-none-any),
+# installed with pip --no-index. compile.sh takes the libraries and the
+# platform from the archive. So the build needs no network.
+# Testing: a commit archive of tsx-xx50-linux has no generated project, so a
+# test build uses the pre-release tag v<next>_pre<YYYYMMDD> of tsx-xx50-linux
+# (docs/build.md "Test builds" of that repo). The release <next> on main uses
+# the tag v$pkgver again, with tsx-xx50-board>=$pkgver.
 # 0.3.7: the program reads the release notes of tsx-autoupdate 0.3.7 (a newline
 # is the two characters \n in update.state).
 # 0.3.8: no touch poll, and the entities send a change only.
 # 0.3.10: the sensor "Last boot".
+# 0.3.11_pre20261028: Tessera (testing). Any standby counts as a dark screen
+# for tsx-autoupdate. tsx-xx50-board 0.3.10 is enough: Tessera needs no new
+# board file. The package installs every license text, and the build needs no
+# network.
 pkgname=tsx-xx50-panel-app
-pkgver=0.3.10
+pkgver=0.3.11_pre20261028
 pkgrel=0
 _pio=6.1.19
-pkgdesc="TSX panel app program for the xx50 panels (ESPHome, LVGL, DRM/KMS)"
+pkgdesc="TSX panel app program for the xx50 panels (Tessera, ESPHome, LVGL, DRM/KMS)"
 url="https://github.com/tsx-mainline/tsx-xx50-linux"
 arch="armv7"
-# The program links the C++ code of ESPHome (GPL-3.0-or-later).
-license="GPL-3.0-or-later"
-# tsx_drm draws with libdrm (no SDL, no EGL).
-depends="tsx-panel-app>=0.3.6 tsx-xx50-board>=$pkgver libdrm libstdc++"
-makedepends="build-base libdrm-dev python3 py3-pip git"
-options="net !check !fhs"
-source="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/v$pkgver/tsx-xx50-panel-app-src-$pkgver.tar.gz"
+# Tessera is AGPL-3.0-or-later ("version 3 of the License or (at your option)
+# any later version", NOTICE of Tessera). The C++ code of ESPHome is GPL-3.0
+# (the ESPHome License says GPLv3, with no "or any later version"). The
+# program combines the two under section 13 of both licenses: each part keeps
+# its license, and the network terms of AGPL section 13 apply to the whole
+# program. The program also contains the tsx-linux-common components
+# (GPL-2.0-or-later), LVGL, ArduinoJson and noise-c (MIT), libsodium (ISC, the
+# ESPHome port files MIT), the fonts Roboto and Noto Sans Symbols 2 (OFL-1.1)
+# and Material Design Icons (Apache-2.0).
+license="AGPL-3.0-or-later AND GPL-3.0-only AND GPL-2.0-or-later AND MIT AND ISC AND OFL-1.1 AND Apache-2.0"
+# tsx_drm draws with libdrm (no SDL, no EGL). The live camera view decodes
+# JPEG pictures with libjpeg-turbo.
+depends="tsx-panel-app>=0.3.6 tsx-xx50-board>=0.3.10 libdrm libjpeg-turbo libstdc++"
+makedepends="build-base libdrm-dev libjpeg-turbo-dev python3 py3-pip"
+options="!check !fhs"
+_srcurl="https://github.com/tsx-mainline/tsx-xx50-linux/releases/download/v$pkgver/tsx-xx50-panel-app-src-$pkgver.tar.gz"
+# PlatformIO $_pio and its dependencies, as pip resolves them for the Python
+# of Alpine v3.24 (pip download platformio==$_pio).
+_pypi=https://files.pythonhosted.org/packages
+source="$_srcurl
+	$_pypi/cf/6f/6abff7fe6813e6f94129a50c8c70bf70fb33ed2515b1037e703cef6d7a7e/ajsonrpc-1.2.0-py3-none-any.whl
+	$_pypi/12/b8/4bd346e22b28902df4d651910f5242c28d84e4a5c2435ca5c3f797ed7e2e/anyio-4.15.1-py3-none-any.whl
+	$_pypi/83/f6/b55ec74cfe68c6584163faa311503c20b0da4c09883a41e8e00d6726c954/bottle-0.13.4-py2.py3-none-any.whl
+	$_pypi/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl
+	$_pypi/fc/ad/d07d7862a62ffa6d79d68074d14823243dd235a77c45262acbf6adeb28bf/charset_normalizer-3.5.2-py3-none-any.whl
+	$_pypi/ae/44/c1221527f6a71a01ec6fbad7fa78f1d50dfa02217385cf0fa3eec7087d59/click-8.3.3-py3-none-any.whl
+	$_pypi/d1/d6/3965ed04c63042e047cb6a3e6ed1a63a35087b6a609aa3a15ed8ac56c221/colorama-0.4.6-py2.py3-none-any.whl
+	$_pypi/04/4b/29cac41a4d98d144bf5f6d33995617b185d14b22401f75ca86f384e87ff1/h11-0.16.0-py3-none-any.whl
+	$_pypi/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+	$_pypi/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl
+	$_pypi/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+	$_pypi/cf/15/ecb78457241aef59977cafe52b521ed99c7f42e78016d55bbaa953a2b6ae/platformio-6.1.19-py3-none-any.whl
+	$_pypi/46/2a/f9697576603dae937727827505a6126a066affb227034e77e6f9068910da/pyelftools-0.33-py3-none-any.whl
+	$_pypi/07/bc/587a445451b253b285629263eb51c2d8e9bcea4fc97826266d186f96f558/pyserial-3.5-py2.py3-none-any.whl
+	$_pypi/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
+	$_pypi/6a/23/8146aad7d88f4fcb3a6218f41a60f6c2d4e3a72de72da1825dc7c8f7877c/semantic_version-2.10.0-py2.py3-none-any.whl
+	$_pypi/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl
+	$_pypi/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl
+	$_pypi/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl
+	$_pypi/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl
+	$_pypi/3d/d8/2083a1daa7439a66f3a48589a57d576aa117726762618f6bb09fe3798796/uvicorn-0.40.0-py3-none-any.whl
+	$_pypi/a4/f5/10b68b7b1544245097b2a1b8238f66f2fc6dcaeb24ba5d917f52bd2eed4f/wsproto-1.3.2-py3-none-any.whl
+	"
 builddir="$srcdir/tsx-xx50-panel-app-$pkgver"
 
 build() {
 	python3 -m venv "$srcdir"/pio
-	"$srcdir"/pio/bin/pip install -q --no-cache-dir platformio==$_pio
+	"$srcdir"/pio/bin/pip install -q --no-index --no-cache-dir --disable-pip-version-check \
+		--find-links "$srcdir" platformio==$_pio
 	PATH="$srcdir/pio/bin:$PATH" PLATFORMIO_CORE_DIR="$srcdir"/pio-core HOME="$srcdir" \
 		JOBS="${JOBS:-$(nproc)}" sh "$builddir"/compile.sh "$builddir" "$builddir"/tsx-panel-app
 }
 
 package() {
+	local lic="$pkgdir"/usr/share/licenses/$pkgname
 	install -Dm755 "$builddir"/tsx-panel-app "$pkgdir"/usr/local/bin/tsx-panel-app
 	install -Dm644 "$builddir"/BUILDINFO "$pkgdir"/usr/local/share/tsx/panel-app/BUILDINFO.xx50
+	install -d "$lic"
+	install -m644 "$builddir"/LICENSE "$builddir"/NOTICE "$builddir"/licenses/* "$lic"/
+	# The AGPL corresponding source is on another server than the package.
+	printf '%s\n' "The corresponding source of /usr/local/bin/tsx-panel-app ($pkgname $pkgver):" \
+		"$_srcurl" > "$lic"/SOURCE
 }
 
 sha512sums="
-038dcb96edd5daea5398fa51327d1fe7a4102282bc2436f9de42567eaec5d2ae7cb6e3c44d34c30c6d9751efbddc868f3d647e859156413a7a899165c3145edb  tsx-xx50-panel-app-src-0.3.10.tar.gz
+5a2a074ef45e5ce04d8c320f8cf8a5448c5973f25664c2840c531b0f834a365c0528331c7998af73c9934ed38449e3a220855f27f4c7c76daeb594c0515f784c  tsx-xx50-panel-app-src-0.3.11_pre20261028.tar.gz
+844a33601b74b19ba44af5b944d938ff73bf64ce2a3ffa6d55eac669faabb42f7d6e5885466c3fc8ae2561685b7fc68306fe9868f6876995690a14767ba84a3e  ajsonrpc-1.2.0-py3-none-any.whl
+bbe7183523ab1d381486413823bce2f3de800354b540a4235aee52408bb0e0c589b02f2c74fc2e88de04d133d04a13b0767b0c967d111657abba253e01e51003  anyio-4.15.1-py3-none-any.whl
+eb9a897529c5b6a22b4a5926a41b8d471cb659e3eb41e06dfc2d1be93326e0fe2e23d57dee963095b811f66d8337b6108ecc019a50670269a7302d04c8738db7  bottle-0.13.4-py2.py3-none-any.whl
+3d573c0d0b9a0877e0537d9c28d3dbd94d94140839c585a84df439eba0e467aa6c7f641e540a21e1f26b9affb70612e362f34c6052d8a93918df171df100d661  certifi-2026.10.23-py3-none-any.whl
+8728a2c7780046841b9aa4c22a43c26c49d4132b4a49e58c5901230cf1c82046ea91cfbdfd299d85d935bbbd0396a408420ec90a937d753c93221e7d2d0567da  charset_normalizer-3.5.2-py3-none-any.whl
+1495d2934932ebd6822af77eabd560db3cccb15c7f2b6d043f79914d4e1a2ff9284b24e1d4073cdab27717bc376197343c22e574afc4805e9bc125f42958d7ea  click-8.3.3-py3-none-any.whl
+a5301fe83709a4632969bf32e0e5564679bac01fcb2068a57781c0fbd04ad48f90f14b6439c27155a9ed1ef6567a70f509b0d27d9661fa1dc56abd32bcc599dd  colorama-0.4.6-py2.py3-none-any.whl
+b658fecf8464de6761f8409ff044cf15ca87462457f16e66445129693dc9b6b670ca667eff778b6191012407cac6f78ee41fc9481fa2f2b0cc801f6f57592872  h11-0.16.0-py3-none-any.whl
+8f1487cce03c9bbb74fabbfc3e144364c0f02b9de13feee666a7fc661e41a800624161c0c82e90c432112ee2237c5abb973d599f7a2972d13c0c2c2b21cb4988  idna-3.20-py3-none-any.whl
+130903f878784942e5e17aaff0686dd5535aaf680e668affe1e824f99adcc8befd521fe7e0ff184f6fddf519491601cf18be2e4b4df0922430973a37fe5a312e  marshmallow-3.26.2-py3-none-any.whl
+e9492eedaac7cfddde6d84389ef7df86c68275e8f29d838fc431d9bf379401bf6d82ec70ac02461995982613c80592cd8de74c16a3654d7d8fdc06f96057d6e7  packaging-26.3-py3-none-any.whl
+bd9666e6024a45a86d3b4ffe365d66cb6344ef7421ba72751ff041709bb335b5225d86f6e3c39a0edfb411d0c8b8dbe5e791aa6aa0dbd3faf048a2b2f3812c6d  platformio-6.1.19-py3-none-any.whl
+bf49dafca5057c58af537e92637b2d075039327b658ea37d527e0c4ad874a81275ca43f3a26aa67a5365d11facad85062b2143589d31494c5429d6b985371816  pyelftools-0.33-py3-none-any.whl
+29bce14c59e60f54ce476d919c9b9477190ef6bb44a6102f71345840f5c0f1d0a323c4c3c302c5f380bfaae32cf04142ee528b6dd7184f17789632a31d5ecab6  pyserial-3.5-py2.py3-none-any.whl
+a5dc72000aaea1b10e1aed1330b373385a21af01afb3fbb68dde309f496059a20b227a5a93c18a14d9eadbbb6cfe217da94d1d032b8dbccc66a4411cc4fdc64c  requests-2.34.2-py3-none-any.whl
+7c9196e00a22bd8a156ed4681a1257a264d2b24ff34c812a3e425edf8f53a76d84450c14f5a9056688797255f6a41655ff2ce1ebcbfc1190009556a4649fafba  semantic_version-2.10.0-py2.py3-none-any.whl
+3719972a2c424b19c9ac5d4406dbeeaf093128b35675cbf2e8aa6d06c328e01fbdf1d010111c3629c3f2b8d80d47a4f896b2ce1ed9b20a9751e6b1776e4e7c8e  starlette-0.52.1-py3-none-any.whl
+d16807541626924abede5b39e4186092b6af43228dc35c91a1fd78d44c45c58be6bd8c7f64e8ef128eee674f1fad70d1c4d59920cf9ced99144524a9845a64ff  tabulate-0.10.0-py3-none-any.whl
+1c0fde132124d6b6d28064a7642ec7c67c7020eeff42485172940080d2f3c926f2d3c664990d194c089c3d5d9ee8750bde0c65792fc7ba08991549f948a05716  typing_extensions-4.16.0-py3-none-any.whl
+dfeddaa1d2e95c02efa7bfc98b3f651406a1834263f3697644dbd9754ba64582b3b48d7ca12b58115475707f2cef147697e059dabf3c01a7034175bac1460195  urllib3-2.8.0-py3-none-any.whl
+89f626828c73e9ec5b851efbced4683f52e9bd0d7f55ec2eefc719e135f9d37e6549b71ba3b10d556cb78b736c7647610c8b515772707bbcfef295ef1d407382  uvicorn-0.40.0-py3-none-any.whl
+ff5d9f31a5bac115e31907ae1ac814eda4a3803da41f736e06d4efc9852cdebf2df29e4719a7996e5c5b78b33d809fd9c6513b69db7be0907954710c8c0413e2  wsproto-1.3.2-py3-none-any.whl
 "
