@@ -9,8 +9,9 @@
 # and uc-pxx-post-update (the board step of tsx-autoupdate after an install:
 # it checks the reviewed files, arms slot A, runs uc-pxx-update-boot write
 # --yes and checks the A/B state before a restart).
-# 0.1.0-r2: the first public build (r1 was a private build). The source is the
-# tag board-v0.1.0.
+# 0.1.0-r2: the first public build (r1 was a private build).
+# 0.1.1-r0: the service uc-pxx-boot-ok stays "started" after the hook ends
+# (no "crashed" in rc-status). The source is the tag board-v0.1.1.
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
 # 49156) of a panel, and two more run them without a person
@@ -36,8 +37,8 @@
 # local snapshot.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
-pkgver=0.1.0
-pkgrel=2
+pkgver=0.1.1
+pkgrel=0
 _tbundle_tag=uc-pxx-tools-20261024
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -64,7 +65,7 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 _pins="
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
 b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
-c36628b8ba2ee6d99f1eb24d343c68d047bf70b53dced0ed2748b2831a2b3235 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
+15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
 400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
 f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
 4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
@@ -129,7 +130,7 @@ package() {
 }
 
 sha512sums="
-bc336739df19ab5f84b2a6dbcc6d93f388cffe7d03b6aee1572c26a40ba873c83436ea1110352400262543652c6408e1ad88038a43b4f7358114923d58087d96  uc-pxx-linux-0.1.0.tar.gz
+36cbb8c808d2d9b654ee014095765ef53db58510a3b7beed138fc4766db4cbb8eb4e8e6403edd805211b5e53889b3b7e67c57aa47db69f71cf6c11ae6d6e12cf  uc-pxx-linux-0.1.1.tar.gz
 1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
 409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "
