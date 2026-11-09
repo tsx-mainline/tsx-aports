@@ -18,14 +18,17 @@
 # 0.3.12: board hooks (tsx_board_pre_update before an install, tsx_board_post_update
 # after apk upgrade), TSX_PKG_PREFIX for the packages of the board family, and
 # the file restart-block that stops the Restart button while a board step runs.
+# 0.3.13: autoupdate.conf moved to /usr/local/share/tsx/defaults. /etc/tsx/autoupdate.conf
+# holds only the changes of the user.
 pkgname=tsx-autoupdate
-pkgver=0.3.12
+pkgver=0.3.13_pre20261108
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
 license="GPL-2.0-or-later"
-depends="tsx-base>=0.3.6 apk-tools curl python3"
+depends="tsx-base>=0.3.13_pre20261108 apk-tools curl python3"
+install="$pkgname.pre-upgrade $pkgname.post-install $pkgname.post-upgrade"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
 source="tsx-linux-common-$pkgver.tar.gz::https://github.com/tsx-mainline/tsx-linux-common/archive/refs/tags/v$pkgver.tar.gz"
@@ -40,5 +43,5 @@ package() {
 }
 
 sha512sums="
-ee4604a0f44d3e47dc14485e134c366d45040543094731fe2f74e4dff828eed6c24e3c0cb8124608afd3601b4079340ecf3b91937827150376192ee6b42aa684  tsx-linux-common-0.3.12.tar.gz
+26076df3bc3456e554ca40a282f5f5b45c8127f30f350600efc213e6ebac65aa4451d35538bcb62572d119dfe0d6d89978dab5e87294af7d85a073a748446bcb  tsx-linux-common-0.3.13_pre20261108.tar.gz
 "

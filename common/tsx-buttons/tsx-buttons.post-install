@@ -1,0 +1,4 @@
+#!/bin/sh
+# A new installation: write the short user file (header only) when it is missing.
+/usr/local/sbin/tsx-conf-migrate --init buttons.conf || true
+exit 0

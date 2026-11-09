@@ -1,0 +1,4 @@
+#!/bin/sh
+# A new installation: write the short user file (header only) when it is missing.
+/usr/local/sbin/tsx-conf-migrate --init panel-app.conf || true
+exit 0

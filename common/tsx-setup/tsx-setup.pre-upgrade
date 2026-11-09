@@ -9,4 +9,17 @@ fi
 getent group tsx-setup-screen >/dev/null || addgroup -S tsx-setup-screen
 addgroup tsx-setup tsx-setup-screen 2>/dev/null || true
 getent passwd tsx-panel-app >/dev/null && addgroup tsx-panel-app tsx-setup-screen 2>/dev/null
+# Up to 0.3.12, this package held the full settings file in /etc. A new version
+# does not ship it, so apk deletes an unedited file and keeps an edited one with
+# no owner. Copy the old file to the folder that tsx-conf-migrate reads. The
+# post-upgrade script runs the tool. The tool compares the copy with the old
+# defaults, so an unedited file becomes a short header.
+d=/usr/local/share/tsx/defaults
+for n in setup.conf; do
+	case $n in kiosk.conf) f=/etc/kiosk.conf;; *) f=/etc/tsx/$n;; esac
+	if [ ! -e "$d/$n" ] && [ -f "$f" ]; then
+		mkdir -p /var/lib/tsx/conf-migrate
+		cp -p "$f" "/var/lib/tsx/conf-migrate/$n" || true
+	fi
+done
 exit 0

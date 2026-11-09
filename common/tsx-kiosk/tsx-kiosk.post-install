@@ -1,4 +1,6 @@
 #!/bin/sh
 mkdir -p /var/lib/kiosk
 chown kiosk:kiosk /var/lib/kiosk
+# A new installation: write the short user file (header only) when it is missing.
+/usr/local/sbin/tsx-conf-migrate --init kiosk.conf || true
 exit 0

@@ -1,0 +1,5 @@
+#!/bin/sh
+# Move the old full settings file to the split layout (tsx-conf-migrate is in
+# tsx-base, not in the PATH of apk). A failure does not stop the upgrade.
+/usr/local/sbin/tsx-conf-migrate kiosk.conf || echo "tsx-conf-migrate failed for kiosk.conf: your old file is in /var/lib/tsx/conf-migrate"
+exit 0

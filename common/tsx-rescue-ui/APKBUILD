@@ -5,9 +5,10 @@
 # Source: the signed tag v$pkgver of tsx-linux-common. The build downloads the
 # GitHub archive of that tag. sha512sums holds the sum of the archive. After a
 # new tag, run `abuild checksum` (README.md, "Source of the packages").
+# 0.3.13: no change in this package. It follows the version of the archive.
 pkgname=tsx-rescue-ui
-pkgver=0.2.0
-pkgrel=2
+pkgver=0.3.13_pre20261108
+pkgrel=0
 pkgdesc="TSX rescue screen: status text, console font and login choice"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="noarch"
@@ -26,5 +27,5 @@ package() {
 }
 
 sha512sums="
-97123b7ac4fa1b72deb20291a562b3d0159ec1577efbf8ae1eead721de43b355f9a66cdf46db1a00742866fda83926a9448e39f7443cb688a0e0a64957c28d3e  tsx-linux-common-0.2.0.tar.gz
+26076df3bc3456e554ca40a282f5f5b45c8127f30f350600efc213e6ebac65aa4451d35538bcb62572d119dfe0d6d89978dab5e87294af7d85a073a748446bcb  tsx-linux-common-0.3.13_pre20261108.tar.gz
 "
