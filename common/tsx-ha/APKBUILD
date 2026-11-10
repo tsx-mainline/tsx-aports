@@ -16,7 +16,7 @@
 # 0.3.13: mqtt.conf, esphome.conf and voice.conf moved to /usr/local/share/tsx/defaults.
 # The files in /etc/tsx hold only the changes of the user.
 pkgname=tsx-ha
-pkgver=0.3.13_pre20261108
+pkgver=0.3.13_pre20261109
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -34,7 +34,7 @@ license="GPL-2.0-or-later"
 # (tsx-base 0.3.4). The setup plugin has the field HA_URL (tsx-setup 0.3.4).
 # 0.3.5: the Sendspin player is the package tsx-sendspin. tsx-ha depends on it,
 # so a panel keeps the player, its runlevel entry and its settings.
-depends="tsx-base>=0.3.13_pre20261108 tsx-kiosk tsx-setup>=0.3.6 alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
+depends="tsx-base>=0.3.13_pre20261109 tsx-kiosk tsx-setup>=0.3.6 alsa-utils avahi avahi-compat-libdns_sd bluez-deprecated
 	mosquitto-clients mpv-libs py3-aiohappyeyeballs py3-cryptography py3-mpv py3-numpy
 	py3-protobuf py3-tzlocal py3-zeroconf python3 tsx-sendspin>=0.3.5 tensorflow-lite-c>=2.17.1-r1"
 install="$pkgname.pre-upgrade $pkgname.post-install $pkgname.post-upgrade"
@@ -58,5 +58,5 @@ package() {
 }
 
 sha512sums="
-26076df3bc3456e554ca40a282f5f5b45c8127f30f350600efc213e6ebac65aa4451d35538bcb62572d119dfe0d6d89978dab5e87294af7d85a073a748446bcb  tsx-linux-common-0.3.13_pre20261108.tar.gz
+b28e6ee2f831270dedb0e9dee230d16ec563f4437d9b61f95f96dea68f7338b3372533be83ef1d4aa546f3564c166bef41d7c91523851d109c7f9794c26b1239  tsx-linux-common-0.3.13_pre20261109.tar.gz
 "

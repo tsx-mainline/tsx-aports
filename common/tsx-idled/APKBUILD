@@ -14,13 +14,13 @@
 # only file that differs from 0.2.0.
 # 0.3.13: tsx-idled reads the kiosk.conf layers with tsx-conf.h (defaults, board, user).
 pkgname=tsx-idled
-pkgver=0.3.13_pre20261108
+pkgver=0.3.13_pre20261109
 pkgrel=0
 pkgdesc="TSX idle daemon: backlight timeout, blank and wake, and the tsx-blank and tsx-display-power tools"
 url="https://github.com/tsx-mainline/tsx-aports"
 arch="armv7 aarch64"
 license="GPL-2.0-or-later"
-depends="tsx-base>=0.3.13_pre20261108 brightnessctl"
+depends="tsx-base>=0.3.13_pre20261109 brightnessctl"
 makedepends="linux-headers"
 # The panel software lives in /usr/local (and /opt/lva for the voice shim), as in the image.
 options="!check !fhs"
@@ -41,5 +41,5 @@ package() {
 }
 
 sha512sums="
-26076df3bc3456e554ca40a282f5f5b45c8127f30f350600efc213e6ebac65aa4451d35538bcb62572d119dfe0d6d89978dab5e87294af7d85a073a748446bcb  tsx-linux-common-0.3.13_pre20261108.tar.gz
+b28e6ee2f831270dedb0e9dee230d16ec563f4437d9b61f95f96dea68f7338b3372533be83ef1d4aa546f3564c166bef41d7c91523851d109c7f9794c26b1239  tsx-linux-common-0.3.13_pre20261109.tar.gz
 "
