@@ -12,11 +12,24 @@
 # 0.1.0-r2: the first public build (r1 was a private build).
 # 0.1.1-r0: the service uc-pxx-boot-ok stays "started" after the hook ends
 # (no "crashed" in rc-status). The source is the tag board-v0.1.1.
+# 0.2.0-r0: the both-slot boot control (uc-pxx-linux mainline-linux-int,
+# MAINLINE-STEP2-DESIGN section 10 L1-L5). New: uc-pxx-slot (prints the slot
+# that U-Boot started; in boot-control.sha256). The hook marks the booted
+# slot (mark-successful --expect a|b); uc-pxx-bootctl (source c4368f09...)
+# checks the token of boot_b for --expect b; uc-pxx-arm-slot and
+# uc-pxx-flash-boot change nothing unless slot A runs (or a RAM boot) with
+# the root system_a. uc-pxx-update-boot, uc-pxx-post-update and
+# uc-pxx-boot-ok are unchanged. Ship it only with uc-pxx-board 0.2.0 and the
+# both-slot kernel package (the depends of uc-pxx-board). The pins below are
+# NOT yet reviewed for the safety rules: the owner enters them after their
+# review (BOTH-SLOT-PACKAGING-2026-11-10.md). The source is the tag
+# board-v0.2.0 (not yet made: a local build uses a snapshot, README.md).
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
 # 49156) of a panel, and two more run them without a person
 # (uc-pxx-update-boot, uc-pxx-post-update). An independent review approved their exact bytes (the
-# sha256 values in _pins). check() refuses the build when a source file has
+# sha256 values in _pins). The eighth, uc-pxx-slot (0.2.0), only reads: it
+# names the booted slot for the hook. check() refuses the build when a source file has
 # another sha256, and package() checks the installed copies again. Never
 # change a value in _pins without a new review of that exact file. The
 # binary is the reviewed static build, so this recipe does not compile it,
@@ -30,17 +43,18 @@
 #    the build host, see scripts/stage-uc-pxx-tools.sh)
 #  - uc-pxx-update-boot next to this file
 # The sums at the end are those of the tag archive and of the tools bundle; they
-# need the real files. A local build uses the files in dist/ (SRCDEST):
+# need the real files (all zeros for 0.2.0 until the tag and the release
+# exist). A local build uses the files in dist/ (SRCDEST):
 # scripts/uc-pxx-source.sh writes a snapshot of a commit under the name of the
 # tag archive, and scripts/stage-uc-pxx-tools.sh writes the bundle. Then
 # run abuild checksum (README.md "uc-pxx packages"). Do not commit the sums of a
 # local snapshot.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
-pkgver=0.1.1
+pkgver=0.2.0
 pkgrel=0
-_tbundle_tag=uc-pxx-tools-20261024
-pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
+_tbundle_tag=uc-pxx-tools-20261110
+pkgdesc="uc-pxx A/B boot control (both slots): uc-pxx-bootctl, uc-pxx-slot, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
@@ -61,15 +75,20 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 # uc-pxx-post-update is the board step of tsx-autoupdate (POST-UPDATE-REVIEW,
 # round 3). It is in boot-control.sha256 too, so its own sha256sum -c also
 # checks itself.
+# uc-pxx-slot decides the slot for the hook (and, as its own copy, for the
+# initramfs): it is in boot-control.sha256 (MAINLINE-STEP2-DESIGN review F10).
+# uc-pxx-arm-slot and uc-pxx-flash-boot parse the slot themselves (they do
+# not run it).
 # scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
-38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
-b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
+11c2afcd0272f9c989f9825074186a2341d0a33a34e0fe9ebf92cf0081f9efa7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
+fe581cf2212d8bc01ff54d1b88dc7d03601af075f56e74fb0d3edf2553a08056 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
-400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
-f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
+2fad02b3d825706affabac71c45a2a04d2143970dcf014c1586593c11dfd6fee tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
+26c3f1c0a375674f8a80b2536ed6765f85ae6b13724770767039a271650f786e tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
 4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
 a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 tag:rootfs/overlay/usr/sbin/uc-pxx-post-update usr/sbin/uc-pxx-post-update
+cfec605c6d4042b36aa9882efa3bf8ee1f5a186ad3a06b07a7cc351b796abe2e tag:rootfs/overlay/usr/sbin/uc-pxx-slot usr/sbin/uc-pxx-slot
 "
 
 # _check_pins source|package: every pinned file has its reviewed sha256.
@@ -114,6 +133,8 @@ package() {
 	install -Dm755 "$o"/etc/init.d/uc-pxx-boot-ok "$pkgdir"/etc/init.d/uc-pxx-boot-ok
 	install -Dm755 "$o"/usr/sbin/uc-pxx-flash-boot "$pkgdir"/usr/sbin/uc-pxx-flash-boot
 	install -Dm755 "$o"/usr/sbin/uc-pxx-arm-slot "$pkgdir"/usr/sbin/uc-pxx-arm-slot
+	# the booted slot (a or b) from the U-Boot command line, read only
+	install -Dm755 "$o"/usr/sbin/uc-pxx-slot "$pkgdir"/usr/sbin/uc-pxx-slot
 	# uc-pxx-reboot stops the system with init, then the program restarts it
 	# with the mode argument (reboot(2) with RESTART2).
 	install -Dm755 "$o"/usr/sbin/uc-pxx-reboot "$pkgdir"/usr/sbin/uc-pxx-reboot
@@ -130,7 +151,7 @@ package() {
 }
 
 sha512sums="
-36cbb8c808d2d9b654ee014095765ef53db58510a3b7beed138fc4766db4cbb8eb4e8e6403edd805211b5e53889b3b7e67c57aa47db69f71cf6c11ae6d6e12cf  uc-pxx-linux-0.1.1.tar.gz
-1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-tools-bundle.tar.zst
 409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "

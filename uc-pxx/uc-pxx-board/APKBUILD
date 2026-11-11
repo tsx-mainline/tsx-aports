@@ -23,30 +23,44 @@
 # /usr/sbin/uc-pxx-post-update of uc-pxx-boot-tools, so uc-pxx-boot-tools
 # 0.1.0-r2 is the floor.
 # 0.1.0-r2: the first public build (r1 was a private build).
+# 0.2.0-r0: the both-slot release (uc-pxx-linux mainline-linux-int). The
+# service uc-pxx-lvm mounts /data itself (the line "# uc-pxx-data-mount: 1"):
+# the partition named userdata when it is ext4 tsxdata, else the phase-1 LVM
+# volume; the image fstab has no /data line. uc-pxx-firmware reads
+# /data/uc-pxx/firmware first. New: uc-pxx-data-migrate and
+# uc-pxx-data-release (the userdata tools of step 2 of the mainline install;
+# pinned in _pins, not yet in the safety rules). It needs the both-slot boot
+# control (uc-pxx-boot-tools 0.2.0) and the both-slot initramfs (the
+# uc-pxx-kernel-lts of the same release): /data, the root of the booted slot
+# and the slot guard of the updaters belong together (MAINLINE-LINUX-INT §7).
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
 #  - uc-pxx-tools-bundle.tar.zst of the tsx-aports release _tbundle_tag
 #    (rtl8363-init, built with the GPL Realtek switch SDK, see
 #    tools/rtl8363-init of uc-pxx-linux)
-# The sums at the end are those of the real tag archive board-v0.1.0 and
-# the real tools bundle. See README.md "uc-pxx packages".
+# The sums at the end are all zeros until the tag board-v0.2.0 and the
+# release uc-pxx-tools-20261110 exist (a local build uses a snapshot and
+# the staged bundle, README.md "uc-pxx packages").
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
-pkgver=0.1.0
-pkgrel=2
-_tbundle_tag=uc-pxx-tools-20261024
+pkgver=0.2.0
+pkgrel=0
+_tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
-depends="alsa-utils evtest iw lvm2 python3 tsx-autoupdate>=0.3.12 tsx-base>=0.3.12 uc-pxx-boot-tools>=0.1.0-r2
-	util-linux-misc wireless-regdb"
+# e2fsprogs: mkfs.ext4 and e2fsck of uc-pxx-data-migrate; util-linux-misc:
+# blkdiscard. The kernel floor is the first kernel package with the
+# both-slot initramfs.
+depends="alsa-utils e2fsprogs evtest iw lvm2 python3 tsx-autoupdate>=0.3.12 tsx-base>=0.3.12 uc-pxx-boot-tools>=0.2.0-r0
+	uc-pxx-kernel-lts>=6.18.54_git20261110-r0 util-linux-misc wireless-regdb"
 # /etc/securetty replaces the one of busybox (and of tsx-base up to 0.2.1).
 replaces="busybox tsx-base"
 # The panel software lives in /usr/local, as in the image. !strip keeps the
 # bytes of the tested rtl8363-init.
-options="!check !fhs !strip"
+options="!fhs !strip"
 source="uc-pxx-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/board-v$pkgver.tar.gz
 	https://github.com/tsx-mainline/tsx-aports/releases/download/$_tbundle_tag/uc-pxx-tools-bundle.tar.zst
 	"
@@ -85,6 +99,8 @@ usr/local/sbin/uc-pxx-loader-key
 usr/local/sbin/uc-pxx-presence
 usr/local/sbin/uc-pxx-switch
 usr/local/share/tsx/esphome.d/uc-pxx.py
+usr/sbin/uc-pxx-data-migrate
+usr/sbin/uc-pxx-data-release
 "
 # The files of rootfs/overlay that other owners have (see the header).
 _others="
@@ -97,11 +113,49 @@ usr/sbin/uc-pxx-flash-boot
 usr/sbin/uc-pxx-arm-slot
 usr/sbin/uc-pxx-reboot
 usr/sbin/uc-pxx-post-update
+usr/sbin/uc-pxx-slot
 "
+
+# The two writers of userdata (step 2 of the mainline install): sha256, the
+# path in the tag archive, the path in the package. check() and package()
+# refuse other bytes, and scripts/check-apk-pins.sh checks the .apk. Proposed
+# for the safety rules (MAINLINE-LINUX-INT-2026-11-10.md R-F.2); a changed
+# copy needs a new review.
+_pins="
+9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 tag:rootfs/overlay/usr/sbin/uc-pxx-data-migrate usr/sbin/uc-pxx-data-migrate
+0e94edad81775245c704153abf7bb0469ed88e9638324b9d798a2312539d853b tag:rootfs/overlay/usr/sbin/uc-pxx-data-release usr/sbin/uc-pxx-data-release
+"
+
+# _check_pins source|package: every pinned file has its sha256.
+_check_pins() {
+	local sum src dst f got bad=0
+	while read -r sum src dst; do
+		[ -n "$sum" ] || continue
+		case $1:$src in
+		source:tag:*) f=$builddir/${src#tag:};;
+		package:*) f=$pkgdir/$dst;;
+		*) error "bad pin line: $sum $src $dst"; return 1;;
+		esac
+		got=$(sha256sum "$f" 2>/dev/null | cut -d' ' -f1)
+		if [ "$got" = "$sum" ]; then
+			msg "pinned file OK: /$dst $sum"
+		else
+			error "pinned file CHANGED: $f has sha256 '$got', the pinned file has $sum"
+			bad=1
+		fi
+	done <<-EOF
+	$_pins
+	EOF
+	return $bad
+}
 
 prepare() {
 	default_prepare
 	(cd "$srcdir" && sha256sum -c CHECKSUMS.sha256) || { error "the tools bundle does not match its CHECKSUMS.sha256"; return 1; }
+}
+
+check() {
+	_check_pins source
 }
 
 package() {
@@ -125,9 +179,10 @@ package() {
 	# The GitHub archive of a tag has group-writable files. tsx-config and the
 	# plugin loader of tsx-ha refuse a group-writable plugin.
 	chmod -R go-w "$pkgdir"
+	_check_pins package
 }
 
 sha512sums="
-bc336739df19ab5f84b2a6dbcc6d93f388cffe7d03b6aee1572c26a40ba873c83436ea1110352400262543652c6408e1ad88038a43b4f7358114923d58087d96  uc-pxx-linux-0.1.0.tar.gz
-1af0a6f265644183cfc16811a9b43550c55a7c6b2623e8db71c7e376eea96934d6a23b8b67fad9f78766cfe7284ab941d2b7555c8d1da4b62f47c1c0968f7d67  uc-pxx-tools-bundle.tar.zst
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-tools-bundle.tar.zst
 "

@@ -31,18 +31,24 @@ SRCDEST="$startdir/dist"
 # pkgver: <upstream kernel version>_git<YYYYMMDD> (the staging date), as for
 # xx70. _kernelrelease records the exact build.
 pkgname=uc-pxx-kernel-lts
-pkgver=6.18.54_git20261025
-pkgrel=2
-# r2: the kernel commit d02e92631f28 (r1 was a private build of
-# the same sources before the Signed-off-by lines).
+pkgver=6.18.54_git20261110
+pkgrel=0
+# 6.18.54_git20261025-r2: the kernel commit d02e92631f28 (r1 was a private
+# build of the same sources before the Signed-off-by lines).
+# 6.18.54_git20261110-r0: the same kernel commit d02e92631f28 and config, with
+# the BOTH-SLOT initramfs built in (uc-pxx-linux mainline-linux-int: /init
+# mounts the root of the booted slot, system_a or system_b, by its GPT name
+# only; the rescue tools act on the booted slot; uc-pxx-findfs). So the Linux
+# Image and the token are new. It belongs to the both-slot release
+# (uc-pxx-board 0.2.0 needs it, uc-pxx-boot-tools 0.2.0).
 _kernelrelease=6.18.54-gd02e92631f28
 # The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
-_kbundle_tag=uc-pxx-kernel-20261025
+_kbundle_tag=uc-pxx-kernel-20261110
 pkgdesc="uc-pxx mainline kernel, longterm (LTS) line: boot image without the resource, modules, device trees"
 url="https://github.com/tsx-mainline/linux"
 arch="aarch64"
 license="GPL-2.0-only"
-depends="uc-pxx-boot-tools"
+depends="uc-pxx-boot-tools>=0.2.0-r0"
 options="!check"
 install="$pkgname.post-install $pkgname.post-upgrade"
 source="https://github.com/tsx-mainline/tsx-aports/releases/download/$_kbundle_tag/uc-pxx-kernel-lts-bundle.tar.zst"
@@ -67,5 +73,5 @@ package() {
 }
 
 sha512sums="
-44771ed94ad6bb79b2043fa375a608f2a86894458c27f154afb9a34cfe57e0d22267b9045df04b8b735a46967a52f2c2e8e5406ccdbec269339b539e63c57ef5  uc-pxx-kernel-lts-bundle.tar.zst
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-kernel-lts-bundle.tar.zst
 "

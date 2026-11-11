@@ -262,8 +262,8 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 
 | Package | Content | Sources |
 |---|---|---|
-| `uc-pxx-board` | The board files of `rootfs/overlay` (board.sh, services, tools, audio, key map) and `rtl8363-init` | tag archive, tools bundle |
-| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot`, `uc-pxx-post-update` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
+| `uc-pxx-board` | The board files of `rootfs/overlay` (board.sh, services, tools, audio, key map; from 0.2.0 also the /data mount of `uc-pxx-lvm` and the userdata tools `uc-pxx-data-migrate` and `uc-pxx-data-release`) and `rtl8363-init` | tag archive, tools bundle |
+| `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot`, `uc-pxx-post-update`, and from 0.2.0 `uc-pxx-slot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
 | `uc-pxx-leds` | `packages/uc-pxx-leds` of uc-pxx-linux (FILES and root/) | tag archive |
 | `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
 | `uc-pxx-console`, `uc-pxx-kiosk`, `uc-pxx-ha` | Meta packages of the image profiles of uc-pxx-linux | none |
@@ -271,6 +271,10 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 The image build of uc-pxx-linux (`rootfs/build-rootfs.sh` without the DEV options) installs `uc-pxx-<profile>` and the packages of its `rootfs/packages-tsx.txt` (with `uc-pxx-kernel-lts` and `uc-pxx-leds`). Its `rootfs/check-kernel-pins.sh` reads `/boot/uc-pxx-lts.img` and `/usr/share/uc-pxx/kernel-lts.release`.
 
 All recipes have `arch="aarch64"`, also the ones without a program. A noarch recipe goes to the armv7 folder of its category when it is built on its own.
+
+### Both slots (0.2.0)
+
+`uc-pxx-board` 0.2.0, `uc-pxx-boot-tools` 0.2.0 and `uc-pxx-kernel-lts` 6.18.54_git20261110 are one release: the both-slot boot control of uc-pxx-linux (`mainline-linux-int`). The kernel package holds the both-slot initramfs (the root of the booted slot by its GPT name), `uc-pxx-boot-tools` marks the booted slot and names it (`uc-pxx-slot`), its slot-A updaters change nothing in a boot of slot B, and `uc-pxx-board` mounts `/data` itself (the image fstab has no `/data` line). `uc-pxx-board` depends on the other two at these versions. `uc-pxx-leds` 0.2.0 has the files of 0.1.0 (one tag `board-v0.2.0` for the three recipes). The new pins are not yet in the safety rules of the UC-P10: do not publish this release before the owner enters them.
 
 ### Pinned files
 
