@@ -1,0 +1,14 @@
+# The sha256 values that the UC-P10 safety rules (ucp10 RULES.md) name for the
+# files of the uc-pxx recipes with _pins. scripts/check-rules-pins.sh refuses a
+# recipe whose _pins has a sha256 that this file does not list, and
+# scripts/build.sh runs it before abuild, so CI never builds (or publishes) boot
+# control that the rules do not name. Add a line only after the owner entered
+# the sha in RULES.md, with the RULES entry. One line: SHA256 PATH # entry.
+38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 usr/sbin/uc-pxx-bootctl # uc-pxx port (BOOTCTL-REVIEW)
+b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d etc/uc-pxx-mark-boot.sh # uc-pxx port
+15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 etc/init.d/uc-pxx-boot-ok # BOOT-OK-STATUS
+400d218b6fb83943974d6dadbb62df20cb8f75c470d7cca0f1910e8d5b46878a usr/sbin/uc-pxx-flash-boot # uc-pxx port
+f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd usr/sbin/uc-pxx-arm-slot # uc-pxx port
+4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 usr/sbin/uc-pxx-update-boot # UPDATE-BOOT-REVIEW
+a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 usr/sbin/uc-pxx-post-update # POST-UPDATE-REVIEW
+15a610e7079ddad643bdacc0f744f348bef0ee965d2fb4e6d912e848f6e1ced2 usr/local/lib/tsx/board.sh # POST-UPDATE-REVIEW (uc-pxx-board)

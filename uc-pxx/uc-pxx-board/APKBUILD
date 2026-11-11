@@ -116,12 +116,18 @@ usr/sbin/uc-pxx-post-update
 usr/sbin/uc-pxx-slot
 "
 
-# The two writers of userdata (step 2 of the mainline install): sha256, the
-# path in the tag archive, the path in the package. check() and package()
-# refuse other bytes, and scripts/check-apk-pins.sh checks the .apk. Proposed
-# for the safety rules (MAINLINE-LINUX-INT-2026-11-10.md R-F.2); a changed
-# copy needs a new review.
+# Pinned files: sha256, the path in the tag archive, the path in the package.
+# check() and package() refuse other bytes, and scripts/check-apk-pins.sh
+# checks the .apk; scripts/check-rules-pins.sh refuses a sha that the UC-P10
+# safety rules do not name (uc-pxx/RULES-PINS). board.sh is the caller of
+# uc-pxx-post-update (RULES pin); uc-pxx-lvm mounts /data and uc-pxx-firmware
+# reads it (the both-slot release depends on them); the two writers of
+# userdata of step 2 (proposed for the rules, MAINLINE-LINUX-INT-2026-11-10.md
+# R-F.2). A changed copy needs a new review.
 _pins="
+15a610e7079ddad643bdacc0f744f348bef0ee965d2fb4e6d912e848f6e1ced2 tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
+8f8632da42376defd3eabc5b11b5dd1d9121c97451e05feaa40b593c761eb4aa tag:rootfs/overlay/etc/init.d/uc-pxx-lvm etc/init.d/uc-pxx-lvm
+4b808b4bb09e22933a4078082779aa59250a23a98a5eb9e886b2e3d5f49ed8b9 tag:rootfs/overlay/usr/local/sbin/uc-pxx-firmware usr/local/sbin/uc-pxx-firmware
 9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 tag:rootfs/overlay/usr/sbin/uc-pxx-data-migrate usr/sbin/uc-pxx-data-migrate
 0e94edad81775245c704153abf7bb0469ed88e9638324b9d798a2312539d853b tag:rootfs/overlay/usr/sbin/uc-pxx-data-release usr/sbin/uc-pxx-data-release
 "

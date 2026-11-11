@@ -411,6 +411,9 @@ while read -r PKGDIR PKGARCH; do
 	*) ensure_image "$PKGARCH"; check_image_arch "$PKGARCH"; READY="$READY $PKGARCH";;
 	esac
 	echo "=== building $PKGDIR ($PKGARCH) ==="
+	# Boot control that the UC-P10 safety rules do not name is never built
+	# here (scripts/check-rules-pins.sh, uc-pxx/RULES-PINS).
+	sh "$REPO/scripts/check-rules-pins.sh" "$REPO/$PKGDIR/APKBUILD" || exit 1
 	read -r PKGNAME PKGVER PKGREL <<<"$(apkbuild_info "$PKGDIR" | head -n 1)"
 	# A family package (xx60/...) depends on common packages (tsx-base,
 	# tsx-ledbar and more). abuild -r resolves a dependency only from the

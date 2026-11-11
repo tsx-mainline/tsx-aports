@@ -40,8 +40,8 @@ for f in "$BOOTCTL" "$REBOOT" "$RTL"; do
 	is_arm64 "$f" || { echo "stage-uc-pxx-tools.sh: $f is not an aarch64 ELF program" >&2; exit 1; }
 done
 GOT=$(sha256sum "$BOOTCTL" | cut -d' ' -f1)
-[ "$GOT" = "$PIN" ] || { echo "stage-uc-pxx-tools.sh: $BOOTCTL has sha256 $GOT, the reviewed binary is $PIN. Not staged." >&2; exit 1; }
-echo "uc-pxx-bootctl: sha256 $GOT (the reviewed binary)"
+[ "$GOT" = "$PIN" ] || { echo "stage-uc-pxx-tools.sh: $BOOTCTL has sha256 $GOT, the pinned binary of uc-pxx-boot-tools/APKBUILD is $PIN. Not staged." >&2; exit 1; }
+echo "uc-pxx-bootctl: sha256 $GOT (the pin of uc-pxx-boot-tools/APKBUILD; scripts/check-rules-pins.sh says whether the rules name it)"
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
 mkdir "$W/b"
