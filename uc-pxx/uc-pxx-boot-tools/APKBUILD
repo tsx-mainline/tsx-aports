@@ -24,6 +24,10 @@
 # NOT yet reviewed for the safety rules: the owner enters them after their
 # review (BOTH-SLOT-PACKAGING-2026-11-10.md). The source is the tag
 # board-v0.2.0 (not yet made: a local build uses a snapshot, README.md).
+# 0.2.0-r1: the hook marks on generic health only (owner Q-T7, 2026-11-11):
+# uptime 60 s, the OpenRC default runlevel finished starting, no oops; the
+# network and sshd are only logged (uc-pxx-linux rc-payload-3 bb130e9,
+# mark-boot 726d5675...; NOT yet reviewed for the safety rules).
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
 # 49156) of a panel, and two more run them without a person
@@ -52,7 +56,7 @@
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
 pkgver=0.2.0
-pkgrel=0
+pkgrel=1
 _tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, uc-pxx-slot, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -82,7 +86,7 @@ builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
 # scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
 11c2afcd0272f9c989f9825074186a2341d0a33a34e0fe9ebf92cf0081f9efa7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
-fe581cf2212d8bc01ff54d1b88dc7d03601af075f56e74fb0d3edf2553a08056 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
+726d567556b1386bee4d60a5052e28fec02676f4c044f717ea096a8ce1e7e916 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
 2fad02b3d825706affabac71c45a2a04d2143970dcf014c1586593c11dfd6fee tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
 26c3f1c0a375674f8a80b2536ed6765f85ae6b13724770767039a271650f786e tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
