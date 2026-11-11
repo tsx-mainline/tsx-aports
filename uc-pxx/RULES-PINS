@@ -4,6 +4,12 @@
 # scripts/build.sh runs it before abuild, so CI never builds (or publishes) boot
 # control that the rules do not name. Add a line only after the owner entered
 # the sha in RULES.md, with the RULES entry. One line: SHA256 PATH # entry.
+# scripts/check-rules-content.sh checks every BUILT .apk by its content as well
+# (the guarded paths, whatever the recipe declares) and the Linux Image of a
+# kernel package: a line "SHA256 linux-image:boot/uc-pxx-lts.img # entry". No
+# kernel Image line yet: RULES names no package Image (CI does not rebuild the
+# published uc-pxx-kernel-lts: --skip-existing; a new kernel package needs the
+# owner's line first).
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 usr/sbin/uc-pxx-bootctl # uc-pxx port (BOOTCTL-REVIEW)
 b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d etc/uc-pxx-mark-boot.sh # uc-pxx port
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 etc/init.d/uc-pxx-boot-ok # BOOT-OK-STATUS

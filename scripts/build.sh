@@ -458,6 +458,12 @@ while read -r PKGDIR PKGARCH; do
 				sh /repo/scripts/check-apk-pins.sh APKBUILD /repo/packages/v3.24/${PKGDIR%%/*}/$PKGARCH/$PKGNAME-$PKGVER-r$PKGREL.apk
 			fi
 		"
+	# By content, whatever the recipe declares (check-rules-content.sh): a
+	# package with boot control that the rules do not name is removed.
+	APKF=$REPO/packages/v3.24/${PKGDIR%%/*}/$PKGARCH/$PKGNAME-$PKGVER-r$PKGREL.apk
+	if [ -f "$APKF" ] && ! sh "$REPO/scripts/check-rules-content.sh" "$APKF"; then
+		rm -f "$APKF"; echo "build.sh: removed $APKF" >&2; exit 1
+	fi
 done <<EOF
 $JOBS
 EOF
