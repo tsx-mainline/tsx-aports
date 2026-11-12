@@ -296,22 +296,26 @@ jobs:
       # The seed (the fallback seed, or seed_url) is for a stable run only,
       # and only when nothing is published. A testing or promote run never
       # uses it.
+      # With a manifest, carry-forward asks only for the indexes that it lists.
+      # Pages can answer 503 for a missing file for minutes.
       - name: Carry forward the published stable tree
         env:
           SEED_URL: ${{ inputs.seed_url }}
           MODE: ${{ steps.mode.outputs.mode }}
+          HAVE_MANIFEST: ${{ steps.manifest.outputs.have }}
         run: |
           set -eu
           DEST=packages/v3.24
           case "$MODE" in testing|promote) DEST=work/stable;; esac
+          M=; [ "$HAVE_MANIFEST" != true ] || M="--manifest work/live-manifest.txt"
           case "$MODE" in
           testing|promote)
-            scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST";;
+            scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST" $M;;
           *)
             if [ -n "$SEED_URL" ]; then
               scripts/carry-forward.py --seed "$SEED_URL" --dest "$DEST"
             else
-              scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST" \
+              scripts/carry-forward.py --from "$SITE_URL" --dest "$DEST" $M \
                 --fallback-seed "https://github.com/$GITHUB_REPOSITORY/releases/download/seed/tsx-aports-seed.tar.gz"
             fi;;
           esac
@@ -321,11 +325,13 @@ jobs:
         if: steps.mode.outputs.mode != 'none'
         env:
           MODE: ${{ steps.mode.outputs.mode }}
+          HAVE_MANIFEST: ${{ steps.manifest.outputs.have }}
         run: |
           set -eu
           DEST=work/testing-live
           [ "$MODE" != testing ] || DEST=packages/v3.24
-          scripts/carry-forward.py --from "$SITE_URL/testing" --dest "$DEST"
+          M=; [ "$HAVE_MANIFEST" != true ] || M="--manifest work/live-manifest.txt --prefix testing/"
+          scripts/carry-forward.py --from "$SITE_URL/testing" --dest "$DEST" $M
           mkdir -p "$DEST"
 
       # promoted.txt lists what a promote copied to stable. Every deploy

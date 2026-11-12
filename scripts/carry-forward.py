@@ -9,7 +9,7 @@ versions, and scripts/index.sh re-indexes and signs the merged result again.
 
   scripts/carry-forward.py [--from BASE_URL] [--seed URL_OR_FILE]
                            [--fallback-seed URL_OR_FILE] [--dest DIR]
-                           [--keys DIR]
+                           [--keys DIR] [--manifest FILE [--prefix P]]
 
   --from BASE_URL        the published tree to fetch, as
                          BASE_URL/v3.24/<category>/<arch>/
@@ -31,6 +31,13 @@ versions, and scripts/index.sh re-indexes and signs the merged result again.
   --dest DIR             the destination (default packages/v3.24 in the repo).
   --keys DIR             the trusted public keys (default
                          common/tsx-keys/*.rsa.pub).
+  --manifest FILE        the manifest of the last deploy (scripts/manifest.py).
+                         An index that the manifest does not list is not
+                         published. The script does not ask the site for it.
+                         Pages can give 503 for a missing file for more than
+                         a minute, so a request for it can fail the run.
+  --prefix P             the path of the tree in the manifest: '' for stable
+                         (the default), 'testing/' for testing.
 
 The script verifies every APKINDEX.tar.gz against the committed public keys
 before it uses anything that the index lists. Every downloaded apk must match
@@ -196,12 +203,31 @@ def open_tarball(where, tmp):
     return root
 
 
-def carry(src, keys, dest):
-    """Fetch every category/arch from src into dest; return the number of indexes found."""
+def read_manifest(path):
+    """The set of paths in a manifest of scripts/manifest.py."""
+    out = set()
+    for line in open(path):
+        if line.startswith('#') or not line.strip():
+            continue
+        h, _, p = line.rstrip('\n').partition('  ')
+        if len(h) != 64 or not p:
+            raise SystemExit(f'manifest {path}: bad line {line!r}')
+        out.add(p)
+    if not out:
+        raise SystemExit(f'manifest {path} lists no file')
+    return out
+
+
+def carry(src, keys, dest, listed=None, prefix=''):
+    """Fetch every category/arch from src into dest; return the number of indexes found.
+    listed: the paths of a manifest, or None (then every index is asked for)."""
     found = 0
     for cat in CATEGORIES:
         for arch in ARCHES:
             rel = f'v3.24/{cat}/{arch}'
+            if listed is not None and f'{prefix}{rel}/APKINDEX.tar.gz' not in listed:
+                log(f'{rel}: no index published (not in the manifest)')
+                continue
             idx = src.get(f'{rel}/APKINDEX.tar.gz')
             if idx is None:
                 log(f'{rel}: no index published')
@@ -240,7 +266,12 @@ def main():
     ap.add_argument('--fallback-seed')
     ap.add_argument('--dest', default=os.path.join(REPO, 'packages', 'v3.24'))
     ap.add_argument('--keys', default=os.path.join(REPO, 'common', 'tsx-keys'))
+    ap.add_argument('--manifest')
+    ap.add_argument('--prefix', default='')
     a = ap.parse_args()
+    if a.manifest and a.seed:
+        raise SystemExit('--manifest is for --from, not for --seed')
+    listed = read_manifest(a.manifest) if a.manifest else None
 
     keys = {os.path.basename(k): k for k in glob.glob(os.path.join(a.keys, '*.rsa.pub'))}
     if not keys:
@@ -255,7 +286,7 @@ def main():
             found = carry(Source(root, True), keys, a.dest)
         else:
             log(f'fetching the published tree from {a.base}')
-            found = carry(Source(a.base, False), keys, a.dest)
+            found = carry(Source(a.base, False), keys, a.dest, listed, a.prefix)
             if found == 0 and a.fallback_seed:
                 log('nothing published yet; trying the fallback seed')
                 root = open_tarball(a.fallback_seed, tmp)

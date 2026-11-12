@@ -2,8 +2,9 @@
 # Host tests for the CI publish path (.github/workflows/build.yml):
 #   1. scripts/carry-forward.py against a local HTTP server: fetch and verify,
 #      a 404 site, a 503 that goes away (Pages gives it for a missing file)
-#      and one that stays, a tampered apk, a bad or unknown index signature, a
-#      trimmed seed tarball, and the fallback seed.
+#      and one that stays, --manifest (no request for an index that it does
+#      not list), a tampered apk, a bad or unknown index signature, a trimmed
+#      seed tarball, and the fallback seed.
 #   2. scripts/build.sh --skip-existing.
 #   3. scripts/build.sh --skip-unreachable (a 404 source, as for a kernel).
 #      scripts/build.sh --verify (no `abuild -F checksum` before the build).
@@ -73,15 +74,19 @@ $CF --from $URL --dest "$W/d1" >/dev/null 2>&1 && ok "second run over existing f
 if OUT=$($CF --from $URL/nothing-here --dest "$W/d2" 2>&1); then ok "404 (empty site) is not an error: $(echo "$OUT" | tail -1)"; else bad "404 site failed: $OUT"; fi
 
 # flaky.py DIR N: serve DIR, but answer 503 to the first N requests of each
-# path (N=-1: always 503). The port goes to stdout.
+# path (N=-1: always 503, N=-2: always 503 for a file that does not exist, as
+# Pages does at times). The port goes to stdout.
 cat > "$W/flaky.py" <<'PY'
-import functools, http.server, sys
+import functools, http.server, os, sys
 seen = {}
 class H(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
     def do_GET(self):
         n = seen[self.path] = seen.get(self.path, 0) + 1
-        if LIMIT < 0 or n <= LIMIT:
+        if LIMIT == -2:
+            if not os.path.exists(self.translate_path(self.path)):
+                self.send_error(503); return
+        elif LIMIT < 0 or n <= LIMIT:
             self.send_error(503); return
         super().do_GET()
 LIMIT = int(sys.argv[2])
@@ -101,6 +106,18 @@ kill $FS 2>/dev/null
 flaky -1
 if OUT=$(TSX_CF_RETRY_SCALE=0 $CF --from http://127.0.0.1:$FP --dest "$W/d2c" 2>&1); then bad "a 503 that stays was accepted"; else
 	case "$OUT" in *"HTTP 503"*"also after 5 more tries"*) ok "a 503 that stays fails the run after the retries";; *) bad "wrong error: $OUT";; esac; fi
+kill $FS 2>/dev/null
+flaky -2
+H=$(sha256sum "$IDX" | cut -d' ' -f1)
+printf '# manifest run=1\n%s  v3.24/common/armv7/APKINDEX.tar.gz\n' "$H" > "$W/m-stable.txt"
+printf '# manifest run=1\n%s  testing/v3.24/common/armv7/APKINDEX.tar.gz\n' "$H" > "$W/m-testing.txt"
+TSX_CF_RETRY_SCALE=0 $CF --from http://127.0.0.1:$FP --dest "$W/d2d" >/dev/null 2>&1 && bad "a lasting 503 for a missing index passed without a manifest" || ok "without a manifest, a lasting 503 for a missing index fails the run"
+if OUT=$(TSX_CF_RETRY_SCALE=0 $CF --from http://127.0.0.1:$FP --dest "$W/d2e" --manifest "$W/m-stable.txt" 2>&1) && [ "$(ls "$W"/d2e/common/armv7/*.apk | wc -l)" = 3 ]; then
+	case "$OUT" in *"trying again"*) bad "--manifest: an unlisted index was asked for: $OUT";; *"not in the manifest"*) ok "--manifest: only listed indexes are asked for (3 apks, no 503)";; *) bad "--manifest: $OUT";; esac
+else bad "--manifest failed: $OUT"; fi
+if OUT=$(TSX_CF_RETRY_SCALE=0 $CF --from http://127.0.0.1:$FP --dest "$W/d2f" --manifest "$W/m-testing.txt" --prefix testing/ 2>&1) && [ "$(ls "$W"/d2f/common/armv7/*.apk | wc -l)" = 3 ]; then
+	ok "--manifest --prefix testing/: the testing paths of the manifest"; else bad "--prefix testing/: $OUT"; fi
+OUT=$(TSX_CF_RETRY_SCALE=0 $CF --from http://127.0.0.1:$FP --dest "$W/d2g" --manifest "$W/m-testing.txt" 2>&1); [ ! -d "$W/d2g/common" ] && ok "--manifest without the right prefix: nothing is listed, nothing is fetched" || bad "wrong prefix fetched: $OUT"
 kill $FS 2>/dev/null
 
 cp -r "$W/site" "$W/tamper"; cp "$W/site/v3.24/common/armv7/tsx-fixture-1-r0.apk" "$W/tamper/v3.24/common/armv7/tsx-fixture-1-r2.apk"
