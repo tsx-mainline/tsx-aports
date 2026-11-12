@@ -12,7 +12,7 @@
 # 0.3.13: kiosk.conf moved to /usr/local/share/tsx/defaults, and the quick-settings
 # overlay reads overlay.json (cJSON). /etc/kiosk.conf holds only the changes of the user.
 pkgname=tsx-kiosk
-pkgver=0.3.13_pre20261109
+pkgver=0.3.13_pre20261111
 pkgrel=0
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -20,7 +20,7 @@ arch="armv7 aarch64"
 license="GPL-2.0-or-later"
 # The browser and the compositor patch are family packages (the meta package
 # tsx-<family>-kiosk adds them).
-depends="tsx-base>=0.3.13_pre20261109 tsx-idled tsx-splash brightnessctl cairo cjson curl font-dejavu libinput mesa-dri-gallium mesa-egl
+depends="tsx-base>=0.3.13_pre20261111 tsx-idled tsx-splash brightnessctl cairo cjson curl font-dejavu libinput mesa-dri-gallium mesa-egl
 	mesa-gbm mesa-gles python3 seatd seatd-openrc squeekboard sway swaybg wayland-libs-client wlr-randr
 	wvkbd-mobintl"
 makedepends="cairo-dev cjson-dev linux-headers wayland-dev wayland-protocols wlr-protocols"
@@ -84,5 +84,5 @@ _cursors() {
 }
 
 sha512sums="
-b28e6ee2f831270dedb0e9dee230d16ec563f4437d9b61f95f96dea68f7338b3372533be83ef1d4aa546f3564c166bef41d7c91523851d109c7f9794c26b1239  tsx-linux-common-0.3.13_pre20261109.tar.gz
+2e0742ccf0609b96d9f233d3bcca691255e6d057ae12d89443a14d3fc212bcf53d8ae42d2a796b40e91f5d64cd6a6d94c87e436a8178aa2378826b20a2cf984a  tsx-linux-common-0.3.13_pre20261111.tar.gz
 "

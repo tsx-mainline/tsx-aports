@@ -8,7 +8,7 @@
 # 0.3.13: sendspin.conf moved to /usr/local/share/tsx/defaults. /etc/tsx/sendspin.conf
 # holds only the changes of the user.
 pkgname=tsx-sendspin
-pkgver=0.3.13_pre20261109
+pkgver=0.3.13_pre20261111
 pkgrel=0
 pkgdesc="TSX Sendspin player: the service of sendspin-cli, its settings and the key SENDSPIN"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -17,7 +17,7 @@ license="GPL-2.0-or-later"
 # No kiosk, no browser and no Home Assistant layer: the player needs only the
 # client (sendspin-cli brings alsa-lib, avahi and dbus) and the base system
 # (tsx-config, board.sh). The board gives the "media" PCM in /etc/asound.conf.
-depends="tsx-base>=0.3.13_pre20261109 sendspin-cli>=0.3.0-r1"
+depends="tsx-base>=0.3.13_pre20261111 sendspin-cli>=0.3.0-r1"
 # Up to 0.3.4, tsx-ha held the service, its settings and its logrotate file.
 replaces="tsx-ha"
 install="$pkgname.pre-install $pkgname.pre-upgrade $pkgname.post-install $pkgname.post-upgrade"
@@ -35,5 +35,5 @@ package() {
 }
 
 sha512sums="
-b28e6ee2f831270dedb0e9dee230d16ec563f4437d9b61f95f96dea68f7338b3372533be83ef1d4aa546f3564c166bef41d7c91523851d109c7f9794c26b1239  tsx-linux-common-0.3.13_pre20261109.tar.gz
+2e0742ccf0609b96d9f233d3bcca691255e6d057ae12d89443a14d3fc212bcf53d8ae42d2a796b40e91f5d64cd6a6d94c87e436a8178aa2378826b20a2cf984a  tsx-linux-common-0.3.13_pre20261111.tar.gz
 "

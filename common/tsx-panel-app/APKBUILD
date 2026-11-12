@@ -17,7 +17,7 @@
 # 0.3.13: panel-app.conf moved to /usr/local/share/tsx/defaults. /etc/tsx/panel-app.conf
 # holds only the changes of the user.
 pkgname=tsx-panel-app
-pkgver=0.3.13_pre20261109
+pkgver=0.3.13_pre20261111
 pkgrel=0
 pkgdesc="TSX panel app: service, layout checker and layout editor (shared part)"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -31,7 +31,7 @@ license="GPL-2.0-or-later"
 # 0.3.5: the program runs as the user tsx-panel-app (the install scripts
 # make it). tsx-panelctl of tsx-base 0.3.5 takes its root actions, and
 # tsx-setup 0.3.5 lets it read the pairing code.
-depends="tsx-base>=0.3.13_pre20261109 tsx-setup>=0.3.6 python3"
+depends="tsx-base>=0.3.13_pre20261111 tsx-setup>=0.3.6 python3"
 install="$pkgname.pre-install $pkgname.pre-upgrade $pkgname.post-install $pkgname.post-upgrade"
 # The panel software lives in /usr/local, as in the image.
 options="!check !fhs"
@@ -52,5 +52,5 @@ package() {
 }
 
 sha512sums="
-b28e6ee2f831270dedb0e9dee230d16ec563f4437d9b61f95f96dea68f7338b3372533be83ef1d4aa546f3564c166bef41d7c91523851d109c7f9794c26b1239  tsx-linux-common-0.3.13_pre20261109.tar.gz
+2e0742ccf0609b96d9f233d3bcca691255e6d057ae12d89443a14d3fc212bcf53d8ae42d2a796b40e91f5d64cd6a6d94c87e436a8178aa2378826b20a2cf984a  tsx-linux-common-0.3.13_pre20261111.tar.gz
 "
