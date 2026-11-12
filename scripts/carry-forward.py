@@ -16,8 +16,12 @@ versions, and scripts/index.sh re-indexes and signs the merged result again.
                          (default https://tsx-aports.unexceptional.net).
                          The testing channel is the base URL with /testing.
                          The status 404 for an index means that nothing is
-                         published yet. This is not an error. Any other
-                         error fails the run.
+                         published yet. This is not an error. The script
+                         tries a temporary error again (HTTP 429, 500, 502,
+                         503, 504, or a network error), up to 6 times in
+                         about one minute. Pages sometimes gives 503 in place
+                         of 404 for a file that does not exist. An error that
+                         stays fails the run.
   --seed X               a .tar.gz of a published tree (with v3.24/... inside)
                          at a URL or a local path. The script uses it INSTEAD
                          of --from. The file must exist.
@@ -46,12 +50,17 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import urllib.error
 import urllib.request
 import zlib
 
 CATEGORIES = ('common', 'xx60', 'xx50', 'xx70', 'uc-pxx')
 ARCHES = ('armv7', 'aarch64')
+# A temporary error is tried again after these waits (seconds). The tests set
+# TSX_CF_RETRY_SCALE=0 so that they do not wait.
+RETRY_WAITS = (2, 4, 8, 16, 30)
+RETRY_CODES = (429, 500, 502, 503, 504)
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 
@@ -141,15 +150,23 @@ class Source:
         # manifest of the last deploy (scripts/manifest.py) and waits.
         req = urllib.request.Request(f'{self.base.rstrip("/")}/{rel}',
                                      headers={'User-Agent': 'tsx-aports-ci'})
-        try:
-            with urllib.request.urlopen(req, timeout=120) as r:
-                return r.read()
-        except urllib.error.HTTPError as e:
-            if e.code in (404, 410):
-                return None
-            raise SystemExit(f'{rel}: HTTP {e.code} from {self.base}')
-        except OSError as e:
-            raise SystemExit(f'{rel}: {e} ({self.base})')
+        scale = float(os.environ.get('TSX_CF_RETRY_SCALE', '1'))
+        for wait in RETRY_WAITS + (None,):
+            try:
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    return r.read()
+            except urllib.error.HTTPError as e:
+                if e.code in (404, 410):
+                    return None
+                err = f'HTTP {e.code} from {self.base}'
+                if e.code not in RETRY_CODES:
+                    raise SystemExit(f'{rel}: {err}')
+            except OSError as e:
+                err = f'{e} ({self.base})'
+            if wait is None:
+                raise SystemExit(f'{rel}: {err}, also after {len(RETRY_WAITS)} more tries')
+            warn(f'{rel}: {err}: trying again in {wait} s')
+            time.sleep(wait * scale)
 
 
 def open_tarball(where, tmp):
