@@ -96,7 +96,7 @@ $CF --from $URL --fallback-seed "$W/none.tar.gz" --dest "$W/d10" 2>&1 | grep -q 
 
 echo "== 2/3. build.sh --skip-existing / --skip-unreachable (fake docker) =="
 R=$W/repo; mkdir -p "$R/scripts" "$R/common/tsx-fixture" "$R/xx60/tsx-fixture-kernel" "$R/packages/v3.24/common/armv7" "$W/bin"
-cp "$HERE/build.sh" "$HERE/arch-image.sh" "$HERE/source-policy.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
+cp "$HERE/build.sh" "$HERE/arch-image.sh" "$HERE/source-policy.sh" "$HERE/check-rules-pins.sh" "$HERE/check-rules-content.sh" "$R/scripts/"; cp "$W"/d1/common/armv7/* "$R/packages/v3.24/common/armv7/"
 # The fake docker answers the image steps of scripts/arch-image.sh (pull, tag,
 # and `apk --print-arch`). A build (`docker run ... sh -euc SCRIPT`) prints
 # DOCKER-CALLED and its script.

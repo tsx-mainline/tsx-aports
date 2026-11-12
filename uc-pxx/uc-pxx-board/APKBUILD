@@ -33,6 +33,8 @@
 # control (uc-pxx-boot-tools 0.2.0) and the both-slot initramfs (the
 # uc-pxx-kernel-lts of the same release): /data, the root of the booted slot
 # and the slot guard of the updaters belong together (MAINLINE-LINUX-INT §7).
+# 2026-11-12: the 0.2.0 pins are in the UC-P10 safety rules (owner approval 2026-11-11)
+# (uc-pxx/RULES-PINS); the source is the tag board-v0.2.0 (uc-pxx-linux 26c95ca).
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
@@ -189,6 +191,6 @@ package() {
 }
 
 sha512sums="
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.0.tar.gz
-00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-tools-bundle.tar.zst
+5f445a76b213077b241d91891fadfcf64a1d3da5e3f116e91fc1b2a3c6f9ab53a3f277d68e22faa5f97afd2c789a455d8cf7b730494aca67f6b4e2f1b31b4211  uc-pxx-linux-0.2.0.tar.gz
+a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
 "

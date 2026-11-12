@@ -274,7 +274,7 @@ All recipes have `arch="aarch64"`, also the ones without a program. A noarch rec
 
 ### Both slots (0.2.0)
 
-`uc-pxx-board` 0.2.0, `uc-pxx-boot-tools` 0.2.0 and `uc-pxx-kernel-lts` 6.18.54_git20261110 are one release: the both-slot boot control of uc-pxx-linux (`mainline-linux-int`). The kernel package holds the both-slot initramfs (the root of the booted slot by its GPT name), `uc-pxx-boot-tools` marks the booted slot and names it (`uc-pxx-slot`), its slot-A updaters change nothing in a boot of slot B, and `uc-pxx-board` mounts `/data` itself (the image fstab has no `/data` line). `uc-pxx-board` depends on the other two at these versions. `uc-pxx-leds` 0.2.0 has the files of 0.1.0 (one tag `board-v0.2.0` for the three recipes). The new pins are not yet in the safety rules of the UC-P10: do not publish this release before the owner enters them.
+`uc-pxx-board` 0.2.0, `uc-pxx-boot-tools` 0.2.0 and `uc-pxx-kernel-lts` 6.18.54_git20261110 are one release: the both-slot boot control of uc-pxx-linux (`mainline-linux-int`). The kernel package holds the both-slot initramfs (the root of the booted slot by its GPT name), `uc-pxx-boot-tools` marks the booted slot and names it (`uc-pxx-slot`), its slot-A updaters change nothing in a boot of slot B, and `uc-pxx-board` mounts `/data` itself (the image fstab has no `/data` line). `uc-pxx-board` depends on the other two at these versions. `uc-pxx-leds` 0.2.0 has the files of 0.1.0 (one tag `board-v0.2.0` for the three recipes). The new pins are in the safety rules of the UC-P10 since 2026-11-12 (owner approval 2026-11-11) (testing channel only; on no unit until an owner line names the unit).
 
 ### Pinned files
 

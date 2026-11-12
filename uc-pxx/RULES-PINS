@@ -6,10 +6,12 @@
 # the sha in RULES.md, with the RULES entry. One line: SHA256 PATH # entry.
 # scripts/check-rules-content.sh checks every BUILT .apk by its content as well
 # (the guarded paths, whatever the recipe declares) and the Linux Image of a
-# kernel package: a line "SHA256 linux-image:boot/uc-pxx-lts.img # entry". No
-# kernel Image line yet: RULES names no package Image (CI does not rebuild the
-# published uc-pxx-kernel-lts: --skip-existing; a new kernel package needs the
-# owner's line first).
+# kernel package: a line "SHA256 linux-image:boot/uc-pxx-lts.img # entry". The
+# both-slot lines below (and the kernel Image of uc-pxx-kernel-lts
+# 6.18.54_git20261110) are the entry "Both-slot boot control and its packages"
+# that the owner approved on 2026-11-11 and that was entered in RULES.md on 2026-11-12 (part 1 of the merged RULES
+# patch). That entry allows these packages on the testing channel only, and on
+# no unit until an owner line names the unit.
 38fea6d32412e7977ebc5845b138dc1c8c2df8555dae0b64b47f8a851b45e2d7 usr/sbin/uc-pxx-bootctl # uc-pxx port (BOOTCTL-REVIEW)
 b60c9ef3aa29a7d873e890875217e78ce9bb9826818265d7bf3e22152bb69a5d etc/uc-pxx-mark-boot.sh # uc-pxx port
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 etc/init.d/uc-pxx-boot-ok # BOOT-OK-STATUS
@@ -18,3 +20,13 @@ f5f60db87d32149ac10c83e63852b2f78019fd5140cd8991579df1e8ed4d8dcd usr/sbin/uc-pxx
 4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 usr/sbin/uc-pxx-update-boot # UPDATE-BOOT-REVIEW
 a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 usr/sbin/uc-pxx-post-update # POST-UPDATE-REVIEW
 15a610e7079ddad643bdacc0f744f348bef0ee965d2fb4e6d912e848f6e1ced2 usr/local/lib/tsx/board.sh # POST-UPDATE-REVIEW (uc-pxx-board)
+11c2afcd0272f9c989f9825074186a2341d0a33a34e0fe9ebf92cf0081f9efa7 usr/sbin/uc-pxx-bootctl # both-slot boot control (BOOTCTL-11c2afcd-REVIEW)
+726d567556b1386bee4d60a5052e28fec02676f4c044f717ea096a8ce1e7e916 etc/uc-pxx-mark-boot.sh # both-slot boot control (owner Q-T7)
+2fad02b3d825706affabac71c45a2a04d2143970dcf014c1586593c11dfd6fee usr/sbin/uc-pxx-flash-boot # both-slot boot control (R-F.1)
+26c3f1c0a375674f8a80b2536ed6765f85ae6b13724770767039a271650f786e usr/sbin/uc-pxx-arm-slot # both-slot boot control (R-F.1)
+cfec605c6d4042b36aa9882efa3bf8ee1f5a186ad3a06b07a7cc351b796abe2e usr/sbin/uc-pxx-slot # both-slot boot control (R-F.1)
+9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 usr/sbin/uc-pxx-data-migrate # both-slot boot control (R-F.2)
+0e94edad81775245c704153abf7bb0469ed88e9638324b9d798a2312539d853b usr/sbin/uc-pxx-data-release # both-slot boot control (R-F.2)
+8f8632da42376defd3eabc5b11b5dd1d9121c97451e05feaa40b593c761eb4aa etc/init.d/uc-pxx-lvm # both-slot boot control (uc-pxx-board 0.2.0)
+4b808b4bb09e22933a4078082779aa59250a23a98a5eb9e886b2e3d5f49ed8b9 usr/local/sbin/uc-pxx-firmware # both-slot boot control (uc-pxx-board 0.2.0)
+85f5a417e12feabb3c8a52b246ce8b89d6f9c70d2e6994525f69ff307f13f3d7 linux-image:boot/uc-pxx-lts.img # both-slot boot control (uc-pxx-kernel-lts 6.18.54_git20261110)
