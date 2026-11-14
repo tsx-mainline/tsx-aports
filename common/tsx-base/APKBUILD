@@ -19,7 +19,7 @@
 # layer, and the old defaults in defaults/pre-split. base/src (tsx-conf.h) is source for
 # other packages and does not go on the panel.
 pkgname=tsx-base
-pkgver=0.3.13_pre20261111
+pkgver=0.3.13_pre20261113
 pkgrel=0
 pkgdesc="TSX panel base system: config, hostname, data, clock, banner and the hardware seam"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -45,5 +45,5 @@ package() {
 }
 
 sha512sums="
-2e0742ccf0609b96d9f233d3bcca691255e6d057ae12d89443a14d3fc212bcf53d8ae42d2a796b40e91f5d64cd6a6d94c87e436a8178aa2378826b20a2cf984a  tsx-linux-common-0.3.13_pre20261111.tar.gz
+3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
 "
