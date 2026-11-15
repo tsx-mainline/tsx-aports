@@ -20,8 +20,10 @@
 # the file restart-block that stops the Restart button while a board step runs.
 # 0.3.13: autoupdate.conf moved to /usr/local/share/tsx/defaults. /etc/tsx/autoupdate.conf
 # holds only the changes of the user.
+# 0.3.13_pre20261114: apk info -v with --no-network (no network call in the boot), apk
+# update with --no-logfile --timeout 20 and before the run lock (/run/tsx/autoupdate-apk.lock).
 pkgname=tsx-autoupdate
-pkgver=0.3.13_pre20261113
+pkgver=0.3.13_pre20261114
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -43,5 +45,5 @@ package() {
 }
 
 sha512sums="
-3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
+ee51722dbc5b482124ba32ae9d544abc5cf056d6095420bee54564c20b8ff3dc23e99db492992a72242bb636a4f8b374cbae6ac97a6ea34397a4a7cb18ef7ebc  tsx-linux-common-0.3.13_pre20261114.tar.gz
 "
