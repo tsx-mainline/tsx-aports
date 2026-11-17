@@ -12,9 +12,13 @@
 # both-slot release (one tag board-v0.2.0 for uc-pxx-board, uc-pxx-boot-tools
 # and this recipe, scripts/uc-pxx-source.sh). The sum at the end is all zeros
 # until that tag exists (a local build uses a snapshot, README.md).
+# 0.2.1-r0 (RC-10c, with uc-pxx-board 0.2.1, tag board-v0.2.1): the daemon reads
+# the A/B block itself (read only, O_DIRECT, the checks of uc-pxx-bootctl's
+# validate) in place of "uc-pxx-bootctl status", which wrote a kernel-log
+# line every minute (U4-HW-AUDIT D9). It no longer runs uc-pxx-bootctl.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-leds
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=0
 pkgdesc="uc-pxx LEDs: the LED daemon, its service, the command uc-pxx-led and the ESPHome plugin"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -38,5 +42,5 @@ package() {
 }
 
 sha512sums="
-5f445a76b213077b241d91891fadfcf64a1d3da5e3f116e91fc1b2a3c6f9ab53a3f277d68e22faa5f97afd2c789a455d8cf7b730494aca67f6b4e2f1b31b4211  uc-pxx-linux-0.2.0.tar.gz
+dc460516f92283138bdc88b95a941e55a85c34fd583a56993d650f3f1c2382b20946ce36d62e8f5fc6d1cfe3e7dc59a6469de428b52a9250bbef5b3e071f1733  uc-pxx-linux-0.2.1.tar.gz
 "

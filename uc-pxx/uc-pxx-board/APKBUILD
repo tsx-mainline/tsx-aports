@@ -35,6 +35,15 @@
 # and the slot guard of the updaters belong together (MAINLINE-LINUX-INT §7).
 # 2026-11-12: the 0.2.0 pins are in the UC-P10 safety rules (owner approval 2026-11-11)
 # (uc-pxx/RULES-PINS); the source is the tag board-v0.2.0 (uc-pxx-linux 26c95ca).
+# 0.2.1-r0 (RC-10c, uc-pxx-linux branch uc-pxx-rc10c-base): the shared tsx
+# audio layout in /etc/asound.conf (speaker, media, mic, one dmix, the
+# softvols Master and Media; the volume is Master), uc-pxx-audio for it (and
+# the one-time removal of the temporary 60-tsx-media-temp.conf of 2026-11-17),
+# and the passive Bluetooth proxy on by default (TSX_BT_PROXY_DEFAULT=on in
+# board.sh: the new sha 8bcdd92a... of the pinned board.sh, 15a610e7... with only
+# that default changed; tool-update review BOARDSH-8bcdd92a GO 2026-11-17, line in
+# uc-pxx/RULES-PINS). The source is the tag board-v0.2.1 (uc-pxx-linux 09dbc75 =
+# a8469fb + a CI-only commit; the board files are those of a8469fb).
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
@@ -46,7 +55,7 @@
 # the staged bundle, README.md "uc-pxx packages").
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
-pkgver=0.2.0
+pkgver=0.2.1
 pkgrel=0
 _tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
@@ -127,7 +136,7 @@ usr/sbin/uc-pxx-slot
 # userdata of step 2 (proposed for the rules, MAINLINE-LINUX-INT-2026-11-10.md
 # R-F.2). A changed copy needs a new review.
 _pins="
-15a610e7079ddad643bdacc0f744f348bef0ee965d2fb4e6d912e848f6e1ced2 tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
+8bcdd92a1bf9940b540d48c27367f1c8689e8da871212e6c767cfd3b47b8854f tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
 8f8632da42376defd3eabc5b11b5dd1d9121c97451e05feaa40b593c761eb4aa tag:rootfs/overlay/etc/init.d/uc-pxx-lvm etc/init.d/uc-pxx-lvm
 4b808b4bb09e22933a4078082779aa59250a23a98a5eb9e886b2e3d5f49ed8b9 tag:rootfs/overlay/usr/local/sbin/uc-pxx-firmware usr/local/sbin/uc-pxx-firmware
 9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 tag:rootfs/overlay/usr/sbin/uc-pxx-data-migrate usr/sbin/uc-pxx-data-migrate
@@ -191,6 +200,6 @@ package() {
 }
 
 sha512sums="
-5f445a76b213077b241d91891fadfcf64a1d3da5e3f116e91fc1b2a3c6f9ab53a3f277d68e22faa5f97afd2c789a455d8cf7b730494aca67f6b4e2f1b31b4211  uc-pxx-linux-0.2.0.tar.gz
+dc460516f92283138bdc88b95a941e55a85c34fd583a56993d650f3f1c2382b20946ce36d62e8f5fc6d1cfe3e7dc59a6469de428b52a9250bbef5b3e071f1733  uc-pxx-linux-0.2.1.tar.gz
 a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
 "
