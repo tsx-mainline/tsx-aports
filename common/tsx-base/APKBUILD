@@ -18,8 +18,10 @@
 # 0.3.13: tsx-conf-migrate, conf.sh and tsx_conf.py for the settings files with a defaults
 # layer, and the old defaults in defaults/pre-split. base/src (tsx-conf.h) is source for
 # other packages and does not go on the panel.
+# 0.3.13_pre20261117: the root password note once per interactive root login, in
+# words for a person who is logged in (tsx-rootpw note ssh); /etc/motd without it.
 pkgname=tsx-base
-pkgver=0.3.13_pre20261113
+pkgver=0.3.13_pre20261117
 pkgrel=0
 pkgdesc="TSX panel base system: config, hostname, data, clock, banner and the hardware seam"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -45,5 +47,5 @@ package() {
 }
 
 sha512sums="
-3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
+6bd972075703c925dbef9f9420e8f90ac583f313bd17a078befb7d5680bed2ba0cf1923cb9fb03c5feb620fb894f627c8b7158f65be091cda3d8e70708e9f02f  tsx-linux-common-0.3.13_pre20261117.tar.gz
 "

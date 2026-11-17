@@ -15,8 +15,11 @@
 # tsx_presence.py of tsx-base 0.3.12.
 # 0.3.13: mqtt.conf, esphome.conf and voice.conf moved to /usr/local/share/tsx/defaults.
 # The files in /etc/tsx hold only the changes of the user.
+# 0.3.13_pre20261117: tsx-btscan resets the kernel discovery state with a short
+# inquiry before a connect when Inquiry Cancel fails (BCM4345C5 answers 0x12), so the
+# active central connects after an active scan.
 pkgname=tsx-ha
-pkgver=0.3.13_pre20261113
+pkgver=0.3.13_pre20261117
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -58,5 +61,5 @@ package() {
 }
 
 sha512sums="
-3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
+6bd972075703c925dbef9f9420e8f90ac583f313bd17a078befb7d5680bed2ba0cf1923cb9fb03c5feb620fb894f627c8b7158f65be091cda3d8e70708e9f02f  tsx-linux-common-0.3.13_pre20261117.tar.gz
 "
