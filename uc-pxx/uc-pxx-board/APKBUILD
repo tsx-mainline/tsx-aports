@@ -44,6 +44,14 @@
 # that default changed; tool-update review BOARDSH-8bcdd92a GO 2026-11-17, line in
 # uc-pxx/RULES-PINS). The source is the tag board-v0.2.1 (uc-pxx-linux 09dbc75 =
 # a8469fb + a CI-only commit; the board files are those of a8469fb).
+# 0.2.2-r0 (RC-10d, owner 2026-11-17): the active Bluetooth connections on by
+# default too (TSX_BT_ACTIVE_DEFAULT=on in board.sh: the new sha 27c62b85... of
+# the pinned board.sh, 8bcdd92a... with only that default and its comments
+# added; tool-update review BOARDSH-27c62b85 GO 2026-11-17, line in
+# uc-pxx/RULES-PINS). tsx-config of tsx-base 0.3.13_pre20261118 or newer reads
+# the default; an older one keeps BT_ACTIVE off. The source is the tag
+# board-v0.2.2 (uc-pxx-linux dc49e34; the other packaged files are those of
+# board-v0.2.1).
 #
 # Sources:
 #  - the GitHub archive of the tag board-v$pkgver of uc-pxx-linux
@@ -55,7 +63,7 @@
 # the staged bundle, README.md "uc-pxx packages").
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=0
 _tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
@@ -136,7 +144,7 @@ usr/sbin/uc-pxx-slot
 # userdata of step 2 (proposed for the rules, MAINLINE-LINUX-INT-2026-11-10.md
 # R-F.2). A changed copy needs a new review.
 _pins="
-8bcdd92a1bf9940b540d48c27367f1c8689e8da871212e6c767cfd3b47b8854f tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
+27c62b8516a26535a49a80d0acd8905caa5aee64654f41fadb7b8dc4228b1cd9 tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
 8f8632da42376defd3eabc5b11b5dd1d9121c97451e05feaa40b593c761eb4aa tag:rootfs/overlay/etc/init.d/uc-pxx-lvm etc/init.d/uc-pxx-lvm
 4b808b4bb09e22933a4078082779aa59250a23a98a5eb9e886b2e3d5f49ed8b9 tag:rootfs/overlay/usr/local/sbin/uc-pxx-firmware usr/local/sbin/uc-pxx-firmware
 9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 tag:rootfs/overlay/usr/sbin/uc-pxx-data-migrate usr/sbin/uc-pxx-data-migrate
@@ -200,6 +208,6 @@ package() {
 }
 
 sha512sums="
-dc460516f92283138bdc88b95a941e55a85c34fd583a56993d650f3f1c2382b20946ce36d62e8f5fc6d1cfe3e7dc59a6469de428b52a9250bbef5b3e071f1733  uc-pxx-linux-0.2.1.tar.gz
+203f55dacc77332567277d1f457f3dfa0d5a157b49215fe75418fef1387447a4be50b9952f2a11f68a87c5a0fb202337b5ae6326a5b22d51237931fdc6263e9c  uc-pxx-linux-0.2.2.tar.gz
 a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
 "
