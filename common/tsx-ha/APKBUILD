@@ -18,8 +18,10 @@
 # 0.3.13_pre20261117: tsx-btscan resets the kernel discovery state with a short
 # inquiry before a connect when Inquiry Cancel fails (BCM4345C5 answers 0x12), so the
 # active central connects after an active scan.
+# 0.3.13_pre20261119: tsx-esphome and the voice satellite listen on all IPv4 addresses
+# and announce the current address over mDNS, never 0.0.0.0 (a new address within 5 s).
 pkgname=tsx-ha
-pkgver=0.3.13_pre20261117
+pkgver=0.3.13_pre20261119
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -61,5 +63,5 @@ package() {
 }
 
 sha512sums="
-6bd972075703c925dbef9f9420e8f90ac583f313bd17a078befb7d5680bed2ba0cf1923cb9fb03c5feb620fb894f627c8b7158f65be091cda3d8e70708e9f02f  tsx-linux-common-0.3.13_pre20261117.tar.gz
+ca0ee47dfd4c673f932cbe433a1176baea4110753b87ce21039fafefa10bcd398d6e341d2a3a3e0acd9a94987a6ab80ce4fbeed3bedcb739992d2ef25872e20b  tsx-linux-common-0.3.13_pre20261119.tar.gz
 "
