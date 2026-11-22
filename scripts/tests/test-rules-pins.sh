@@ -23,7 +23,19 @@ TSX_ALLOW_UNREVIEWED_PINS=1 sh "$S" "$T/new/APKBUILD" 2>&1 | grep -q WARNING && 
 TSX_ALLOW_UNREVIEWED_PINS=yes sh "$S" "$T/new/APKBUILD" >/dev/null 2>&1 && bad "an override other than 1 passed" || ok "only the value 1 overrides"
 sh "$S" "$HERE/uc-pxx/uc-pxx-boot-tools/APKBUILD" >/dev/null 2>&1 && st=pass || st=refused
 v=$(sed -n 's/^pkgver=//p' "$HERE/uc-pxx/uc-pxx-boot-tools/APKBUILD")
-case $v:$st in 0.1.*:pass|0.2.0:pass) ok "uc-pxx-boot-tools $v: $st (as the rules stand)";; *) bad "uc-pxx-boot-tools $v: $st";; esac
+# From 0.2.1 (the arm-only-restart set: arm-slot 818e5d1b) the recipe passes
+# only when RULES-PINS lists every one of its pins (sha256 and path), else the
+# checker refuses it.
+want=pass
+case $v in
+0.2.1)
+	awk 'NF == 3 && $1 ~ /^[0-9a-f]{64}$/ { print $1, $3 }' "$HERE/uc-pxx/uc-pxx-boot-tools/APKBUILD" > "$T/pins"
+	[ "$(wc -l < "$T/pins")" = 8 ] && ok "uc-pxx-boot-tools $v: eight pins" || bad "uc-pxx-boot-tools $v: not eight pins"
+	while read -r s p; do
+		awk -v s="$s" -v p="$p" '$1 == s && $2 == p { f = 1 } END { exit !f }' "$L" || want=refused
+	done < "$T/pins";;
+esac
+case $v:$st in 0.1.*:pass|0.2.0:pass|0.2.1:"$want") ok "uc-pxx-boot-tools $v: $st (as the rules stand)";; *) bad "uc-pxx-boot-tools $v: $st";; esac
 grep -qF 'check-rules-pins.sh" "$REPO/$PKGDIR/APKBUILD" || exit 1' "$HERE/scripts/build.sh" && ok "build.sh runs it before abuild" || bad "build.sh does not run it"
 echo "$N ok, $F failed"
 [ "$F" = 0 ]
