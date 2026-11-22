@@ -8,8 +8,12 @@
 # 0.3.12: LED_MODE=onoff and LED_KEY_N for key LEDs that are independent on/off LEDs.
 # 0.3.13: buttons.conf moved to /usr/local/share/tsx/defaults. /etc/tsx/buttons.conf holds
 # only the changes of the user.
+# 0.3.13_pre20261122 (the release integration of 2026-11-22, tsx-linux-common
+# d11b30e): the key action brightness N turns Auto brightness off, brightness
+# auto turns it on (tsx-buttons.c 5868c785...). The sum is zeros until the tag
+# v0.3.13_pre20261122 exists; then abuild checksum.
 pkgname=tsx-buttons
-pkgver=0.3.13_pre20261113
+pkgver=0.3.13_pre20261122
 pkgrel=0
 pkgdesc="TSX front-panel button daemon with its key map"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -41,5 +45,5 @@ package() {
 }
 
 sha512sums="
-3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261122.tar.gz
 "

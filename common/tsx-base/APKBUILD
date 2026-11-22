@@ -22,8 +22,15 @@
 # words for a person who is logged in (tsx-rootpw note ssh); /etc/motd without it.
 # 0.3.13_pre20261118: tsx-config takes a board default for BT_ACTIVE
 # (TSX_BT_ACTIVE_DEFAULT of board.sh; off when the board file has none).
+# 0.3.13_pre20261122 (the release integration of 2026-11-22, tsx-linux-common
+# d11b30e): a fixed level (HA Backlight, brightness N / brightness-pct P) turns
+# Auto brightness off and Auto on clears the fixed level and the offset
+# (tsx-panelctl 10ba58ac..., tsx-config 1ba3498f...); learning shifts the curve
+# instead of flattening it and the learn file records its basis
+# (tsx_brightness.py 9a5a5c2e...); udhcpc-opts -A 3 (a DHCP retry after 3 s).
+# The sum is zeros until the tag v0.3.13_pre20261122 exists; then abuild checksum.
 pkgname=tsx-base
-pkgver=0.3.13_pre20261118
+pkgver=0.3.13_pre20261122
 pkgrel=0
 pkgdesc="TSX panel base system: config, hostname, data, clock, banner and the hardware seam"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -49,5 +56,5 @@ package() {
 }
 
 sha512sums="
-c3ce78f60437690dbc1a9999f983f9ca1658f9ca8c45a736268ac7ca2030f2bdcfe04552f3376b61772d2deae2fdb93c75ac2a6a7c6fdafb798f681b9a9e71cb  tsx-linux-common-0.3.13_pre20261118.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261122.tar.gz
 "

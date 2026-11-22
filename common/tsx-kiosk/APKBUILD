@@ -11,8 +11,12 @@
 # keyboard follows KIOSK_DARK.
 # 0.3.13: kiosk.conf moved to /usr/local/share/tsx/defaults, and the quick-settings
 # overlay reads overlay.json (cJSON). /etc/kiosk.conf holds only the changes of the user.
+# 0.3.13_pre20261122 (the release integration of 2026-11-22, tsx-linux-common
+# d11b30e): kiosk-session waits up to KIOSK_URL_WAIT (30 s) for the server of
+# KIOSK_URL before the browser starts. The sum is zeros until the tag
+# v0.3.13_pre20261122 exists; then abuild checksum.
 pkgname=tsx-kiosk
-pkgver=0.3.13_pre20261113
+pkgver=0.3.13_pre20261122
 pkgrel=0
 pkgdesc="TSX kiosk: session script, orientation, on-screen keyboard and quick-settings overlay"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -84,5 +88,5 @@ _cursors() {
 }
 
 sha512sums="
-3168beb06c514e89c9277533c98504460d4ca717bd6f9be6eea759f48548b2d7b612bcac50577bad00a0c5956308057f2cf2ae26e63db06185fb9369c6921198  tsx-linux-common-0.3.13_pre20261113.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261122.tar.gz
 "

@@ -22,8 +22,13 @@
 # holds only the changes of the user.
 # 0.3.13_pre20261114: apk info -v with --no-network (no network call in the boot), apk
 # update with --no-logfile --timeout 20 and before the run lock (/run/tsx/autoupdate-apk.lock).
+# 0.3.13_pre20261122 (the release integration of 2026-11-22, tsx-linux-common
+# d11b30e = 9a05383 for this package): the restart class by files
+# (tsx-restart-class fb1abd8d...), the fetch by bare name (apk-tools 3), and no
+# restart while the board step is open (tsx-autoupdate c89565fe...). The sum is
+# zeros until the tag v0.3.13_pre20261122 exists; then abuild checksum.
 pkgname=tsx-autoupdate
-pkgver=0.3.13_pre20261114
+pkgver=0.3.13_pre20261122
 pkgrel=0
 pkgdesc="TSX automatic update of the panel packages"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -45,5 +50,5 @@ package() {
 }
 
 sha512sums="
-ee51722dbc5b482124ba32ae9d544abc5cf056d6095420bee54564c20b8ff3dc23e99db492992a72242bb636a4f8b374cbae6ac97a6ea34397a4a7cb18ef7ebc  tsx-linux-common-0.3.13_pre20261114.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261122.tar.gz
 "
