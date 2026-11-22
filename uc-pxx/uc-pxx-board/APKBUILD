@@ -70,10 +70,23 @@ pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
+# The tsx-base floor (BRIGHTNESS-CURVE-LEARN 2026-11-21, review MAJOR-1): the
+# board with the stock curve (uc-pxx-linux 12d666d/d43d033: ALS_CURVE,
+# ALS_CURVE_SPLINE, ALS_SCALE=4) needs the learning of tsx-linux-common
+# 7d0e4a8, the tsx_brightness.py with sha256
+# 083e2caeebd47289df1607906fe1fe7092d32e39b9789bc36ff5b1d7feb77dde (or a
+# later one). With an older tsx-base, one learned bright-room point makes the
+# stock curve flat (unit 2, 2026-11-21). _tsx_base_floor is that tsx-base as
+# pkgver-rpkgrel. PLACEHOLDER: the version is not decided yet; the release
+# integration sets it (0.3.13_pre20261122 is the data-epoch tsx-base, and other
+# branches land in tsx-base too). scripts/tests/test-board-tsx-base-floor.sh
+# fails while it is the placeholder. Publish order on testing: that tsx-base
+# first, or in the same index update.
+_tsx_base_floor=PLACEHOLDER-SET-BY-RELEASE-INTEGRATION
 # e2fsprogs: mkfs.ext4 and e2fsck of uc-pxx-data-migrate; util-linux-misc:
 # blkdiscard. The kernel floor is the first kernel package with the
 # both-slot initramfs.
-depends="alsa-utils e2fsprogs evtest iw lvm2 python3 tsx-autoupdate>=0.3.12 tsx-base>=0.3.12 uc-pxx-boot-tools>=0.2.0-r0
+depends="alsa-utils e2fsprogs evtest iw lvm2 python3 tsx-autoupdate>=0.3.12 tsx-base>=$_tsx_base_floor uc-pxx-boot-tools>=0.2.0-r0
 	uc-pxx-kernel-lts>=6.18.54_git20261110-r0 util-linux-misc wireless-regdb"
 # /etc/securetty replaces the one of busybox (and of tsx-base up to 0.2.1).
 replaces="busybox tsx-base"
