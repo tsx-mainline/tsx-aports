@@ -71,11 +71,12 @@ url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
 license="GPL-2.0-or-later"
 # The tsx-base floor (BRIGHTNESS-CURVE-LEARN 2026-11-21, review MAJOR-1): the
-# board with the stock curve (uc-pxx-linux 12d666d/d43d033: ALS_CURVE,
-# ALS_CURVE_SPLINE, ALS_SCALE=4) needs the learning of tsx-linux-common
-# 7d0e4a8, the tsx_brightness.py with sha256
-# 083e2caeebd47289df1607906fe1fe7092d32e39b9789bc36ff5b1d7feb77dde (or a
-# later one). With an older tsx-base, one learned bright-room point makes the
+# board with the stock curve (uc-pxx-linux 12d666d/d43d033/b48ddaf:
+# ALS_CURVE, ALS_CURVE_SPLINE, ALS_SCALE=4, the one-time conversion of old
+# learn files) needs the learning and the file basis of tsx-linux-common
+# 4f3f9ce, the tsx_brightness.py with sha256
+# 9a5a5c2e23809907cfc7e18e596192ffd66de802c15689bc536bafeaa49cc62f (or a
+# later one; 7d0e4a8 = 083e2cae... has the learning without the basis). With an older tsx-base, one learned bright-room point makes the
 # stock curve flat (unit 2, 2026-11-21). _tsx_base_floor is that tsx-base as
 # pkgver-rpkgrel. PLACEHOLDER: the version is not decided yet; the release
 # integration sets it (0.3.13_pre20261122 is the data-epoch tsx-base, and other

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Host test: the tsx-base floor of uc-pxx-board (BRIGHTNESS-CURVE-LEARN
 # 2026-11-21, review MAJOR-1). The board with the stock curve needs the
-# tsx_brightness.py 083e2cae... of tsx-linux-common 7d0e4a8 or later. The
+# tsx_brightness.py 9a5a5c2e... of tsx-linux-common 4f3f9ce or later. The
 # recipe names that tsx-base in _tsx_base_floor, and depends uses it. Until the
 # release integration sets the version, the value is a placeholder and this
 # test FAILS on purpose. It needs no network and no docker. With apk on the
@@ -18,10 +18,10 @@ deps=$(awk '/^depends="/ { d = 1 } d { print } d && /"$/ && NR > 0 && !/^depends
 [ -n "$floor" ] && ok "the recipe sets _tsx_base_floor ($floor)" || bad "no _tsx_base_floor in $R"
 case $deps in *'tsx-base>=$_tsx_base_floor'*) ok "depends uses it: tsx-base>=\$_tsx_base_floor";;
 	*) bad "depends does not use _tsx_base_floor: $deps";; esac
-grep -q '083e2caeebd47289df1607906fe1fe7092d32e39b9789bc36ff5b1d7feb77dde' "$R" \
-	&& ok "the recipe names the tsx_brightness.py that the floor must carry" || bad "the recipe does not name 083e2cae..."
+grep -q '9a5a5c2e23809907cfc7e18e596192ffd66de802c15689bc536bafeaa49cc62f' "$R" \
+	&& ok "the recipe names the tsx_brightness.py that the floor must carry" || bad "the recipe does not name 9a5a5c2e..."
 case $floor in
-*PLACEHOLDER*) bad "_tsx_base_floor is still the placeholder: the release integration sets the first tsx-base with tsx_brightness.py 083e2cae... (pkgver-rpkgrel)";;
+*PLACEHOLDER*) bad "_tsx_base_floor is still the placeholder: the release integration sets the first tsx-base with tsx_brightness.py 9a5a5c2e... (pkgver-rpkgrel)";;
 *)
 	if printf '%s' "$floor" | grep -Eq '^[0-9]+(\.[0-9]+)*(_(pre|p|rc)[0-9]+)*(-r[0-9]+)?$'; then ok "the floor has the form of an apk version"; else bad "the floor is not a version: $floor"; fi
 	if command -v apk >/dev/null 2>&1; then
