@@ -32,3 +32,5 @@ cfec605c6d4042b36aa9882efa3bf8ee1f5a186ad3a06b07a7cc351b796abe2e usr/sbin/uc-pxx
 85f5a417e12feabb3c8a52b246ce8b89d6f9c70d2e6994525f69ff307f13f3d7 linux-image:boot/uc-pxx-lts.img # both-slot boot control (uc-pxx-kernel-lts 6.18.54_git20261110)
 8bcdd92a1bf9940b540d48c27367f1c8689e8da871212e6c767cfd3b47b8854f usr/local/lib/tsx/board.sh # uc-pxx-board 0.2.1 (RC-10c; tool-update review BOARDSH-8bcdd92a-REVIEW-2026-11-17, GO)
 27c62b8516a26535a49a80d0acd8905caa5aee64654f41fadb7b8dc4228b1cd9 usr/local/lib/tsx/board.sh # uc-pxx-board 0.2.2 (RC-10d; tool-update review BOARDSH-27c62b85-REVIEW-2026-11-18, GO)
+5f892830f17989baca47e6a105fb9e310356dd19eca5ab321194b1354e86c253 usr/local/lib/tsx/board.sh # uc-pxx-board 0.2.4 (the arm-only-restart set; RULES-TOOLS board-step entry, bullet "board.sh 5f892830…, tsx-autoupdate … and tsx-restart-class fb1abd8d…"; reviews ARM-ONLY-RESTART-REVIEW + -FILES-REVIEW, GO)
+818e5d1b2784c98182c9dbdff95e684e56baa0490948e33e9f6ff8cb18495c7f usr/sbin/uc-pxx-arm-slot # uc-pxx-boot-tools 0.2.1 (the arm-only-restart set: 26c3f1c0 + the eMMC reliable-write precondition; ARM-ONLY-RESTART-FILES-REVIEW re-look 2 GO)
