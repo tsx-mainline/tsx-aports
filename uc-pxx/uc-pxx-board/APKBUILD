@@ -62,9 +62,10 @@
 # release uc-pxx-tools-20261110 exist (a local build uses a snapshot and
 # the staged bundle, README.md "uc-pxx packages").
 # 0.2.4-r0 (the release integration of 2026-11-22; uc-pxx-linux tag
-# board-v0.2.4 = release-board-v0.2.4 75a00b7: arm-only-restart 79ef752 +
-# hooks-test-fetch-by-name ded9aa5 + als-stock-curve b48ddaf; board-v0.2.3 is
-# never made, BOOTTOOLS-MERGED-REVIEW-2026-11-21 MINOR-4): board.sh
+# board-v0.2.4 on release-board-v0.2.4 5cc049c = 75a00b7 (arm-only-restart
+# 79ef752 + hooks-test-fetch-by-name ded9aa5 + als-stock-curve b48ddaf) + the
+# CI-only COMMON_REF; board-v0.2.3 is never made,
+# BOOTTOOLS-MERGED-REVIEW-2026-11-21 MINOR-4): board.sh
 # 5f892830... (arm slot A only for an update that needs a restart, the restart
 # class by files on, the install check; RULES-TOOLS, the board-step entry), the
 # stock curve of the factory Android as the UC-P10 default (ALS_CURVE, the
