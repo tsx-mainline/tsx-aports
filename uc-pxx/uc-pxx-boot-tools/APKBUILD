@@ -55,10 +55,26 @@
 # tag archive, and scripts/stage-uc-pxx-tools.sh writes the bundle. Then
 # run abuild checksum (README.md "uc-pxx packages"). Do not commit the sums of a
 # local snapshot.
+# 0.2.1-r0 (the arm-only-restart set; RULES-TOOLS, the board-step entry, the
+# bullet of board.sh 5f892830, tsx-autoupdate and tsx-restart-class, and its
+# tsx-autoupdate c89565fe sub-bullet): uc-pxx-arm-slot 818e5d1b... = 26c3f1c0...
+# plus the eMMC reliable-write precondition before the lock, the marker and
+# any write (queue/fua 1, queue/write_cache "write back", EXT_CSD byte 166
+# bit 2, byte 167 0x1f, byte 222 1; else exit 1, nothing changed). The other
+# seven files are those of 0.2.0-r1; the list boot-control.sha256 is
+# 90de77931c14924b4e2c40cae7d379b4b53a76224f9b5e2c0c91b48d353cf8d6 (eight lines,
+# one changed). The file set ran on unit 2 as the private test build
+# 0.2.1_pre20261120-r0 (U2-AR, U2-AR2 PASS 2026-11-21). The source is the tag
+# board-v0.2.4 of uc-pxx-linux (_srctag), not board-v$pkgver: the tag
+# board-v0.2.1 exists and holds arm-slot 26c3f1c0, and board-v0.2.3 is never
+# made (BOOTTOOLS-MERGED-REVIEW-2026-11-21 MINOR-4). The tag-archive sum is
+# zeros until board-v0.2.4 exists; then abuild checksum.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
-pkgver=0.2.0
-pkgrel=1
+pkgver=0.2.1
+pkgrel=0
+_srctag=board-v0.2.4
+_srcver=${_srctag#board-v}
 _tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, uc-pxx-slot, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
@@ -66,11 +82,11 @@ arch="aarch64"
 license="GPL-2.0-or-later"
 depends="busybox openrc python3"
 options="!strip"
-source="uc-pxx-linux-$pkgver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/board-v$pkgver.tar.gz
+source="uc-pxx-linux-$_srcver.tar.gz::https://github.com/tsx-mainline/uc-pxx-linux/archive/refs/tags/$_srctag.tar.gz
 	https://github.com/tsx-mainline/tsx-aports/releases/download/$_tbundle_tag/uc-pxx-tools-bundle.tar.zst
 	uc-pxx-update-boot
 	"
-builddir="$srcdir/uc-pxx-linux-board-v$pkgver"
+builddir="$srcdir/uc-pxx-linux-$_srctag"
 
 # sha256, the file in the sources (bundle: the tools bundle, tag: the tag
 # archive), the path in the package. The values are the reviewed files of the
@@ -91,7 +107,7 @@ _pins="
 726d567556b1386bee4d60a5052e28fec02676f4c044f717ea096a8ce1e7e916 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
 2fad02b3d825706affabac71c45a2a04d2143970dcf014c1586593c11dfd6fee tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
-26c3f1c0a375674f8a80b2536ed6765f85ae6b13724770767039a271650f786e tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
+818e5d1b2784c98182c9dbdff95e684e56baa0490948e33e9f6ff8cb18495c7f tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
 4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
 a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 tag:rootfs/overlay/usr/sbin/uc-pxx-post-update usr/sbin/uc-pxx-post-update
 cfec605c6d4042b36aa9882efa3bf8ee1f5a186ad3a06b07a7cc351b796abe2e tag:rootfs/overlay/usr/sbin/uc-pxx-slot usr/sbin/uc-pxx-slot
@@ -157,7 +173,7 @@ package() {
 }
 
 sha512sums="
-5f445a76b213077b241d91891fadfcf64a1d3da5e3f116e91fc1b2a3c6f9ab53a3f277d68e22faa5f97afd2c789a455d8cf7b730494aca67f6b4e2f1b31b4211  uc-pxx-linux-0.2.0.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.4.tar.gz
 a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
 409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
 "

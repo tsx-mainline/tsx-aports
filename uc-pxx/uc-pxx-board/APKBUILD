@@ -61,9 +61,20 @@
 # The sums at the end are all zeros until the tag board-v0.2.0 and the
 # release uc-pxx-tools-20261110 exist (a local build uses a snapshot and
 # the staged bundle, README.md "uc-pxx packages").
+# 0.2.4-r0 (the release integration of 2026-11-22; uc-pxx-linux tag
+# board-v0.2.4 = release-board-v0.2.4 75a00b7: arm-only-restart 79ef752 +
+# hooks-test-fetch-by-name ded9aa5 + als-stock-curve b48ddaf; board-v0.2.3 is
+# never made, BOOTTOOLS-MERGED-REVIEW-2026-11-21 MINOR-4): board.sh
+# 5f892830... (arm slot A only for an update that needs a restart, the restart
+# class by files on, the install check; RULES-TOOLS, the board-step entry), the
+# stock curve of the factory Android as the UC-P10 default (ALS_CURVE, the
+# spline, ALS_SCALE 4, the stock debounce 4 s / 8 s in
+# etc/tsx/panel-board.d/default.conf c2ce36b3...) and uc-pxx-als ca09c225...
+# (converts an old learn file once). The other four pins are unchanged. The
+# tag-archive sum is zeros until board-v0.2.4 exists; then abuild checksum.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-board
-pkgver=0.2.2
+pkgver=0.2.4
 pkgrel=0
 _tbundle_tag=uc-pxx-tools-20261110
 pkgdesc="uc-pxx board layer: board file, hardware tools, services, audio and the switch tool"
@@ -78,12 +89,11 @@ license="GPL-2.0-or-later"
 # 9a5a5c2e23809907cfc7e18e596192ffd66de802c15689bc536bafeaa49cc62f (or a
 # later one; 7d0e4a8 = 083e2cae... has the learning without the basis). With an older tsx-base, one learned bright-room point makes the
 # stock curve flat (unit 2, 2026-11-21). _tsx_base_floor is that tsx-base as
-# pkgver-rpkgrel. PLACEHOLDER: the version is not decided yet; the release
-# integration sets it (0.3.13_pre20261122 is the data-epoch tsx-base, and other
-# branches land in tsx-base too). scripts/tests/test-board-tsx-base-floor.sh
-# fails while it is the placeholder. Publish order on testing: that tsx-base
-# first, or in the same index update.
-_tsx_base_floor=PLACEHOLDER-SET-BY-RELEASE-INTEGRATION
+# pkgver-rpkgrel: tsx-base 0.3.13_pre20261122-r0 of the release integration of
+# 2026-11-22 (tsx-linux-common d11b30e, the first tsx-base with 9a5a5c2e...).
+# scripts/tests/test-board-tsx-base-floor.sh checks the form. Publish order on
+# testing: that tsx-base first, or in the same index update.
+_tsx_base_floor=0.3.13_pre20261122-r0
 # e2fsprogs: mkfs.ext4 and e2fsck of uc-pxx-data-migrate; util-linux-misc:
 # blkdiscard. The kernel floor is the first kernel package with the
 # both-slot initramfs.
@@ -158,7 +168,7 @@ usr/sbin/uc-pxx-slot
 # userdata of step 2 (proposed for the rules, MAINLINE-LINUX-INT-2026-11-10.md
 # R-F.2). A changed copy needs a new review.
 _pins="
-27c62b8516a26535a49a80d0acd8905caa5aee64654f41fadb7b8dc4228b1cd9 tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
+5f892830f17989baca47e6a105fb9e310356dd19eca5ab321194b1354e86c253 tag:rootfs/overlay/usr/local/lib/tsx/board.sh usr/local/lib/tsx/board.sh
 8f8632da42376defd3eabc5b11b5dd1d9121c97451e05feaa40b593c761eb4aa tag:rootfs/overlay/etc/init.d/uc-pxx-lvm etc/init.d/uc-pxx-lvm
 4b808b4bb09e22933a4078082779aa59250a23a98a5eb9e886b2e3d5f49ed8b9 tag:rootfs/overlay/usr/local/sbin/uc-pxx-firmware usr/local/sbin/uc-pxx-firmware
 9162c65df08ac5577e38a2fe124d8cb1434b9b2bcfe787d6fba76055b8006791 tag:rootfs/overlay/usr/sbin/uc-pxx-data-migrate usr/sbin/uc-pxx-data-migrate
@@ -222,6 +232,6 @@ package() {
 }
 
 sha512sums="
-203f55dacc77332567277d1f457f3dfa0d5a157b49215fe75418fef1387447a4be50b9952f2a11f68a87c5a0fb202337b5ae6326a5b22d51237931fdc6263e9c  uc-pxx-linux-0.2.2.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.4.tar.gz
 a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
 "
