@@ -266,9 +266,16 @@ The uc-pxx family is the Crestron UC-P10 (and the UC-P8, which has no unit for a
 | `uc-pxx-boot-tools` | The A/B boot control: `uc-pxx-bootctl`, `uc-pxx-mark-boot.sh` with the service `uc-pxx-boot-ok`, `uc-pxx-flash-boot`, `uc-pxx-arm-slot`, `uc-pxx-reboot` with `uc-pxx-reboot-syscall`, `uc-pxx-update-boot`, `uc-pxx-post-update`, and from 0.2.0 `uc-pxx-slot` | tag archive, tools bundle, `uc-pxx-update-boot` of this repo |
 | `uc-pxx-leds` | `packages/uc-pxx-leds` of uc-pxx-linux (FILES and root/) | tag archive |
 | `uc-pxx-kernel-lts` | `/boot/uc-pxx-lts.img` (no resource, see below), `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-lts.release` and the two device trees in `/usr/share/uc-pxx/dtbs-lts/` | kernel bundle |
+| `uc-pxx-kernel-stable` | The same files for the stable flavor (Linux 7.3.y): `/boot/uc-pxx-stable.img`, `/lib/modules/<release>/`, `/usr/share/uc-pxx/kernel-stable.release`, `/usr/share/uc-pxx/dtbs-stable/` (see "The stable flavor") | kernel bundle |
 | `uc-pxx-console`, `uc-pxx-kiosk`, `uc-pxx-ha` | Meta packages of the image profiles of uc-pxx-linux | none |
 
 The image build of uc-pxx-linux (`rootfs/build-rootfs.sh` without the DEV options) installs `uc-pxx-<profile>` and the packages of its `rootfs/packages-tsx.txt` (with `uc-pxx-kernel-lts` and `uc-pxx-leds`). Its `rootfs/check-kernel-pins.sh` reads `/boot/uc-pxx-lts.img` and `/usr/share/uc-pxx/kernel-lts.release`.
+
+### The stable flavor
+
+`uc-pxx-kernel-stable` packages the kernel of the branch `uc-pxx-stable` (Linux 7.3.y) of https://github.com/tsx-mainline/linux, pinned by `kernel/KERNEL_REV.stable` of uc-pxx-linux. It installs next to `uc-pxx-kernel-lts`. The two packages share no file. The release default stays LTS: the images of uc-pxx-linux and the installer install only `uc-pxx-kernel-lts`.
+
+`KERNEL_FLAVOR` of `tsx-config` selects the flavor that the update path writes into `boot_a` (from `uc-pxx-boot-tools` 0.2.4, which `uc-pxx-kernel-stable` depends on; 0.2.3 was a test build only). Not set or empty is `lts`. `uc-pxx-update-boot` has two fixed pairs of paths (`/boot/uc-pxx-<flavor>.img`, `/usr/share/uc-pxx/kernel-<flavor>.release`) and gives the stable image the same checks as the LTS image. Any other value of `KERNEL_FLAVOR` is refused: `uc-pxx-post-update` checks it (`uc-pxx-update-boot flavor`) before it arms slot A and stops with 1, nothing armed or written. With `stable` and no `/boot/uc-pxx-stable.img` (the package not installed) the tool uses the LTS image and says so; it never falls back to stable. The install and upgrade scripts of `uc-pxx-kernel-stable` write nothing: they run `uc-pxx-update-boot --hook stable`, which only reports. A switch is a normal kernel update through `tsx-autoupdate` (uc-pxx-linux `docs/boot-control.md` "Kernel flavors"). `scripts/check-rules-content.sh` checks the Linux Image of `/boot/uc-pxx-stable.img` against its own `linux-image:boot/uc-pxx-stable.img` line in `uc-pxx/RULES-PINS`. RULES-PINS has no such line, so CI refuses the package until the safety rules name its Image.
 
 All recipes have `arch="aarch64"`, also the ones without a program. A noarch recipe goes to the armv7 folder of its category when it is built on its own.
 
@@ -286,7 +293,7 @@ The Android boot image of the UC-P10 has a Rockchip resource for U-Boot in its "
 
 `uc-pxx-update-boot` (package `uc-pxx-boot-tools`) makes the complete image on the panel:
 
-1. It checks the package image: header version 0, page size 2048, no second part, a build token, the id field, the model of its device tree and the kernel release.
+1. It takes the package image of the flavor of `KERNEL_FLAVOR` (see "The stable flavor") and checks it: header version 0, page size 2048, no second part, a build token, the id field, the model of its device tree and the kernel release.
    It also checks that `uc-pxx.id=` on the command line of the embedded device tree is the header token.
 2. It reads the boot image header of `boot_b` (read only) and takes its second part. The resource must have the RSCE layout with an `rk-kernel.dtb` entry, and its sha256 must be on the list of approved resources of the model (`RESOURCES` in the tool). The UC-P10 has one: the stock resource `290ef405...`. The UC-P8 has none yet, so the tool refuses a UC-P8. The tool has no option to skip this check.
 3. It puts the resource into a copy of the package image and checks the result again from its own bytes. The result has the same bytes as `kernel/mkimage.sh --resource` with that resource (tested with the v4 image of the UC-P10). It writes the image to a new file with a unique name in `/run/uc-pxx`. That folder must be a real folder of root with mode 0700, and a lock in it allows one run at a time.
@@ -294,7 +301,7 @@ The Android boot image of the UC-P10 has a Rockchip resource for U-Boot in its "
 
 As root the tool uses only its fixed paths: the `UC_PXX_*` variables of the host test have no effect. `assemble` and `extract` write only a new file (not an existing path, not a link, not in `/dev`).
 
-The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook`, which only says if `boot_a` holds the kernel of the package. `tsx-autoupdate` writes the kernel: after each install it runs the board hook `tsx_board_post_update` of `uc-pxx-board`, which runs `/usr/sbin/uc-pxx-post-update` of `uc-pxx-boot-tools` before the restart. The script checks the reviewed files and the sha256 of `uc-pxx-update-boot`, arms slot A, runs `uc-pxx-update-boot write --yes` and checks the A/B state. A failed step stops the restart (uc-pxx-linux `docs/boot-control.md` "Kernel updates"). After a plain `apk upgrade`, run `tsx-autoupdate post-update` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
+The install and upgrade scripts of `uc-pxx-kernel-lts` write nothing. They run `uc-pxx-update-boot --hook` (the same as `--hook lts`), which only says if `boot_a` holds the kernel of the package, or that the update path writes the other flavor. `tsx-autoupdate` writes the kernel: after each install it runs the board hook `tsx_board_post_update` of `uc-pxx-board`, which runs `/usr/sbin/uc-pxx-post-update` of `uc-pxx-boot-tools` before the restart. The script checks the reviewed files, the sha256 of `uc-pxx-update-boot` and the kernel flavor, arms slot A, runs `uc-pxx-update-boot write --yes` and checks the A/B state. A failed step stops the restart (uc-pxx-linux `docs/boot-control.md` "Kernel updates"). After a plain `apk upgrade`, run `tsx-autoupdate post-update` and reboot. The host test is `scripts/tests/test-uc-pxx-update-boot.sh`.
 
 ### Sources and local build
 
@@ -303,7 +310,7 @@ The recipes use the signed tag `board-v$pkgver` of uc-pxx-linux and the tsx-apor
 1. Run `scripts/uc-pxx-source.sh REPO REF` on the workstation. It writes the archive of a uc-pxx-linux commit into the `dist/` of the three recipes and the sum into each recipe. A commit that is not the tag is a snapshot, and the script says so.
 2. Copy the repository to the build host (BUILD_DIR).
 3. On the build host, run `scripts/stage-uc-pxx-tools.sh BOOTCTL REBOOT_SYSCALL RTL8363_INIT NOTE` with the static programs of `tools/` of uc-pxx-linux.
-4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. The script makes one boot image for each model with a new build token.
+4. On the build host, run `scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX [FLAVOR]`. KOUT is the output folder of `ci/build-kernel.sh` of uc-pxx-linux. FLAVOR is `lts` (the default) or `stable`. The script makes one boot image for each model with a new build token.
 5. Copy the changed APKBUILDs back, check the diff, and build with `scripts/build.sh --arch aarch64 uc-pxx/<pkg>`.
 
 To publish, push the tag of uc-pxx-linux, make the two releases of this repository with the staged bundles (unchanged), run `abuild checksum` for the four recipes with the tag archive or a bundle, and check that the content is the same. Do not commit the sums of a local snapshot.

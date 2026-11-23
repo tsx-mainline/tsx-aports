@@ -5,7 +5,8 @@
 # service uc-pxx-boot-ok, the flash wrapper uc-pxx-flash-boot, the helper
 # uc-pxx-arm-slot, uc-pxx-reboot (the loader and fastboot modes, a script
 # with the program uc-pxx-reboot-syscall), uc-pxx-update-boot (puts
-# the boot image of uc-pxx-kernel-lts into boot_a through the two wrappers)
+# the boot image of the selected kernel flavor, uc-pxx-kernel-lts or
+# uc-pxx-kernel-stable, into boot_a through the two wrappers)
 # and uc-pxx-post-update (the board step of tsx-autoupdate after an install:
 # it checks the reviewed files, arms slot A, runs uc-pxx-update-boot write
 # --yes and checks the A/B state before a restart).
@@ -30,6 +31,31 @@
 # mark-boot 726d5675...; NOT yet reviewed for the safety rules).
 # 2026-11-12: the 0.2.0 pins are in the UC-P10 safety rules (owner approval 2026-11-11)
 # (uc-pxx/RULES-PINS); the source is the tag board-v0.2.0 (uc-pxx-linux 26c95ca).
+# 0.2.3-r0: the kernel flavor. uc-pxx-update-boot reads KERNEL_FLAVOR of
+# tsx-config (lts, the default, or stable) and writes the image of that
+# flavor, with the same checks; an unknown value is refused, and stable
+# without its image installed falls back to lts (never the other way).
+# uc-pxx-post-update checks the flavor (uc-pxx-update-boot flavor) before it
+# arms slot A, and pins the new uc-pxx-update-boot. The other six pinned
+# files are those of 0.2.0-r1. The source is the tag board-v0.2.3 (not yet
+# made: the sum of its archive is zeros until it exists). The two new pins
+# are NOT yet in the safety rules (uc-pxx/RULES-PINS has no line for them):
+# CI refuses the package until they are entered
+# (plan/uc-pxx/KERNEL-FLAVOR-SWITCH-2026-11-18.md). 0.2.3-r0 was a private test
+# build only (never published); 0.2.4 takes its place.
+# 0.2.4-r0: one release of the boot tools that were reviewed apart: the kernel
+# flavor of 0.2.3 (uc-pxx-update-boot b7e9304c..., uc-pxx-post-update
+# a188f10a...), uc-pxx-arm-slot 818e5d1b... (the eMMC reliable-write
+# precondition before an arm; 0.2.1, ARM-ONLY-RESTART), and uc-pxx-bootctl
+# 2a8a1066... (the same precondition in the program before every A/B write)
+# with the mark hook 8235066b... (BOOTCTL-RELWRITE). The other three pinned
+# files are those of 0.2.0-r1. The source is the tag board-v0.2.4 (not yet
+# made: the sum of its archive is zeros until it exists) on the uc-pxx-linux
+# merge of these branches; the tools bundle is the release
+# uc-pxx-tools-20261121 (uc-pxx-bootctl 2a8a1066, the other two programs of
+# uc-pxx-tools-20261110 unchanged). The five changed pins are NOT yet in
+# uc-pxx/RULES-PINS: CI refuses the package until they are entered
+# (plan/uc-pxx/BOOTTOOLS-MERGED-2026-11-21.md).
 #
 # PINNED FILES. Five files of this package may write the A/B metadata (misc LBA
 # 49156) of a panel, and two more run them without a person
@@ -69,13 +95,21 @@
 # board-v0.2.1 exists and holds arm-slot 26c3f1c0, and board-v0.2.3 is never
 # made (BOOTTOOLS-MERGED-REVIEW-2026-11-21 MINOR-4). The tag-archive sum is
 # zeros until board-v0.2.4 exists; then abuild checksum.
+# 0.2.4-r1: the testing publish of 0.2.4 (the same files as the private
+# 0.2.4-r0 that ran on unit 2, a version above it). The source is the tag
+# board-v0.2.5 of uc-pxx-linux (_srctag), not board-v$pkgver: the tag
+# board-v0.2.4 is the release integration of 2026-11-22 and holds the 0.2.1
+# files. board-v0.2.5 is the merge of uc-pxx-boot-tools-0.2.4 (add8ef3d) into
+# that release (5cc049c); its boot-tools files are those of add8ef3d. The
+# five changed pins are in uc-pxx/RULES-PINS with this publish. The
+# tag-archive sum is zeros until board-v0.2.5 exists; then abuild checksum.
 SRCDEST="$startdir/dist"
 pkgname=uc-pxx-boot-tools
-pkgver=0.2.1
-pkgrel=0
-_srctag=board-v0.2.4
+pkgver=0.2.4
+pkgrel=1
+_srctag=board-v0.2.5
 _srcver=${_srctag#board-v}
-_tbundle_tag=uc-pxx-tools-20261110
+_tbundle_tag=uc-pxx-tools-20261121
 pkgdesc="uc-pxx A/B boot control: uc-pxx-bootctl, uc-pxx-slot, the boot-marking hook, the flash wrapper and uc-pxx-update-boot"
 url="https://github.com/tsx-mainline/uc-pxx-linux"
 arch="aarch64"
@@ -92,24 +126,28 @@ builddir="$srcdir/uc-pxx-linux-$_srctag"
 # archive), the path in the package. The values are the reviewed files of the
 # uc-pxx boot control (rule 9 exception of the UC-P10 safety rules).
 # uc-pxx-update-boot is a caller of the two wrappers. Its sha256 is the one
-# that the review passed (GO in round 2, plan/uc-pxx/UPDATE-BOOT-REVIEW.md),
-# and it is in the rule 9 list. A changed copy needs a new review.
+# of the flavor-aware tool (0.2.3 and 0.2.4; review
+# plan/uc-pxx/KERNEL-FLAVOR-SWITCH-REVIEW-2026-11-18.md, the form of
+# UPDATE-BOOT-REVIEW.md). A changed copy needs a new review.
 # uc-pxx-post-update is the board step of tsx-autoupdate (POST-UPDATE-REVIEW,
-# round 3). It is in boot-control.sha256 too, so its own sha256sum -c also
-# checks itself.
+# round 3; 0.2.3 and 0.2.4: the flavor check before the arm and the new
+# TOOL_SHA, the same review). It is in boot-control.sha256 too, so its own sha256sum -c
+# also checks itself.
 # uc-pxx-slot decides the slot for the hook (and, as its own copy, for the
 # initramfs): it is in boot-control.sha256 (MAINLINE-STEP2-DESIGN review F10).
 # uc-pxx-arm-slot and uc-pxx-flash-boot parse the slot themselves (they do
-# not run it).
+# not run it). uc-pxx-arm-slot (0.2.4) and uc-pxx-bootctl (0.2.4) refuse an
+# A/B write without the eMMC reliable write (BOOTCTL-RELWRITE-REVIEW,
+# ARM-ONLY-RESTART-FILES-REVIEW); the mark hook (0.2.4) checks the same rule.
 # scripts/check-apk-pins.sh checks the same list in the built .apk.
 _pins="
-11c2afcd0272f9c989f9825074186a2341d0a33a34e0fe9ebf92cf0081f9efa7 bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
-726d567556b1386bee4d60a5052e28fec02676f4c044f717ea096a8ce1e7e916 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
+2a8a106618705be6bead7e26c73ee813f657d9e815b24650f4b3be3ad9d0cfce bundle:uc-pxx-bootctl usr/sbin/uc-pxx-bootctl
+8235066be0e4de2f785a1a5778b0aa925077c2d00f6498e93b18476bfb79c8e8 tag:rootfs/overlay/etc/uc-pxx-mark-boot.sh etc/uc-pxx-mark-boot.sh
 15d7588c6f6dd9bea3bb8fbccf4e4d4c8986c7e20973f806c71ba530e78f59f4 tag:rootfs/overlay/etc/init.d/uc-pxx-boot-ok etc/init.d/uc-pxx-boot-ok
 2fad02b3d825706affabac71c45a2a04d2143970dcf014c1586593c11dfd6fee tag:rootfs/overlay/usr/sbin/uc-pxx-flash-boot usr/sbin/uc-pxx-flash-boot
 818e5d1b2784c98182c9dbdff95e684e56baa0490948e33e9f6ff8cb18495c7f tag:rootfs/overlay/usr/sbin/uc-pxx-arm-slot usr/sbin/uc-pxx-arm-slot
-4de04b78b8a48a4cf4d79f22f18f2f69a6932a36398e4ba6ec0ac175483b3703 local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
-a512a311af2ddfa8a08be74cb19c7aebee8d4de773f59e5c98885dc3924836f3 tag:rootfs/overlay/usr/sbin/uc-pxx-post-update usr/sbin/uc-pxx-post-update
+b7e9304cd17b01b636e7120fdb40bc167e67eea0b64a441e1062d72a836b9ddc local:uc-pxx-update-boot usr/sbin/uc-pxx-update-boot
+a188f10a5ad3dfc26225d2d3f4996ec200a2745678c6d6a184906f23590a9ef1 tag:rootfs/overlay/usr/sbin/uc-pxx-post-update usr/sbin/uc-pxx-post-update
 cfec605c6d4042b36aa9882efa3bf8ee1f5a186ad3a06b07a7cc351b796abe2e tag:rootfs/overlay/usr/sbin/uc-pxx-slot usr/sbin/uc-pxx-slot
 "
 
@@ -173,7 +211,7 @@ package() {
 }
 
 sha512sums="
-8759a6cfc745266e043a5b59a1cdb939cec328eb45a10b59e8e27b328497e07a745a6d2cb1d3c51055b79b8f179acd0af7d31a5193affa80741b8955fa8b60d8  uc-pxx-linux-0.2.4.tar.gz
-a8676408b25506371fa0741aae9a208f754bb48064e742136b35b337689c7094b625800e09e549fb2bc1ba32a9b7cea4639960ae92c1f4849987436e43649267  uc-pxx-tools-bundle.tar.zst
-409676d291651f98e55853416f6180a78e905cf859f178f0e4af908700b08c993a4aac5412025ddf019cea67e1c12fadd1e12fcf8843e4784bdfedf0805d3bc8  uc-pxx-update-boot
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  uc-pxx-linux-0.2.5.tar.gz
+92c27e000d623345acbc5d5070d84c7ccedec46b328ef5c2caa30fa83a87866bb72af6c2df1b8ab9b2d95d9f7fff3b2a0ad8fa5bd6aa92290fb3280241b7e618  uc-pxx-tools-bundle.tar.zst
+178b13ac3be8a2c99c85e625167656f41801c0ce2f438bee43ec8dd4e43f8e8c497bdfcef8afc89f798b79cb15cdb271ca77922fa8bfe91dfda5af7cebd43ec5  uc-pxx-update-boot
 "

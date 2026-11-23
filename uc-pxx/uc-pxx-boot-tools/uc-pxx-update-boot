@@ -2,20 +2,34 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 """uc-pxx-update-boot: put the boot image of the kernel package into boot_a.
 
-The kernel package (uc-pxx-kernel-lts) ships /boot/uc-pxx-lts.img without the
-Rockchip resource for U-Boot. The resource derives from vendor files, so no
-package holds it. This tool takes the resource from the "second" part of the
-stock boot image in boot_b of this unit, puts it into a copy of the package
-image, and writes the copy into boot_a only through the reviewed wrappers:
-first uc-pxx-arm-slot, then uc-pxx-flash-boot IMAGE SHA256. The tool itself
-opens every block device read only.
+The kernel packages (uc-pxx-kernel-lts, uc-pxx-kernel-stable) ship
+/boot/uc-pxx-lts.img and /boot/uc-pxx-stable.img without the Rockchip
+resource for U-Boot. The resource derives from vendor files, so no package
+holds it. This tool takes the resource from the "second" part of the stock
+boot image in boot_b of this unit, puts it into a copy of the package image
+of the selected flavor, and writes the copy into boot_a only through the
+reviewed wrappers: first uc-pxx-arm-slot, then uc-pxx-flash-boot IMAGE
+SHA256. The tool itself opens every block device read only.
+
+The flavor: KERNEL_FLAVOR in /data/tsx/panel.conf (tsx-config), read as
+`tsx-config get` reads it. Not set or empty = lts. lts uses
+/boot/uc-pxx-lts.img and /usr/share/uc-pxx/kernel-lts.release, stable uses
+/boot/uc-pxx-stable.img and /usr/share/uc-pxx/kernel-stable.release: two
+fixed pairs, no other path. Any other value is refused before anything is
+armed or written. When KERNEL_FLAVOR is stable and /boot/uc-pxx-stable.img
+does not exist (uc-pxx-kernel-stable is not installed), the tool uses the
+LTS image and says so. It never uses the stable image unless KERNEL_FLAVOR
+is stable. The image of either flavor passes the same checks.
 
 The resource must be one that has booted on that model. RESOURCES lists their
 sha256 values. The tool refuses every other resource, and it has no option to
 skip this check: a new resource needs a new review and a new entry.
 
-  uc-pxx-update-boot [status]       show the package image, boot_a and boot_b.
-                                    Read only.
+  uc-pxx-update-boot [status]       show the flavor, the package image, boot_a
+                                    and boot_b. Read only.
+  uc-pxx-update-boot flavor         check KERNEL_FLAVOR and show the flavor
+                                    and the image that a write uses. Reads
+                                    only panel.conf and /boot (no device).
   uc-pxx-update-boot check          make the image in /run/uc-pxx and check it.
                                     The eMMC is only read.
   uc-pxx-update-boot write [--yes]  make and check the image, show the checks,
@@ -23,8 +37,10 @@ skip this check: a new resource needs a new review and a new entry.
                                     uc-pxx-flash-boot. Without --yes it asks on
                                     the terminal. Reboot after it to start the
                                     new kernel.
-  uc-pxx-update-boot --hook         the install and upgrade scripts of the
-                                    kernel package: report only, never write.
+  uc-pxx-update-boot --hook [lts|stable]
+                                    the install and upgrade scripts of the
+                                    kernel package of that flavor (no flavor:
+                                    lts): report only, never write.
   uc-pxx-update-boot assemble TEMPLATE RESOURCE OUT
                                     no device access: put RESOURCE into the
                                     package image TEMPLATE (for an installer
@@ -40,6 +56,7 @@ skip this check: a new resource needs a new review and a new entry.
 Exit status:
    0  done, or nothing to do
    1  refused before uc-pxx-arm-slot ran: nothing was armed or written
+      (also: KERNEL_FLAVOR is not lts, stable or empty)
    2  usage
   1N  uc-pxx-arm-slot exited with N (11: refused or failed, 13: the A/B state
       is unknown). boot_a was not written. Slot A may be armed (trying).
@@ -52,8 +69,8 @@ Exit status:
 
 Test hooks (environment, ignored when the tool runs as root): UC_PXX_SYSBLOCK,
 UC_PXX_DEVDIR, UC_PXX_ROOT, UC_PXX_DT_COMPATIBLE, UC_PXX_RUNDIR,
-UC_PXX_BOOT_IMAGE, UC_PXX_RELEASE_FILE, UC_PXX_ARM_SLOT, UC_PXX_FLASH_BOOT,
-UC_PXX_BOOTCTL, UC_PXX_TEST_NONROOT.
+UC_PXX_BOOT_DIR, UC_PXX_SHARE_DIR, UC_PXX_PANEL_CONF, UC_PXX_ARM_SLOT,
+UC_PXX_FLASH_BOOT, UC_PXX_BOOTCTL, UC_PXX_TEST_NONROOT.
 """
 import errno
 import fcntl
@@ -83,8 +100,9 @@ DEVDIR = setting("UC_PXX_DEVDIR", "/dev")
 ROOT = setting("UC_PXX_ROOT", "/")
 DT_COMPATIBLE = setting("UC_PXX_DT_COMPATIBLE", "/proc/device-tree/compatible")
 RUNDIR = setting("UC_PXX_RUNDIR", "/run/uc-pxx")
-BOOT_IMAGE = setting("UC_PXX_BOOT_IMAGE", "/boot/uc-pxx-lts.img")
-RELEASE_FILE = setting("UC_PXX_RELEASE_FILE", "/usr/share/uc-pxx/kernel-lts.release")
+BOOT_DIR = setting("UC_PXX_BOOT_DIR", "/boot")
+SHARE_DIR = setting("UC_PXX_SHARE_DIR", "/usr/share/uc-pxx")
+PANEL_CONF = setting("UC_PXX_PANEL_CONF", "/data/tsx/panel.conf")
 ARM_SLOT = setting("UC_PXX_ARM_SLOT", "/usr/sbin/uc-pxx-arm-slot")
 FLASH_BOOT = setting("UC_PXX_FLASH_BOOT", "/usr/sbin/uc-pxx-flash-boot")
 BOOTCTL = setting("UC_PXX_BOOTCTL", "/usr/sbin/uc-pxx-bootctl")
@@ -111,6 +129,11 @@ RESOURCES = {
     "crestron,uc-p8": (),
 }
 SIGNALS = (signal.SIGINT, signal.SIGHUP, signal.SIGTERM, signal.SIGQUIT)
+# The kernel flavors. The first one is the default (KERNEL_FLAVOR not set or
+# empty) and the only one a missing package image falls back to.
+FLAVORS = ("lts", "stable")
+DEFAULT_FLAVOR = FLAVORS[0]
+MAX_CONF = 1024 * 1024
 
 
 class Refuse(Exception):
@@ -458,19 +481,93 @@ def boot_a_holds(p, img):
     return hashlib.sha256(got).hexdigest() == hashlib.sha256(img).hexdigest()
 
 
-def load_template():
+# --- the kernel flavor -------------------------------------------------------
+
+def flavor_files(flavor):
+    """The package image and the release file of FLAVOR (one of FLAVORS)."""
+    if flavor not in FLAVORS:
+        raise Refuse("no kernel flavor %s" % flavor)
+    return (os.path.join(BOOT_DIR, "uc-pxx-%s.img" % flavor),
+            os.path.join(SHARE_DIR, "kernel-%s.release" % flavor))
+
+
+def conf_value(text, key):
+    """The value of KEY in the text of panel.conf, as cfg_get of tsx-config
+    reads it: blank lines and lines that start with # are skipped; a line is
+    trimmed (spaces at both ends, every CR) and matches when it starts with
+    KEY=; the value is the trimmed text after the first =, without one pair
+    of double quotes (then \\" is " and \\\\ is \\) or of single quotes; the
+    last match wins. None when no line matches. Nothing in the file runs."""
+    ws = " \t\n\v\f\r"
+    val = None
+    for raw in text.split("\n"):
+        line = raw.strip(ws).replace("\r", "")
+        if not line or line.startswith("#") or not line.startswith(key + "="):
+            continue
+        v = line.split("=", 1)[1].strip(ws).replace("\r", "")
+        if len(v) >= 2 and v[0] == v[-1] == '"':
+            v = v[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+        elif len(v) >= 2 and v[0] == v[-1] == "'":
+            v = v[1:-1]
+        val = v
+    return val
+
+
+def selected_flavor():
+    """(the KERNEL_FLAVOR text or None, the flavor that a write uses, a note
+    or ""). Refuse a value that is not lts, stable or empty, and a
+    panel.conf that cannot be read (a missing file is "not set")."""
     try:
-        with open(BOOT_IMAGE, "rb") as f:
+        st = os.stat(PANEL_CONF)
+    except FileNotFoundError:
+        raw = None
+    except OSError as e:
+        raise Refuse("cannot read %s: %s" % (PANEL_CONF, e.strerror))
+    else:
+        if not stat.S_ISREG(st.st_mode):
+            raise Refuse("%s is not a regular file" % PANEL_CONF)
+        if st.st_size > MAX_CONF:
+            raise Refuse("%s has %d bytes, more than %d" % (PANEL_CONF, st.st_size, MAX_CONF))
+        try:
+            with open(PANEL_CONF, "rb") as f:
+                text = f.read(MAX_CONF + 1)
+        except OSError as e:
+            raise Refuse("cannot read %s: %s" % (PANEL_CONF, e.strerror))
+        if len(text) > MAX_CONF:
+            raise Refuse("%s has more than %d bytes" % (PANEL_CONF, MAX_CONF))
+        raw = conf_value(text.decode("latin-1"), "KERNEL_FLAVOR")
+    want = raw or DEFAULT_FLAVOR
+    if want not in FLAVORS:
+        raise Refuse("KERNEL_FLAVOR=%s in %s is not lts, stable or empty"
+                     % (ascii(raw[:40]), PANEL_CONF))
+    img = flavor_files(want)[0]
+    if want != DEFAULT_FLAVOR and not os.path.lexists(img):
+        return raw, DEFAULT_FLAVOR, ("KERNEL_FLAVOR is %s, but %s does not exist (uc-pxx-kernel-%s is not "
+                                     "installed): the %s kernel is used" % (want, img, want, DEFAULT_FLAVOR))
+    return raw, want, ""
+
+
+def say_flavor(raw, flavor, note):
+    shown = "not set" if raw is None else ("empty" if raw == "" else raw)
+    say("kernel flavor: %s (KERNEL_FLAVOR %s in %s), image %s" % (flavor, shown, PANEL_CONF, flavor_files(flavor)[0]))
+    if note:
+        say(note)
+
+
+def load_template(flavor):
+    image = flavor_files(flavor)[0]
+    try:
+        with open(image, "rb") as f:
             data = f.read()
     except OSError as e:
-        raise Refuse("cannot read %s (is uc-pxx-kernel-lts installed?): %s" % (BOOT_IMAGE, e.strerror))
+        raise Refuse("cannot read %s (is uc-pxx-kernel-%s installed?): %s" % (image, flavor, e.strerror))
     h = check_template(data)
     return data, h
 
 
-def package_release():
+def package_release(flavor):
     try:
-        with open(RELEASE_FILE) as f:
+        with open(flavor_files(flavor)[1]) as f:
             return f.read().strip()
     except OSError:
         return ""
@@ -585,13 +682,16 @@ def prepare():
     why = installed_panel()
     if why:
         raise Refuse("not on an installed UC-P panel: " + why)
-    data, h = load_template()
+    raw, flavor, note = selected_flavor()
+    say_flavor(raw, flavor, note)
+    image, release_file = flavor_files(flavor)
+    data, h = load_template(flavor)
     token = h["name"].decode()
     model = dtb_model(data, h)
     rel = linux_release(data, h)
-    want_rel = package_release()
+    want_rel = package_release(flavor)
     if want_rel and rel != want_rel:
-        raise Refuse("the package image has kernel %s, %s says %s" % (rel or "?", RELEASE_FILE, want_rel))
+        raise Refuse("the package image has kernel %s, %s says %s" % (rel or "?", release_file, want_rel))
     here = running_model()
     if model != here:
         raise Refuse("the package image is for %s, this unit is %s" % (model, here or "not a UC-P"))
@@ -603,22 +703,24 @@ def prepare():
     if len(img) > pa[1] * 512:
         raise Refuse("the image (%d bytes) is larger than boot_a" % len(img))
     sha = hashlib.sha256(img).hexdigest()
-    say("package image: %s, kernel %s, model %s, token %s" % (BOOT_IMAGE, rel, model, token))
+    say("package image: %s, kernel %s, model %s, token %s" % (image, rel, model, token))
     say("resource from boot_b (header version %d): %d bytes, sha256 %s (approved for %s), entries %s"
         % (hb["version"], len(res), res_sha, model, " ".join(names)))
     say("image: %d bytes (limit %d), sha256 %s" % (len(img), MAX_IMAGE, sha))
     say("boot_a (%s): token %s" % (pa[0], a_token or "none"))
-    return dict(token=token, model=model, release=rel, size=len(img), sha=sha, boot_a=pa, img=img)
+    return dict(token=token, model=model, release=rel, size=len(img), sha=sha, boot_a=pa, img=img, flavor=flavor)
 
 
 def cmd_status():
     why = installed_panel()
     data = None
     try:
-        data, h = load_template()
+        raw, flavor, note = selected_flavor()
+        say_flavor(raw, flavor, note)
+        data, h = load_template(flavor)
         model = dtb_model(data, h)
         say("package image: %s, kernel %s, model %s, token %s"
-            % (BOOT_IMAGE, linux_release(data, h) or "?", model, h["name"].decode()))
+            % (flavor_files(flavor)[0], linux_release(data, h) or "?", model, h["name"].decode()))
     except Refuse as e:
         say(str(e))
         data = None
@@ -645,14 +747,31 @@ def cmd_status():
     return 0
 
 
-def cmd_hook():
-    """Report for the package scripts. Never writes, always exits 0."""
+def cmd_flavor():
+    """Check KERNEL_FLAVOR and show the flavor of a write. No device access."""
+    raw, flavor, note = selected_flavor()
+    say_flavor(raw, flavor, note)
+    return 0
+
+
+def cmd_hook(pkg_flavor):
+    """Report for the scripts of the kernel package of PKG_FLAVOR. Never
+    writes, always exits 0."""
     try:
         why = installed_panel()
         if why:
             say("not on an installed UC-P panel (%s). Nothing written." % why)
             return 0
-        data, h = load_template()
+        raw, flavor, note = selected_flavor()
+        if flavor != pkg_flavor:
+            say_flavor(raw, flavor, note)
+            say("uc-pxx-kernel-%s: the update path writes the %s kernel, not this one. Nothing written."
+                % (pkg_flavor, flavor))
+            if pkg_flavor != DEFAULT_FLAVOR:
+                say("To switch: tsx-config set KERNEL_FLAVOR %s, then tsx-autoupdate post-update, then restart."
+                    % pkg_flavor)
+            return 0
+        data, h = load_template(flavor)
         token = h["name"].decode()
         _, a_token = boot_a_info()
         if a_token == token:
@@ -756,7 +875,7 @@ def write_locked(folder, yes):
         say("Read the message of uc-pxx-flash-boot above before a reboot. The image stays in %s." % path)
         return 20 + min(rc, 9)
     safe_unlink(path)
-    say("done: boot_a holds kernel %s (token %s). Slot A is trying." % (f["release"], f["token"]))
+    say("done: boot_a holds kernel %s (token %s, flavor %s). Slot A is trying." % (f["release"], f["token"], f["flavor"]))
     say("Reboot to start it. After a healthy boot the hook marks slot A. A bad kernel falls back to slot B.")
     return 0
 
@@ -813,8 +932,10 @@ def main(argv):
     try:
         if not args or args == ["status"]:
             return cmd_status()
-        if args == ["--hook"]:
-            return cmd_hook()
+        if args[0] == "--hook" and args[1:] in ([], ["lts"], ["stable"]):
+            return cmd_hook((args[1:] or [DEFAULT_FLAVOR])[0])
+        if args == ["flavor"]:
+            return cmd_flavor()
         if args == ["check"]:
             return cmd_check()
         if args[0] == "write" and args[1:] in ([], ["--yes"]):

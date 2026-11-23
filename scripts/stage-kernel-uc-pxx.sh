@@ -1,17 +1,20 @@
 #!/bin/bash
-# Stage the bundle of uc-pxx/uc-pxx-kernel-lts from an already built kernel:
-# uc-pxx-kernel-lts-bundle.tar.zst in the dist/ folder of the recipe. Then
-# update the recipe (pkgver, pkgrel, _kernelrelease, _kbundle_tag,
-# sha512sums).
+# Stage the bundle of uc-pxx/uc-pxx-kernel-FLAVOR from an already built
+# kernel: uc-pxx-kernel-FLAVOR-bundle.tar.zst in the dist/ folder of the
+# recipe. Then update the recipe (pkgver, pkgrel, _kernelrelease,
+# _kbundle_tag, sha512sums).
 #
-#   scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX
+#   scripts/stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX [FLAVOR]
 #   KOUT          the --out folder of ci/build-kernel.sh of uc-pxx-linux:
 #                 Image, rk3399-crestron-ucp10.dtb, rk3399-crestron-ucp8.dtb,
 #                 kernel.release, kernel.commit, modules-<release>.tar.gz and
 #                 sha256sums.txt
 #   UC_PXX_LINUX  a checkout of uc-pxx-linux (or an archive of one commit)
-#                 whose kernel/KERNEL_REV.lts is the commit of the kernel. Its
-#                 kernel/mkimage.sh makes the boot images.
+#                 whose kernel/KERNEL_REV.FLAVOR is the commit of the kernel.
+#                 Its kernel/mkimage.sh makes the boot images.
+#   FLAVOR        lts (the default, uc-pxx-kernel-lts) or stable
+#                 (uc-pxx-kernel-stable). The boot images are
+#                 uc-pxx-<model>-FLAVOR.img.
 #
 # Nothing is compiled except the shim of kernel/mkimage.sh. Run the script on
 # the build host (it needs aarch64-linux-gnu-gcc, mkbootimg, fdtget, fdtput
@@ -35,13 +38,15 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 REPO=$(cd "$HERE/.." && pwd)
 KOUT=${1:?usage: stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX}
-SRC=${2:?usage: stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX}
+SRC=${2:?usage: stage-kernel-uc-pxx.sh KOUT UC_PXX_LINUX [FLAVOR]}
+FLAVOR=${3:-lts}
+case $FLAVOR in lts|stable) ;; *) echo "stage-kernel-uc-pxx: FLAVOR must be lts or stable, not $FLAVOR" >&2; exit 2;; esac
 # kernel/mkimage.sh of uc-pxx-linux as reviewed with the boot control (it
 # writes the build token)
 MKIMAGE_SHA256=98ef579ce1f152463c8902c53c2f2f8edfbdfd6b8a0d40d650c59844d893703f
-PKGDIR=$REPO/uc-pxx/uc-pxx-kernel-lts
+PKGDIR=$REPO/uc-pxx/uc-pxx-kernel-$FLAVOR
 APKBUILD=$PKGDIR/APKBUILD
-BUNDLE=uc-pxx-kernel-lts-bundle.tar.zst
+BUNDLE=uc-pxx-kernel-$FLAVOR-bundle.tar.zst
 TOOL=$REPO/uc-pxx/uc-pxx-boot-tools/uc-pxx-update-boot
 say() { echo "[stage-kernel-uc-pxx] $*"; }
 die() { echo "stage-kernel-uc-pxx: $*" >&2; exit 1; }
@@ -53,12 +58,13 @@ KREL=$(cat "$KOUT/kernel.release")
 KCOMMIT=$(cat "$KOUT/kernel.commit")
 [ -f "$KOUT/modules-$KREL.tar.gz" ] || die "no $KOUT/modules-$KREL.tar.gz"
 (cd "$KOUT" && sha256sum -c --quiet sha256sums.txt) || die "$KOUT does not match its sha256sums.txt"
-PIN=$(grep -v '^#' "$SRC/kernel/KERNEL_REV.lts" | head -n 1 | tr -d ' \n')
-[ "$PIN" = "$KCOMMIT" ] || die "the kernel is $KCOMMIT, kernel/KERNEL_REV.lts of $SRC pins $PIN"
+[ -f "$SRC/kernel/KERNEL_REV.$FLAVOR" ] || die "no $SRC/kernel/KERNEL_REV.$FLAVOR"
+PIN=$(grep -v '^#' "$SRC/kernel/KERNEL_REV.$FLAVOR" | head -n 1 | tr -d ' \n')
+[ "$PIN" = "$KCOMMIT" ] || die "the kernel is $KCOMMIT, kernel/KERNEL_REV.$FLAVOR of $SRC pins $PIN"
 GOT=$(sha256sum "$SRC/kernel/mkimage.sh" | cut -d' ' -f1)
 [ "$GOT" = "$MKIMAGE_SHA256" ] || die "$SRC/kernel/mkimage.sh has sha256 $GOT, the reviewed file is $MKIMAGE_SHA256"
 TOKEN=${UC_PXX_TOKEN:-ucpxx-$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')}
-say "kernel $KREL ($KCOMMIT), token $TOKEN"
+say "flavor $FLAVOR, kernel $KREL ($KCOMMIT), token $TOKEN"
 
 W=$(mktemp -d)
 trap 'rm -rf "$W"' EXIT
@@ -66,17 +72,17 @@ mkdir "$W/b"
 : > "$W/empty.res"
 for m in ucp10 ucp8; do
 	bash "$SRC/kernel/mkimage.sh" --resource "$W/empty.res" --board "$TOKEN" \
-		"$KOUT/Image" "$KOUT/rk3399-crestron-$m.dtb" "$W/b/uc-pxx-$m-lts.img"
-	info=$(python3 -I "$TOOL" inspect "$W/b/uc-pxx-$m-lts.img") || die "uc-pxx-$m-lts.img fails the check of uc-pxx-update-boot"
+		"$KOUT/Image" "$KOUT/rk3399-crestron-$m.dtb" "$W/b/uc-pxx-$m-$FLAVOR.img"
+	info=$(python3 -I "$TOOL" inspect "$W/b/uc-pxx-$m-$FLAVOR.img") || die "uc-pxx-$m-$FLAVOR.img fails the check of uc-pxx-update-boot"
 	want="crestron,uc-p${m#ucp}"
 	grep -qx "token=$TOKEN" <<<"$info" && grep -qx "model=$want" <<<"$info" && grep -qx "release=$KREL" <<<"$info" ||
-		die "uc-pxx-$m-lts.img: $info (expected $TOKEN, $want, $KREL)"
-	say "uc-pxx-$m-lts.img: $want, $(stat -c %s "$W/b/uc-pxx-$m-lts.img") bytes"
+		die "uc-pxx-$m-$FLAVOR.img: $info (expected $TOKEN, $want, $KREL)"
+	say "uc-pxx-$m-$FLAVOR.img: $want, $(stat -c %s "$W/b/uc-pxx-$m-$FLAVOR.img") bytes"
 done
 cp "$KOUT/rk3399-crestron-ucp10.dtb" "$KOUT/rk3399-crestron-ucp8.dtb" "$KOUT/modules-$KREL.tar.gz" \
 	"$KOUT/kernel.release" "$KOUT/kernel.commit" "$W/b/"
 echo "$TOKEN" > "$W/b/token.txt"
-FILES="uc-pxx-ucp10-lts.img uc-pxx-ucp8-lts.img rk3399-crestron-ucp10.dtb rk3399-crestron-ucp8.dtb modules-$KREL.tar.gz kernel.release kernel.commit token.txt"
+FILES="uc-pxx-ucp10-$FLAVOR.img uc-pxx-ucp8-$FLAVOR.img rk3399-crestron-ucp10.dtb rk3399-crestron-ucp8.dtb modules-$KREL.tar.gz kernel.release kernel.commit token.txt"
 # shellcheck disable=SC2086 # one word per file
 (cd "$W/b" && sha256sum $FILES > CHECKSUMS.sha256)
 # shellcheck disable=SC2086
@@ -106,4 +112,4 @@ sed -i \
 grep -q "^$SUM  $BUNDLE\$" "$APKBUILD" || die "no sha512sums line for $BUNDLE in $APKBUILD"
 say "pkgver=$PKGVER pkgrel=$PKGREL (was $OLDVER-r$OLDREL, $OLDKREL), _kbundle_tag=uc-pxx-kernel-$DATE"
 say "bundle $(stat -c %s "$PKGDIR/dist/$BUNDLE") bytes, sha512 ${SUM:0:16}..."
-say "done. Build with scripts/build.sh uc-pxx/uc-pxx-kernel-lts"
+say "done. Build with scripts/build.sh uc-pxx/uc-pxx-kernel-$FLAVOR"

@@ -35,6 +35,15 @@ mk put "$T/img" boot/uc-pxx-lts.img
 sh "$S" "$T/p.apk" >/dev/null 2>&1 && ok "a listed kernel Image passes" || bad "a listed kernel Image refused"
 python3 -I -c 'import sys; d = bytearray(open(sys.argv[1], "rb").read()); d[2048 + 0x200000] ^= 1; open(sys.argv[1], "wb").write(d)' "$T/img"; mk put "$T/img" boot/uc-pxx-lts.img
 sh "$S" "$T/p.apk" >/dev/null 2>&1 && bad "an unlisted kernel Image passed" || ok "an unlisted kernel Image refused"
+# the stable flavor: its own linux-image line, an LTS line does not cover it
+python3 -I -c 'import sys; d = bytearray(open(sys.argv[1], "rb").read()); d[2048 + 0x200000] ^= 1; open(sys.argv[1], "wb").write(d)' "$T/img"; mk put "$T/img" boot/uc-pxx-stable.img
+sh "$S" "$T/p.apk" >/dev/null 2>&1 && bad "a stable Image with only an LTS line passed" || ok "a stable Image needs its own line (an LTS line does not cover it)"
+printf '%s linux-image:boot/uc-pxx-stable.img # test\n' "$L" >> "$T/list"
+sh "$S" "$T/p.apk" >/dev/null 2>&1 && ok "a listed stable kernel Image passes" || bad "a listed stable kernel Image refused"
+mk sh -c "mkdir -p $T/r/boot; ln -s uc-pxx-lts.img $T/r/boot/uc-pxx-stable.img"
+sh "$S" "$T/p.apk" >/dev/null 2>&1 && bad "a link at the stable image path passed" || ok "a link at the stable image path refused"
+mk sh -c "mkdir -p $T/r/boot; ln -s uc-pxx-stable.img $T/r/boot/uc-pxx-lts.img"
+sh "$S" "$T/p.apk" >/dev/null 2>&1 && bad "a link at the LTS image path passed" || ok "a link at the LTS image path refused"
 mk put "$T/other" usr/libexec/uc-pxx-step2/uc-pxx-step2
 TSX_ALLOW_UNREVIEWED_PINS=1 sh "$S" "$T/p.apk" >/dev/null 2>&1 && bad "a step-2 file in a package passed" || ok "uc-pxx-step2 is never in a package, also with the override"
 mk put "$T/other" usr/sbin/uc-pxx-bootctl-inst
