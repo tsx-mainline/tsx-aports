@@ -1,0 +1,92 @@
+# Contributor: unex <7575866+unex@users.noreply.github.com>
+# Maintainer: unex <7575866+unex@users.noreply.github.com>
+#
+# BINARY packaging of an already-built kernel: no compiler runs in this
+# APKBUILD. source= is ONE release asset of this repository (tsx-aports),
+# uc-pxx-kernel-stable-bundle.tar.zst of the release _kbundle_tag.
+# ../../scripts/stage-kernel-uc-pxx.sh (flavor stable) makes the bundle on the
+# build host from the output of ci/build-kernel.sh --flavor stable of
+# uc-pxx-linux (README.md "uc-pxx kernel package"). The bundle holds the boot
+# image of each model (uc-pxx-<model>-stable.img, from kernel/mkimage.sh of
+# uc-pxx-linux), the two device trees, the modules tree tarball,
+# kernel.release, kernel.commit, the build token and CHECKSUMS.sha256.
+#
+# This is the stable flavor (Linux 7.3.y, branch uc-pxx-stable). It installs
+# next to uc-pxx-kernel-lts: its own /boot/uc-pxx-stable.img,
+# /lib/modules/<release>/, /usr/share/uc-pxx/kernel-stable.release and
+# /usr/share/uc-pxx/dtbs-stable/. No file is shared with the LTS package.
+#
+# THE BOOT IMAGE HAS NO RESOURCE. The Rockchip resource for U-Boot (the
+# "second" part of the image) derives from vendor files, so no package holds
+# it. The image in this package has an empty second part. It is not a
+# complete boot image: never write it to a partition as it is.
+#
+# THE FLAVOR SWITCH. uc-pxx-update-boot of uc-pxx-boot-tools 0.2.4 (the depends
+# below) writes the image of this package into boot_a only when KERNEL_FLAVOR
+# of tsx-config is stable, through the update path (tsx-autoupdate, then
+# uc-pxx-post-update: arm slot A, write boot_a, check A/B, restart; slot B
+# stays the fallback). With another KERNEL_FLAVOR this package is inert. The
+# install and upgrade scripts of this package write NOTHING: they run
+# uc-pxx-update-boot --hook stable, which only reports. uc-pxx-kernel-lts
+# stays installed (uc-pxx-board depends on it), so a switch back to lts
+# needs no package change. uc-pxx-linux docs/boot-control.md "Kernel
+# flavors" tells the steps.
+#
+# A local build uses the staged file in dist/: SRCDEST below makes abuild use
+# that file (checked by sha512sums) and not the network. The stage script
+# fills in pkgver, pkgrel, _kernelrelease and sha512sums below: do not edit
+# them by hand. The sum at the end is that of the bundle, the asset of the
+# release _kbundle_tag. Attach the staged bundle without a change.
+SRCDEST="$startdir/dist"
+#
+# pkgver: <upstream kernel version>_git<YYYYMMDD> (the staging date), as for
+# uc-pxx-kernel-lts. _kernelrelease records the exact build.
+pkgname=uc-pxx-kernel-stable
+pkgver=7.3.5_git20261121
+pkgrel=1
+# 7.3.5_git20261121-r0: the first stable build, kernel commit 1217d359257b
+# (uc-pxx-stable on v7.3.5: the 21 commits of uc-pxx-lts d02e92631f28 that
+# v7.3.5 does not have, and the five candidate fixes of
+# uc-pxx-lts-fixes-rc10c 0ce5be1fcde6), the both-slot initramfs 4d351397.
+# NOT BOOTED ON HARDWARE.
+# 7.3.5_git20261121-r1: the testing publish of the same bundle (the release
+# uc-pxx-kernel-20261121, the sum below) and the same files. Only pkgrel is
+# set by hand, so that r1 sorts above the private r0 of a unit. The stage
+# script did not run again: a new staging makes a new token and a new
+# image. The files of r0 boot from slot A of a UC-P10 since 2026-11-22.
+_kernelrelease=7.3.5-g1217d359257b
+# The tsx-aports release that holds the bundle (uc-pxx-kernel-<YYYYMMDD>).
+_kbundle_tag=uc-pxx-kernel-20261121
+pkgdesc="uc-pxx mainline kernel, stable line: boot image without the resource, modules, device trees"
+url="https://github.com/tsx-mainline/linux"
+arch="aarch64"
+license="GPL-2.0-only"
+# 0.2.4: the first published uc-pxx-update-boot that reads KERNEL_FLAVOR and
+# knows --hook stable (0.2.3 was a test build only, with an older uc-pxx-arm-slot).
+depends="uc-pxx-boot-tools>=0.2.4-r0"
+options="!check"
+install="$pkgname.post-install $pkgname.post-upgrade"
+source="https://github.com/tsx-mainline/tsx-aports/releases/download/$_kbundle_tag/uc-pxx-kernel-stable-bundle.tar.zst"
+
+package() {
+	cd "$srcdir"
+	sha256sum -c CHECKSUMS.sha256 || { error "the bundle does not match its CHECKSUMS.sha256"; return 1; }
+	[ "$(cat kernel.release)" = "$_kernelrelease" ] || { error "the bundle has kernel $(cat kernel.release), the recipe says $_kernelrelease"; return 1; }
+	# The UC-P10 image. The bundle also holds the UC-P8 image, which is not
+	# packaged yet (the UC-P8 has no unit for a test).
+	install -Dm644 uc-pxx-ucp10-stable.img "$pkgdir"/boot/uc-pxx-stable.img
+	mkdir -p "$pkgdir"/usr/share/uc-pxx/dtbs-stable
+	echo "$_kernelrelease" > "$pkgdir"/usr/share/uc-pxx/kernel-stable.release
+	install -m644 rk3399-crestron-ucp10.dtb rk3399-crestron-ucp8.dtb "$pkgdir"/usr/share/uc-pxx/dtbs-stable/
+	tar -xzf modules-$_kernelrelease.tar.gz -C "$pkgdir"
+	# The bundle keeps the owner and the modes of the machine that packed it.
+	chown -R 0:0 "$pkgdir"/lib
+	chmod -R go-w "$pkgdir"/lib
+	# modules_install's build and source links point into the kernel build
+	# directory of the build machine. They mean nothing on a panel.
+	rm -f "$pkgdir"/lib/modules/$_kernelrelease/build "$pkgdir"/lib/modules/$_kernelrelease/source
+}
+
+sha512sums="
+6535e15668aefa627007cd8c1fa6763f66224b4ae494ec4b8e5ac951e63b4988a5af0969b3ade5e8d4cf086cd33133c9f6a0a6d6a64ff9a9f0d58e3fad1a802d  uc-pxx-kernel-stable-bundle.tar.zst
+"

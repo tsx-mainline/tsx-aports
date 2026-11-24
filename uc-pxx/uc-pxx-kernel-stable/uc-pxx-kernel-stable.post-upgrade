@@ -1,0 +1,12 @@
+#!/bin/sh
+# Writes NOTHING. The image of this package has no resource for U-Boot, so it
+# never goes into boot_a as it is. uc-pxx-update-boot --hook stable only says
+# which flavor the update path writes (KERNEL_FLAVOR), if boot_a holds this
+# kernel, and how to switch. tsx-autoupdate writes boot_a after the install
+# (uc-pxx-post-update), only when KERNEL_FLAVOR is stable.
+if [ -x /usr/sbin/uc-pxx-update-boot ]; then
+	/usr/sbin/uc-pxx-update-boot --hook stable
+else
+	echo "uc-pxx-kernel-stable: uc-pxx-update-boot is missing (uc-pxx-boot-tools too old?). Nothing written."
+fi
+exit 0

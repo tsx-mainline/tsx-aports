@@ -37,6 +37,18 @@ case $v in
 	done < "$T/pins";;
 esac
 case $v:$st in 0.1.*:pass|0.2.0:pass|0.2.1:"$want"|0.2.3:"$want"|0.2.4:"$want") ok "uc-pxx-boot-tools $v: $st (as the rules stand)";; *) bad "uc-pxx-boot-tools $v: $st";; esac
+# The kernel packages have no _pins: scripts/check-rules-content.sh checks the
+# Linux Image of each built kernel package against a linux-image line. From
+# 7.3.5_git20261121 the rules name the Image of uc-pxx-kernel-stable, and the
+# package needs the first boot tools that read KERNEL_FLAVOR (0.2.4).
+grep -v '^#' "$L" | awk '$2 ~ /^linux-image:/ && $2 != "linux-image:boot/uc-pxx-lts.img" && $2 != "linux-image:boot/uc-pxx-stable.img" { e = 1 } END { exit e }' \
+	&& ok "every linux-image line names boot/uc-pxx-lts.img or boot/uc-pxx-stable.img" || bad "a linux-image line with another path"
+K=$HERE/uc-pxx/uc-pxx-kernel-stable/APKBUILD
+if [ -f "$K" ]; then
+	grep -qx 'depends="uc-pxx-boot-tools>=0.2.4-r0"' "$K" && ok "uc-pxx-kernel-stable depends on uc-pxx-boot-tools>=0.2.4-r0" || bad "uc-pxx-kernel-stable: not the depends on uc-pxx-boot-tools>=0.2.4-r0"
+	grep -v '^#' "$L" | awk '$2 == "linux-image:boot/uc-pxx-stable.img" { f = 1 } END { exit !f }' \
+		&& ok "uc-pxx-kernel-stable: RULES-PINS has a stable linux-image line (as the rules stand)" || bad "uc-pxx-kernel-stable: no stable linux-image line in RULES-PINS"
+fi
 grep -qF 'check-rules-pins.sh" "$REPO/$PKGDIR/APKBUILD" || exit 1' "$HERE/scripts/build.sh" && ok "build.sh runs it before abuild" || bad "build.sh does not run it"
 echo "$N ok, $F failed"
 [ "$F" = 0 ]
