@@ -20,8 +20,14 @@
 # active central connects after an active scan.
 # 0.3.13_pre20261119: tsx-esphome and the voice satellite listen on all IPv4 addresses
 # and announce the current address over mDNS, never 0.0.0.0 (a new address within 5 s).
+# 0.3.13_pre20261126 (the setup-page security release, tsx-linux-common
+# release-0.3.13_pre20261126): the setup plugin gives the Home Assistant words of
+# the update, controls and dark-mode hints (tsx-setup 0.3.13_pre20261126 has words
+# without Home Assistant), and its header says that the origin of the page URL
+# counts for the setup login only while this plugin is loaded. The sum is zeros
+# until the tag v0.3.13_pre20261126 exists; then abuild checksum.
 pkgname=tsx-ha
-pkgver=0.3.13_pre20261119
+pkgver=0.3.13_pre20261126
 pkgrel=0
 pkgdesc="TSX Home Assistant layer: ESPHome device, MQTT, voice satellite, Bluetooth proxy and Sendspin"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -63,5 +69,5 @@ package() {
 }
 
 sha512sums="
-ca0ee47dfd4c673f932cbe433a1176baea4110753b87ce21039fafefa10bcd398d6e341d2a3a3e0acd9a94987a6ab80ce4fbeed3bedcb739992d2ef25872e20b  tsx-linux-common-0.3.13_pre20261119.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261126.tar.gz
 "

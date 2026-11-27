@@ -15,8 +15,15 @@
 # d11b30e): the Backlight slider with Auto brightness on shows Auto off without
 # a stale form, and the ALS_SCALE field says "(default of the unit)". The sum is
 # zeros until the tag v0.3.13_pre20261122 exists; then abuild checksum.
+# 0.3.13_pre20261126 (the setup-page security release, tsx-linux-common
+# release-0.3.13_pre20261126 = d11b30e + the setup-page fixes): without the tsx-ha
+# plugin only an HA_URL that a person set gives "Log in with Home Assistant" (no
+# login from the origin of KIOSK_URL); a loopback request is served only with the
+# Host 127.0.0.1, localhost or [::1] and the port of the page (else 403); the
+# update, controls and dark-mode hints name no Home Assistant without tsx-ha. The
+# sum is zeros until the tag v0.3.13_pre20261126 exists; then abuild checksum.
 pkgname=tsx-setup
-pkgver=0.3.13_pre20261122
+pkgver=0.3.13_pre20261126
 pkgrel=0
 pkgdesc="TSX on-panel setup page and its root helper"
 url="https://github.com/tsx-mainline/tsx-aports"
@@ -41,5 +48,5 @@ package() {
 }
 
 sha512sums="
-58b331621f6ddcf3cabdd59c42c74195076bf662f94ca0c7ce30ece3ee4b7fba3d6e2c5796ce71a72ed74cbcdef08aef155c56fb820e392e7afabc7595ba907f  tsx-linux-common-0.3.13_pre20261122.tar.gz
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000  tsx-linux-common-0.3.13_pre20261126.tar.gz
 "
